@@ -33,7 +33,8 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-Initial PECL release
+- Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication
+- Added the "filelist" id's to the file list tables to allow usage of page anchors in navigation.
  </notes>
   <contents>
     <dir name="/">
