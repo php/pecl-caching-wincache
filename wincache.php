@@ -40,7 +40,19 @@
  */
 define('USE_AUTHENTICATION', 1);
 define('USERNAME', 'wincache');
-define('PASSWORD', '');
+define('PASSWORD', 'wincache');
+
+/*The Basic PHP authentication will work only when IIS is configured to support 
+'Anonymous Authentication' and nothing else. If IIS is configured to support/use
+any other kind of authentication like Basic/Negotiate/Digest etc. this will not work.
+In that case please define the name of users in the array below which you would like
+to grant access in your domain/network.*/
+$user_allowed = array('DOMAIN\user1', 'DOMAIN\user2', 'DOMAIN\user3');
+
+/*If the array contains string 'all' all the users authenticated by IIS
+will have access to the page. Uncomment the below line and comment above line
+to grant access to all users who gets authenticated by IIS.*/
+/*$user_allowed = array('all');*/
 
 /** ===================== END OF CONFIGURATION SETTINGS ========================== */
 
@@ -49,26 +61,26 @@ if ( !extension_loaded( 'wincache' ) )
     die('The extension WINCACHE (php_wincache.dll) is not loaded. No statistics to show.');
 }
 
-if ( USE_AUTHENTICATION ) {
-    session_start();
-    $error_message = null;
-
-    if ( isset( $_GET['action'] ) && $_GET['action'] == 'logout' ) {
-        $old_user = $_SESSION['valid_user'];
-        unset( $_SESSION['valid_user'] );
-        session_destroy();
-    } else if ( isset( $_POST['username'] ) && isset( $_POST['password'] ) ) {
-        $username = $_POST['username'];
-        $password = $_POST['password'];
-        
-        if ( $password == '' ){
-            $error_message = 'Cannot use an empty password. Set the non-empty password';
-            $error_message .= ' in the beginning of the wincache.php file, e.g.: define(\'PASSWORD\', \'mypassword\');';
-        } else if ( $username == USERNAME && $password == PASSWORD ) {
-            $_SESSION['valid_user'] = $username;
-        } else {
-            $error_message = 'Cannot log you in. Incorrect user name or password.';
-        }
+if ( USE_AUTHENTICATION == 1 ) {
+	if (!empty($_SERVER['AUTH_TYPE']) && !empty($_SERVER['REMOTE_USER']) && strcasecmp($_SERVER['REMOTE_USER'], 'anonymous'))
+	{
+		if (!in_array(strtolower($_SERVER['REMOTE_USER']), array_map('strtolower', $user_allowed))
+		&& !in_array('all', array_map('strtolower', $user_allowed)))
+		{
+			echo 'You are not authorised to view this page. Please contact server admin to get permission. Exiting.';
+			exit;
+		}
+	}
+    else if ( !isset($_SERVER['PHP_AUTH_USER'] ) || !isset( $_SERVER['PHP_AUTH_PW'] ) ||	
+    $_SERVER['PHP_AUTH_USER'] != USERNAME || $_SERVER['PHP_AUTH_PW'] != PASSWORD ) {
+        header( 'WWW-Authenticate: Basic realm="WINCACHE Log In!"' );
+        header( 'HTTP/1.0 401 Unauthorized' );
+        exit;
+    }
+    else if ( $_SERVER['PHP_AUTH_PW'] == 'wincache' )
+    {
+        echo "Please change the default password to get this page working. Exiting.";
+        exit;
     }
 }
 
@@ -417,9 +429,6 @@ body {
 h1 {
     font-size: 2em;
 }
-h2 {
-    font-size: 1.5em;
-}
 #content {
     width: 880px;
     margin: 1em;
@@ -513,12 +522,6 @@ th {
     background-color: #E7E7E7;
     color: #000000;
 }
-#logon{
-    width: 500px;
-    background-color: #E7E7E7;
-    border: 1px solid black;
-    padding: 10px;
-}
 .clear{
     clear: both;
 }
@@ -532,7 +535,6 @@ th {
     <div id="header">
         <h1>Windows Cache Extension for PHP - Statistics</h1>
     </div>
-<?php if ( !USE_AUTHENTICATION || isset( $_SESSION['valid_user'] ) ) {?>
     <div id="menu">
         <ul>
             <li <?php echo ($page == SUMMARY_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', SUMMARY_DATA; ?>">Summary</a></li>
@@ -542,7 +544,7 @@ th {
         </ul>
     </div>
 <?php if ( $page == SUMMARY_DATA ) { 
-          init_cache_info( SUMMARY_DATA );
+    init_cache_info( SUMMARY_DATA );
 ?>
     <div class="overview">
         <div class="tabledata_left">
@@ -579,7 +581,7 @@ th {
                     <td class="v"><?php echo isset( $_SERVER['PROCESSOR_IDENTIFIER'] ) ? $_SERVER['PROCESSOR_IDENTIFIER']: 'Not set'; ?></td>
                 </tr>
                 <tr>
-                    <td class="e">Number of processors</th>
+                    <td class="e">Number of processors</td>
                     <td class="v"><?php echo isset( $_SERVER['NUMBER_OF_PROCESSORS'] ) ? $_SERVER['NUMBER_OF_PROCESSORS']: 'Not set'; ?></td>
                 </tr>
                 <tr>
@@ -789,7 +791,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <?php echo get_chart_markup( OCACHE_DATA ); ?>
         </div>
     </div>
-    <div class="list" id="filelist">
+    <div class="list">
         <table style="width:100%">
             <tr>
                 <th colspan="7">Opcode cache entries</th>
@@ -865,7 +867,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <?php echo get_chart_markup( FCACHE_DATA ); ?>
         </div>
     </div>
-    <div class="list" id="filelist">
+    <div class="list">
         <table style="width:100%">
             <tr>
                 <th colspan="6">Opcode cache entries</th>
@@ -921,7 +923,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
     </div>
-    <div class="list" id="filelist">
+    <div class="list">
         <table style="width:100%">
             <tr>
                 <th colspan="2">Relative path cache entries</th>
@@ -940,27 +942,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
 ?>
         </table>
     </div>
-<?php }
-} else if ( USE_AUTHENTICATION ) {?>
-    <div id="logon">
-  <h2>Logon to access the statistics</h2>
-<?php if ( isset( $error_message ) && $error_message != null ) {
-    echo '<p style="color:red">', $error_message, '</p>';
-}
-?>
-        <form method="post">
-            <p><label for="username"><strong>Username:</strong></label><br/>
-            <input type="text" name="username" size="40"/>
-            <br/>
-            <label for="password"><strong>Password:</strong></label><br/>
-            <input type="password" name="password" size="40"/><br/><br/>
-            <input type="submit" value="Log In" />
-            </p>
-        </form>
-    </div>
-<?php 
-}
-?>
+<?php } ?>
 <div class="clear"></div>
 </div>
 </body>
