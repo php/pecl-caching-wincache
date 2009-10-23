@@ -789,7 +789,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <?php echo get_chart_markup( OCACHE_DATA ); ?>
         </div>
     </div>
-    <div class="list">
+    <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
                 <th colspan="7">Opcode cache entries</th>
@@ -865,7 +865,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <?php echo get_chart_markup( FCACHE_DATA ); ?>
         </div>
     </div>
-    <div class="list">
+    <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
                 <th colspan="6">Opcode cache entries</th>
@@ -921,7 +921,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
     </div>
-    <div class="list">
+    <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
                 <th colspan="2">Relative path cache entries</th>
