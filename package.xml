@@ -59,7 +59,7 @@ Initial PECL release
       <file role="src" name="wincache_lock.c"/>
       <file role="src" name="wincache_lock.h"/>
       <file role="src" name="wincache_ocache.c"/>
-      <file role="php" name="wincache_ocache.h"/>
+      <file role="src" name="wincache_ocache.h"/>
       <file role="src" name="wincache_opcopy.c"/>
       <file role="src" name="wincache_opcopy.h"/>
       <file role="src" name="wincache_rplist.c"/>
