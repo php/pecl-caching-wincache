@@ -46,7 +46,7 @@ define('PASSWORD', 'wincache');
 'Anonymous Authentication' and nothing else. If IIS is configured to support/use
 any other kind of authentication like Basic/Negotiate/Digest etc. this will not work.
 In that case please define the name of users in the array below which you would like
-to grant access in your domain/network.*/
+to grant access in your domain/network/workgroup.*/
 $user_allowed = array('DOMAIN\user1', 'DOMAIN\user2', 'DOMAIN\user3');
 
 /*If the array contains string 'all' all the users authenticated by IIS
