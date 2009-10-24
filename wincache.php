@@ -255,8 +255,8 @@ if ( $img > 0 ) {
         if ( $hits < 0 ) $hits = 0;
         if ( $misses < 0 ) $misses = 0;
         if ( $hits > 0 || $misses > 0 ) {
-            $hit_percent = round( $hits / ( $hits + $misses ) * 100 );
-            $miss_percent = round( $misses / ( $hits + $misses ) * 100 );
+            $hit_percent = round( $hits / ( $hits + $misses ) * 100, 2 );
+            $miss_percent = round( $misses / ( $hits + $misses ) * 100, 2 );
         }
         $data = array( 'Hits' => $hit_percent, 'Misses' => $miss_percent );		
         
@@ -521,6 +521,13 @@ th {
 .v {
     background-color: #E7E7E7;
     color: #000000;
+}
+.notice {
+    display: block;
+    margin-top: 1.5em;
+    padding: 1em;
+    background-color: #ffffe0;
+    border: 1px solid #dddddd;
 }
 .clear{
     clear: both;

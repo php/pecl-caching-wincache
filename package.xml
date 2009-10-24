@@ -35,6 +35,7 @@
   <notes>
 - Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication
 - Added the "filelist" id's to the file list tables to allow usage of page anchors in navigation.
+- Modified the chart in wincache.php to display the numbers rounded to 2 digits after decimal point.
  </notes>
   <contents>
     <dir name="/">
