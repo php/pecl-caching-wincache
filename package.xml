@@ -1,20 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://pear.php.net/dtd/package-2.0" xmlns:tasks="http://pear.php.net/dtd/tasks-1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" packagerversion="1.4.7" version="2.0" xsi:schemaLocation="http://pear.php.net/dtd/tasks-1.0 http://pear.php.net/dtd/tasks-1.0.xsd http://pear.php.net/dtd/package-2.0 http://pear.php.net/dtd/package-2.0.xsd">
-  <name>APC</name>
+  <name>WINCACHE</name>
   <channel>pecl.php.net</channel>
-  <summary>Alternative PHP Cache</summary>
-  <description>APC is a free, open, and robust framework for caching and optimizing PHP intermediate code.</description>
+  <summary>Windows Cache Extension for PHP</summary>
+  <description>Windows Cache Extension for PHP is a PHP accelerator that is used to increase the speed of PHP applications running on Windows and Windows Server. 
+  Once the Windows Cache Extension for PHP is enabled and loaded by the PHP engine, PHP applications can take advantage of the functionality without any code modifications.
+  The extension includes three caches:
+- PHP opcode cache
+- File system cache
+- Relative path cache
+
+  </description>
   <lead>
     <name>Ruslan Yakushev</name>
     <user>ruslany</user>
     <email>ruslany@microsoft.com</email>
-    <active>no</active>
+    <active>yes</active>
   </lead>
   <lead>
     <name>Venkat Raman Don</name>
     <user>donraman</user>
     <email>don.raman@microsoft.com</email>
-    <active>no</active>
+    <active>yes</active>
   </lead>
   <lead>
     <name>Kanwaljeet Singla</name>
@@ -33,7 +40,8 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-- Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication
+- Implemented new INI directive FCENABLEDFILER for file cache which is similar to OCENABLEDFILTER for output cache.
+- Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication.
 - Added the "filelist" id's to the file list tables to allow usage of page anchors in navigation.
 - Modified the chart in wincache.php to display the numbers rounded to 2 digits after decimal point.
  </notes>
