@@ -33,14 +33,14 @@
 
 #include "precomp.h"
 
-#define BLOCK_ISFREE_FIRST             'i'
-#define BLOCK_ISFREE_FREE              'f'
-#define BLOCK_ISFREE_USED              'u'
-#define BLOCK_ISFREE_LAST              'l'
+#define BLOCK_ISFREE_FIRST             (unsigned int)'iiii'
+#define BLOCK_ISFREE_FREE              (unsigned int)'ffff'
+#define BLOCK_ISFREE_USED              (unsigned int)'uuuu'
+#define BLOCK_ISFREE_LAST              (unsigned int)'llll'
 
 #define ALLOC_SEGMENT_HEADER_SIZE      (sizeof(alloc_segment_header))
 #define ALLOC_FREE_BLOCK_OVERHEAD      (sizeof(alloc_free_header) + sizeof(size_t))
-#define ALLOC_USED_BLOCK_OVERHEAD      (sizeof(alloc_used_header) + sizeof(size_t) + sizeof(size_t) + sizeof(size_t))
+#define ALLOC_USED_BLOCK_OVERHEAD      (sizeof(alloc_used_header) + sizeof(size_t))
 
 #define POINTER_OFFSET(baseaddr, p)    ((char *)p - (char *)baseaddr)
 #define FREE_HEADER(baseaddr, offset)  (alloc_free_header *)((char *)baseaddr + offset)
@@ -161,15 +161,14 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
         usedh = (alloc_used_header *)freeh;
         usedh->size    = size;
         usedh->is_free = BLOCK_ISFREE_USED;
+        usedh->dummy1  = 0;
+        usedh->dummy2  = 0;
 
         /* Return pointer right after the used header */
         paddr = (void *)(usedh + 1);
 
-        /* Put 0s in second last bytes of allocated segment */
         /* Put the size of allocated block in the end */
-        *((size_t *)((char *)paddr + size)) = 0;
-        *((size_t *)((char *)paddr + size + sizeof(size_t))) = 0;
-        *((size_t *)((char *)paddr + size + sizeof(size_t) + sizeof(size_t))) = size;
+        *((size_t *)((char *)paddr + size)) = size;
 
         /* Create a new free header after the allocated block */
         freeh = (alloc_free_header *)((char *)usedh + size + ALLOC_USED_BLOCK_OVERHEAD);
@@ -204,14 +203,16 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
 
         /* Set used header and last two size_t bytes */
         usedh = (alloc_used_header *)freeh;
-        usedh->size = size;
+        usedh->size    = size;
         usedh->is_free = BLOCK_ISFREE_USED;
+        usedh->dummy1  = 0;
+        usedh->dummy2  = 0;
 
+        /* Return pointer right after the used header */
         paddr = (void *)(usedh + 1);
 
-        *((size_t *)((char *)paddr + size)) = 0;
-        *((size_t *)((char *)paddr + size + sizeof(size_t))) = 0;
-        *((size_t *)((char *)paddr + size + sizeof(size_t) + sizeof(size_t))) = size;
+        /* Put the size of allocated block in the end */
+        *((size_t *)((char *)paddr + size)) = size;
 
         header->free_size  -= size;
 

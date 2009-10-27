@@ -72,40 +72,40 @@ struct alloc_segment_header
 typedef struct alloc_free_header alloc_free_header;
 struct alloc_free_header
 {
-    size_t  size;      /* size of free segment including this header */
-    char    is_free;   /* marker which differentiate this block from used block */
-    size_t  prev_free; /* offset to previous free block */
-    size_t  next_free; /* offset to next free block */
+    size_t       size;        /* size of free segment including this header */
+    unsigned int is_free;     /* marker which differentiate this block from used block */
+    size_t       prev_free;   /* offset to previous free block */
+    size_t       next_free;   /* offset to next free block */
     /* free block will have size written in the end */
 };
 
 typedef struct alloc_used_header alloc_used_header;
 struct alloc_used_header
 {
-    size_t size;       /* size of this used block */
-    char   is_free;    /* marker which differentiate this block from free block */
-    /* used blocks will have three size_t appended in the end */
-    /* two size_t will be 0 and last will have size of used block */
-    /* Net: overhead of free and used blocks will be the same */
+    size_t       size;        /* size of this used block */
+    unsigned int is_free;     /* marker which differentiate this block from free block */
+    size_t       dummy1;      /* Dummy variable to make size equal to free header */
+    size_t       dummy2;      /* Dummy variable to make size equal to free header */
+    /* used block will have size written in the end */
 };
 
 typedef struct alloc_mpool_header alloc_mpool_header;
 struct alloc_mpool_header
 {
-    size_t          foffset;  /* First memory chunk offset */
-    size_t          loffset;  /* Last memory chunk offset */
-    size_t          socurr;   /* Current chunk for small allocations */
-    size_t          mocurr;   /* Current chunk for medium allocations */
-    size_t          locurr;   /* Current chunk for large allocations */
+    size_t       foffset;     /* First memory chunk offset */
+    size_t       loffset;     /* Last memory chunk offset */
+    size_t       socurr;      /* Current chunk for small allocations */
+    size_t       mocurr;      /* Current chunk for medium allocations */
+    size_t       locurr;      /* Current chunk for large allocations */
 };
 
 typedef struct alloc_mpool_segment alloc_mpool_segment;
 struct alloc_mpool_segment
 {
-    size_t         aoffset;  /* Address of this memory chunk offset */
-    size_t         size;     /* Size of this memory chunk */
-    size_t         position; /* Current position where allocation can be made */
-    size_t         next;     /* Next chunk of memory offset */
+    size_t       aoffset;     /* Address of this memory chunk offset */
+    size_t       size;        /* Size of this memory chunk */
+    size_t       position;    /* Current position where allocation can be made */
+    size_t       next;        /* Next chunk of memory offset */
 };
 
 typedef struct alloc_context alloc_context;
@@ -124,11 +124,11 @@ struct alloc_context
 typedef struct alloc_info alloc_info;
 struct alloc_info
 {
-    size_t       total_size;   /* total size of memory segment */
-    size_t       free_size;    /* free memory */
-    unsigned int usedcount;    /* number of used blocks */
-    unsigned int freecount;    /* number of free blocks */
-    size_t       mem_overhead; /* overhead of used/free headers */
+    size_t       total_size;  /* total size of memory segment */
+    size_t       free_size;   /* free memory */
+    unsigned int usedcount;   /* number of used blocks */
+    unsigned int freecount;   /* number of free blocks */
+    size_t       mem_overhead;/* overhead of used/free headers */
 };
 
 extern int    alloc_create(alloc_context ** ppalloc);

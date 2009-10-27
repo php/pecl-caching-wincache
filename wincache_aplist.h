@@ -70,22 +70,22 @@ struct aplist_header
 
     unsigned int       itemcount;   /* Number of valid items */
     unsigned int       valuecount;  /* Total values starting from last entry */
-    size_t             values[1];   /* valuecount aplist_value offsets */
+    size_t             values[1];   /* Valuecount aplist_value offsets */
 };
 
 typedef struct aplist_context aplist_context;
 struct aplist_context
 {
-    unsigned short     id;          /* unique identifier for cache */
-    unsigned short     islocal;     /* is the cache local or shared */
-    HANDLE             hinitdone;   /* event indicating if memory is initialized */
-    unsigned int       fchangefreq; /* file change check frequency in mseconds */
+    unsigned short     id;          /* Unique identifier for cache */
+    unsigned short     islocal;     /* Is the cache local or shared */
+    HANDLE             hinitdone;   /* Event indicating if memory is initialized */
+    unsigned int       fchangefreq; /* File change check frequency in mseconds */
 
-    char *             apmemaddr;   /* base addr of memory segment */
-    aplist_header *    apheader;    /* aplist cache header */
-    filemap_context *  apfilemap;   /* filemap where aplist is kept */
-    lock_context *     aprwlock;    /* reader writer lock for aplist header */
-    alloc_context *    apalloc;     /* alloc context for aplist segment */
+    char *             apmemaddr;   /* Base addr of memory segment */
+    aplist_header *    apheader;    /* Aplist cache header */
+    filemap_context *  apfilemap;   /* Filemap where aplist is kept */
+    lock_context *     aprwlock;    /* Reader writer lock for aplist header */
+    alloc_context *    apalloc;     /* Alloc context for aplist segment */
 
     rplist_context *   prplist;     /* Relative path cache to resolve relative paths */
     fcache_context *   pfcache;     /* File cache containing file content */
@@ -96,12 +96,12 @@ struct aplist_context
 typedef struct cache_entry_info cache_entry_info;
 struct cache_entry_info
 {
-    char *             filename;    /* file name */
+    char *             filename;    /* File name */
     unsigned int       addage;      /* Seconds elapsed after add */
     unsigned int       useage;      /* Seconds elapsed after last use */
     unsigned int       lchkage;     /* Seconds elapsed after last check */
     void *             cdata;       /* Custom data for file/opcode cache */
-    cache_entry_info * next;        /* next entry */
+    cache_entry_info * next;        /* Next entry */
 };
 
 typedef struct cache_info cache_info;

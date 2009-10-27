@@ -630,20 +630,15 @@ PHP_RINIT_FUNCTION(wincache)
             goto Finished;
         }
     }
-    if(WCG(ocefilter) != NULL)
+
+    if(WCG(ocefilter) != NULL && isin_cseplist(WCG(ocefilter), Z_STRVAL_PP(siteid)))
     {
-        if(isin_cseplist(WCG(ocefilter), Z_STRVAL_PP(siteid)))
-        {
-            WCG(dooctoggle) = 1;
-        }
+        WCG(dooctoggle) = 1;
     }
 
-    if(WCG(fcefilter) != NULL)
+    if(WCG(fcefilter) != NULL && isin_cseplist(WCG(fcefilter), Z_STRVAL_PP(siteid)))
     {
-        if(isin_cseplist(WCG(fcefilter), Z_STRVAL_PP(siteid)))
-        {
-            WCG(dofctoggle) = 1;
-        }
+        WCG(dofctoggle) = 1;
     }
 
     /* zend_error_cb needs to be wincache_error_cb only when original_compile_file is used */
@@ -738,6 +733,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
 #endif
 
     cenabled = WCG(fcenabled);
+
     /* If fcenabled is not modified in php code and toggle is set, change cenabled */
     if(ini_entries[FCENABLED_INDEX_IN_GLOBALS].modified == 0 && WCG(dofctoggle) == 1)
     {
