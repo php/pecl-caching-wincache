@@ -904,13 +904,13 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th colspan="7">Opcode cache entries</th>
             </tr>
             <tr>
-                <th>File name</th>
-                <th>Function count</th>
-                <th>Class count</th>
-                <th>Add time</th>
-                <th>Use time</th>
-                <th>Last check</th>
-                <th>Hit count</th>
+                <th title="Name of the file">File name</th>
+                <th title="Number of PHP functions in the file">Function count</th>
+                <th title="Number of PHP classes in the file">Class count</th>
+                <th title="Indicates total amount of time in seconds for which the file has been in the cache">Add time</th>
+                <th title="Total amount of time in seconds which has elapsed since the file was last used">Use time</th>
+                <th title="Indicates total amount of time in seconds which has elapsed since the file was last checked for file change">Last check</th>
+                <th title="Number of times cache has been hit">Hit count</th>
             </tr>
 <?php 
     foreach ( $ocache_file_info['file_entries'] as $entry ) {
@@ -975,12 +975,12 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th colspan="6">Opcode cache entries</th>
             </tr>
             <tr>
-                <th>File name</th>
-                <th>Add time</th>
-                <th>Use time</th>
-                <th>Last check</th>
-                <th>File size</th>
-                <th>Hit Count</th>
+                <th title="Name of the file">File name</th>
+                <th title="Indicates total amount of time in seconds for which the file has been in the cache">Add time</th>
+                <th title="Total amount of time in seconds which has elapsed since the file was last used">Use time</th>
+                <th title="Indicates total amount of time in seconds which has elapsed since the file was last checked for file change">Last check</th>
+                <th title="Size of the file in KB">File size</th>
+                <th title="Number of times the file has been served from the cache">Hit Count</th>
         </tr>
 <?php 
     foreach ( $fcache_file_info['file_entries'] as $entry ) {
