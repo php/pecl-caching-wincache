@@ -62,15 +62,15 @@ if ( !extension_loaded( 'wincache' ) )
 }
 
 if ( USE_AUTHENTICATION == 1 ) {
-	if (!empty($_SERVER['AUTH_TYPE']) && !empty($_SERVER['REMOTE_USER']) && strcasecmp($_SERVER['REMOTE_USER'], 'anonymous'))
-	{
-		if (!in_array(strtolower($_SERVER['REMOTE_USER']), array_map('strtolower', $user_allowed))
-		&& !in_array('all', array_map('strtolower', $user_allowed)))
-		{
-			echo 'You are not authorised to view this page. Please contact server admin to get permission. Exiting.';
-			exit;
-		}
-	}
+    if (!empty($_SERVER['AUTH_TYPE']) && !empty($_SERVER['REMOTE_USER']) && strcasecmp($_SERVER['REMOTE_USER'], 'anonymous'))
+    {
+        if (!in_array(strtolower($_SERVER['REMOTE_USER']), array_map('strtolower', $user_allowed))
+        && !in_array('all', array_map('strtolower', $user_allowed)))
+        {
+            echo 'You are not authorised to view this page. Please contact server admin to get permission. Exiting.';
+            exit;
+        }
+    }
     else if ( !isset($_SERVER['PHP_AUTH_USER'] ) || !isset( $_SERVER['PHP_AUTH_PW'] ) ||	
     $_SERVER['PHP_AUTH_USER'] != USERNAME || $_SERVER['PHP_AUTH_PW'] != PASSWORD ) {
         header( 'WWW-Authenticate: Basic realm="WINCACHE Log In!"' );
@@ -90,9 +90,11 @@ define('SUMMARY_DATA', 1);
 define('OCACHE_DATA', 2);
 define('FCACHE_DATA', 3);
 define('RCACHE_DATA', 4);
-define('PATH_MAX_LENGTH', 40);
-define('INI_MAX_LENGTH', 30);
-define('SUBKEY_MAX_LENGTH', 80);
+define('BAR_CHART', 1);
+define('PIE_CHART', 2);
+define('PATH_MAX_LENGTH', 45);
+define('INI_MAX_LENGTH', 45);
+define('SUBKEY_MAX_LENGTH', 90);
 
 // WinCache settings that are used for debugging purposes
 $settings_to_hide = array( 'wincache.localheap', 'wincache.debuglevel' );
@@ -106,6 +108,10 @@ if ( !is_numeric( $page ) || $page < SUMMARY_DATA || $page > RCACHE_DATA )
 $img = isset( $_GET['img'] ) ? $_GET['img'] : 0;
 if ( !is_numeric( $img ) || $img < OCACHE_DATA || $img > FCACHE_DATA ) 
     $img = 0;
+
+$chart_type = isset( $_GET['type'] ) ? $_GET['type'] : BAR_CHART;
+if ( !is_numeric( $chart_type ) || $chart_type < BAR_CHART || $chart_type > PIE_CHART )
+    $chart_type = BAR_CHART;
 
 $ocache_mem_info = null;
 $ocache_file_info = null;
@@ -193,22 +199,9 @@ function get_ocache_summary( $entries ) {
     $result['recent_entry'] = '';
 
     if ( isset( $entries ) && count( $entries ) > 0 && isset( $entries[1]['file_name'] ) ) {
-        $oldest_time = $entries[1]['add_time'];
-        $recent_time = $oldest_time;
-        $result['oldest_entry'] = $entries[1]['file_name'];
-        $result['recent_entry'] = $result['oldest_entry'];
-        
         foreach ( (array)$entries as $entry ) {
             $result['total_classes'] += $entry['class_count'];
             $result['total_functions'] += $entry['function_count'];
-            if ( $entry['add_time'] > $oldest_time ) {
-                $oldest_time = $entry['add_time'];
-                $result['oldest_entry'] = $entry['file_name'];
-            }
-            if ( $entry['add_time'] < $recent_time ) {
-                $recent_time = $entry['add_time'];
-                $result['recent_entry'] = $entry['file_name'];
-            }
         }
     }
     return $result;
@@ -220,21 +213,8 @@ function get_fcache_summary( $entries ) {
     $result['recent_entry'] = '';
 
     if ( isset( $entries ) && count( $entries ) > 0 && isset( $entries[1]['file_name'] ) ) {
-        $oldest_time = $entries[1]['add_time'];
-        $recent_time = $oldest_time;
-        $result['oldest_entry'] = $entries[1]['file_name'];
-        $result['recent_entry'] = $result['oldest_entry'];
-        
         foreach ( (array)$entries as $entry ) {
             $result['total_size'] += $entry['file_size'];
-            if ( $entry['add_time'] > $oldest_time ) {
-                $oldest_time = $entry['add_time'];
-                $result['oldest_entry'] = $entry['file_name'];
-            }
-            if ( $entry['add_time'] < $recent_time ) {
-                $recent_time = $entry['add_time'];
-                $result['recent_entry'] = $entry['file_name'];
-            }
         }
     }
     return $result;
@@ -342,17 +322,133 @@ if ( $img > 0 ) {
         }
         return $image;
     }
+    
+    function create_used_free_chart( $width, $height, $used_memory, $free_memory, $title = 'Free & Used Memory (in %)' ) {
+        $centerX = 120;
+        $centerY = 120;
+        $diameter = 120;
+
+        $hmargin = 5; // left (right) horizontal margin
+        $vmargin = 20; // top (bottom) vertical margin
+
+        $image = imagecreate( $width, $height );
+
+        // colors 
+        $white = imagecolorallocate( $image, 0xFF, 0xFF, 0xFF );
+        $black = imagecolorallocate( $image, 0x00, 0x00, 0x00 );
+        $pie_color[1] = imagecolorallocate($image, 0x5C, 0x87, 0xB2);
+        $pie_color[2] = imagecolorallocate($image, 0xCB, 0xE1, 0xEF);
+        $pie_color[3] = imagecolorallocate($image, 0xC0, 0xC0, 0xC0);
+
+        // Label font size
+        $labelfont = 2;
+        $hfw = imagefontwidth( $labelfont );
+        $vfw = imagefontheight( $labelfont );
+
+        // Border
+        imagerectangle( $image, $hmargin, $vmargin, $width - $hmargin, $height - $vmargin, $black ); 
+
+        // Top label
+        $titlefont = 3;
+        $txtsize = imagefontwidth( $titlefont ) * strlen( $title );
+        $hpos = (int)( ($width - $txtsize) / 2 );
+        $vpos = 3; // distance from top 
+        imagestring( $image, $titlefont, $hpos, $vpos, $title , $black );
+
+        $total = 0;
+        $n = 0;
+        $items = array('Used memory' => $used_memory, 'Free memory' => $free_memory);
+
+        //read the arguments into different arrays:
+        foreach( $items as $key => $val ) {
+            $n++;
+            $label[$n] = $key;
+            $value[$n] = $val;
+            $total += $val;
+            $arc_dec[$n] = $total*360;
+            $arc_rad[$n] = $total*2*pi();
+        }
+
+        //the base:
+        $arc_rad[0] = 0;
+        $arc_dec[0] = 0;
+
+        //count the labels:
+        for ( $i = 1; $i <= $n; $i++ ) {
+            
+            //calculate the percents:
+            $perc[$i] = $value[$i] / $total;
+            $percstr[$i] = (string) number_format( $perc[$i] * 100, 2 )."%";
+            //label with percentage:
+            $label[$i] = $percstr[$i];
+
+            //calculate the arc and line positions:
+            $arc_rad[$i] = $arc_rad[$i] / $total;
+            $arc_dec[$i] = $arc_dec[$i] / $total;
+            $hpos = round( $centerX + ( $diameter / 2 ) * sin( $arc_rad[$i] ) );
+            $vpos = round( $centerY + ( $diameter / 2 ) * cos( $arc_rad[$i] ) );
+            imageline( $image, $centerX, $centerY, $hpos, $vpos, $black );
+            imagearc( $image, $centerX, $centerY, $diameter, $diameter, $arc_dec[$i-1], $arc_dec[$i], $black );
+
+            //calculate the positions for the labels:
+            $arc_rad_label = $arc_rad[$i-1] + 0.5 * $perc[$i] * 2 * pi();
+            $hpos = $centerX + 1.1 * ( $diameter / 2 ) * sin( $arc_rad_label );
+            $vpos = $centerY + 1.1 * ( $diameter / 2 ) * cos( $arc_rad_label );
+            if ( ( $arc_rad_label > 0.5 * pi() ) && ( $arc_rad_label < 1.5 * pi() ) ) {
+                $vpos = $vpos - $vfw;
+            }
+            if ( $arc_rad_label > pi() ) {
+                $hpos = $hpos - $hfw * strlen( $label[$i] );
+            }
+            //display the labels:
+            imagestring($image, $labelfont, $hpos, $vpos, $label[$i], $black);
+        }
+
+        //fill the parts with their colors:
+        for ( $i = 1; $i <= $n; $i++ ) {
+            if ( round($arc_dec[$i] - $arc_dec[$i-1]) != 0 ) {
+                $arc_rad_label = $arc_rad[$i - 1] + 0.5 * $perc[$i] * 2 * pi();
+                $hpos = $centerX + 0.8 * ( $diameter / 2 ) * sin( $arc_rad_label );
+                $vpos = $centerY + 0.8 * ( $diameter / 2 ) * cos( $arc_rad_label );
+                imagefilltoborder( $image, $hpos, $vpos, $black, $pie_color[$i] );
+            }
+        }
+
+        // legend
+        $hpos = $centerX + 1.1 * ($diameter / 2) + $hfw * strlen( '50.00%' );
+        $vpos = $centerY - ($diameter / 2);
+        $i = 1;
+        $thumb_size = 5;
+        foreach ($items as $key => $value){
+            imagefilledrectangle( $image, $hpos, $vpos, $hpos + $thumb_size, $vpos + $thumb_size, $pie_color[$i++] );
+            imagestring( $image, $labelfont, $hpos + $thumb_size + 5, $vpos, $key, $black );
+            $vpos += $vfw + 2;
+        }
+        return $image;
+    }
 
     $image = null;
     switch( $img ) {
         case OCACHE_DATA: {
-            $ocache_file_info = wincache_ocache_fileinfo();
-            $image = create_hit_miss_chart(IMG_WIDTH, IMG_HEIGHT, $ocache_file_info['total_hit_count'], $ocache_file_info['total_miss_count'], 'Opcode Cache Hits & Misses (in %)');
+            if ( $chart_type == PIE_CHART ){
+                $ocache_mem_info = wincache_ocache_meminfo();
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, ini_get('wincache.ocachesize') * 1048576 - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'], 'Memory Usage by Opcode Cache (in %)' );
+            }
+            else{
+                $ocache_file_info = wincache_ocache_fileinfo();
+                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT, $ocache_file_info['total_hit_count'], $ocache_file_info['total_miss_count'], 'Opcode Cache Hits & Misses (in %)' );
+            }
             break;
         }
         case FCACHE_DATA: {
-            $fcache_file_info = wincache_fcache_fileinfo();
-            $image = create_hit_miss_chart(IMG_WIDTH, IMG_HEIGHT, $fcache_file_info['total_hit_count'], $fcache_file_info['total_miss_count'], 'File Cache Hits & Misses (in %)');
+            if ( $chart_type == PIE_CHART ){
+                $fcache_mem_info = wincache_fcache_meminfo();
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, ini_get('wincache.fcachesize') * 1048576 - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'], 'Memory Usage by File Cache (in %)' );
+            }
+            else{
+                $fcache_file_info = wincache_fcache_fileinfo();
+                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT, $fcache_file_info['total_hit_count'], $fcache_file_info['total_miss_count'], 'File Cache Hits & Misses (in %)' );                
+           }
         }
     }
 
@@ -365,20 +461,27 @@ if ( $img > 0 ) {
     exit;
 }
 
-function get_chart_markup( $chart_type ) {
+function get_chart_markup( $data_type, $chart_type ) {
     global $PHP_SELF;
     $result = '';
     $alt_title = '';
-            
+
     if ( gd_loaded() ){
-        if ( $chart_type == OCACHE_DATA )
-            $alt_title = 'Opcode cache hit and miss percentage chart';
-        elseif ($chart_type == FCACHE_DATA )
-            $alt_title = "File cache hit and miss percentage chart";
+        if ( $data_type == OCACHE_DATA )
+            $alt_title = 'Opcode cache ';
+        elseif ( $data_type == FCACHE_DATA )
+            $alt_title = "File cache ";
         else 
             return '';
 
-        $result = '<img src="'.$PHP_SELF.'?img='.$chart_type.'" alt="'.$alt_title.'" width="'.IMG_WIDTH.'" height="'.IMG_HEIGHT.'" />';
+        if ( $chart_type == BAR_CHART )
+            $alt_title .= 'hit and miss percentage chart';
+        elseif ( $chart_type == PIE_CHART )
+            $alt_title .= 'memory usage percentage chart';
+        else
+            return '';
+
+        $result = '<img src="'.$PHP_SELF.'?img='.$data_type.'&amp;type='.$chart_type.'" alt="'.$alt_title.'" width="'.IMG_WIDTH.'" height="'.IMG_HEIGHT.'" />';
     }
     else {
         $result = '<p class="notice">Enable GD library (<em>php_gd2.dll</em>) in order to see the charts.</p>';
@@ -430,8 +533,8 @@ h1 {
     font-size: 2em;
 }
 #content {
-    width: 880px;
-    margin: 1em;
+    width: 960px;
+    margin: 5px;
 }
 #header {
     color: #ffffff;
@@ -488,14 +591,23 @@ h1 {
     width: 100%;
     margin-bottom: 2em;
 }
-.tabledata_left{
+.wideleftpanel{
     float: left;
-    width: 500px;
+    width: 520px;
     margin-right: 20px;
 }
-.tabledata_right, .graphdata_right{
+.widerightpanel{
+    float: left;
+    width: 420px;
+}
+.leftpanel{
+    float: left;
+    width: 310px;
+}
+.rightpanel{
     float:left;
-    width: 360px;
+    width: 320px;
+    margin-left: 5px;
 }
 .extra_margin{
     margin-top: 20px;
@@ -517,6 +629,9 @@ th {
     font-weight: bold;
     color: #000000;
     width: 40%;
+}
+.leftpanel .e{
+    width: 50%;
 }
 .v {
     background-color: #E7E7E7;
@@ -554,7 +669,7 @@ th {
     init_cache_info( SUMMARY_DATA );
 ?>
     <div class="overview">
-        <div class="tabledata_left">
+        <div class="wideleftpanel">
             <table style="width: 100%">
                 <tr>
                     <th colspan="2">General Information</th>
@@ -609,7 +724,7 @@ th {
                 </tr>
             </table>
         </div>
-        <div class="tabledata_right">
+        <div class="widerightpanel">
             <table style="width:100%">
                 <tr>
                     <th colspan="2">Cache Settings</th>
@@ -626,12 +741,12 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo $ini_value['local_value'];
     echo '</td></tr>', "\n";
 } 
-?>				
+?>
             </table>
         </div>
     </div>
     <div class="overview">
-        <div class="tabledata_left extra_margin">
+        <div class="leftpanel extra_margin">
             <table width="100%">
                 <tr>
                     <th colspan="2">Opcode Cache Overview</th>
@@ -664,22 +779,17 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="e">Number of classes</td>
                     <td class="v"><?php echo $ocache_summary_info['total_classes']; ?></td>
                 </tr>
-                <tr title="<?php echo $ocache_summary_info['oldest_entry']; ?>">
-                    <td class="e">Oldest entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $ocache_summary_info['oldest_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
-                <tr title="<?php echo $ocache_summary_info['recent_entry']; ?>">
-                    <td class="e">Most recent entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $ocache_summary_info['recent_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
             </table>
         </div>
-        <div class="graphdata_right">
-            <?php echo get_chart_markup( OCACHE_DATA ); ?>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART ); ?>
         </div>
     </div>
     <div class="overview">
-        <div class="tabledata_left extra_margin">
+        <div class="leftpanel extra_margin">
             <table style="width: 100%">
                 <tr>
                     <th colspan="2">File Cache Overview</th>
@@ -689,7 +799,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="v"><a href="<?php echo $PHP_SELF, '?page=3#filelist'; ?>"><?php echo $fcache_file_info['total_file_count']; ?></a></td>
                 </tr>
                 <tr>
-                    <td class="e">Total size of cached files</td>
+                    <td class="e">Total files size</td>
                     <td class="v"><?php echo convert_bytes_to_string( $fcache_summary_info['total_size'] ); ?></td>
                 </tr>
                 <tr>
@@ -708,22 +818,17 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="e">Memory overhead</td>
                     <td class="v"><?php echo convert_bytes_to_string( $fcache_mem_info['memory_overhead'] ); ?></td>
                 </tr>
-                <tr title="<?php echo $fcache_summary_info['oldest_entry']; ?>">
-                    <td class="e">Oldest entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $fcache_summary_info['oldest_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
-                <tr title="<?php echo $fcache_summary_info['recent_entry']; ?>">
-                    <td class="e">Most recent entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $fcache_summary_info['recent_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
             </table>
         </div>
-        <div class="graphdata_right">
-            <?php echo get_chart_markup( FCACHE_DATA ); ?>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART ); ?>
         </div>
     </div>
     <div class="overview">
-        <div class="tabledata_left">
+        <div class="leftpanel">
             <table style="width: 100%">
                 <tr>
                     <th colspan="2">Relative Path Cache Overview</th>
@@ -751,7 +856,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     init_cache_info( OCACHE_DATA );
 ?>
     <div class="overview">
-        <div class="tabledata_left">
+        <div class="leftpanel extra_margin">
             <table width="100%">
                 <tr>
                     <th colspan="2">Opcode Cache Overview</th>
@@ -784,18 +889,13 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="e">Number of classes</td>
                     <td class="v"><?php echo $ocache_summary_info['total_classes']; ?></td>
                 </tr>
-                <tr title="<?php echo $ocache_summary_info['oldest_entry']; ?>">
-                    <td class="e">Oldest entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $ocache_summary_info['oldest_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
-                <tr title="<?php echo $ocache_summary_info['recent_entry']; ?>">
-                    <td class="e">Most recent entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $ocache_summary_info['recent_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
             </table>
         </div>
-        <div class="graphdata_right">
-            <?php echo get_chart_markup( OCACHE_DATA ); ?>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART ); ?>
         </div>
     </div>
     <div class="list" id="filelist">
@@ -831,7 +931,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     init_cache_info( FCACHE_DATA );
 ?>
     <div class="overview">
-        <div class="tabledata_left">
+        <div class="leftpanel extra_margin">
             <table style="width: 100%">
                 <tr>
                     <th colspan="2">File Cache Overview</th>
@@ -841,7 +941,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="v"><?php echo $fcache_file_info['total_file_count']; ?></td>
                 </tr>
                 <tr>
-                    <td class="e">Total size of cached files</td>
+                    <td class="e">Total files size</td>
                     <td class="v"><?php echo convert_bytes_to_string( $fcache_summary_info['total_size'] ); ?></td>
                 </tr>                    
                 <tr>
@@ -860,18 +960,13 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="e">Memory overhead</td>
                     <td class="v"><?php echo convert_bytes_to_string( $fcache_mem_info['memory_overhead'] ); ?></td>
                 </tr>
-                <tr title="<?php echo $fcache_summary_info['oldest_entry']; ?>">
-                    <td class="e">Oldest entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $fcache_summary_info['oldest_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
-                <tr title="<?php echo $fcache_summary_info['recent_entry']; ?>">
-                    <td class="e">Most recent entry</td>
-                    <td class="v"><?php echo get_trimmed_filename( $fcache_summary_info['recent_entry'], PATH_MAX_LENGTH ); ?></td>
-                </tr>
             </table>
         </div>
-        <div class="graphdata_right">
-            <?php echo get_chart_markup( FCACHE_DATA ); ?>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART ); ?>
         </div>
     </div>
     <div class="list" id="filelist">
@@ -902,11 +997,11 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         </table>
     </div>
 
-<?php } else if ( $page == 4 ) {
+<?php } else if ( $page == RCACHE_DATA ) {
     init_cache_info( RCACHE_DATA );
 ?>
     <div class="overview">
-        <div class="tabledata_left">
+        <div class="wideleftpanel">
             <table style="width: 100%">
                 <tr>
                     <th colspan="2">Relative Path Cache Overview</th>
