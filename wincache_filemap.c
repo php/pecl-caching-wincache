@@ -31,6 +31,7 @@
    +----------------------------------------------------------------------------------------------+
 */
 
+
 #include "precomp.h"
 
 #define FILEMAP_INFO_HEADER_SIZE ALIGNQWORD(sizeof(filemap_information_header))
@@ -333,6 +334,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         namelen += strlen(WCG(namesalt)) + 1;
     }
 
+
     /* Allocate memory to keep name of the information filemap */
     pinfo->infoname = (char *)alloc_pemalloc(namelen);
     if(pinfo->infoname == NULL)
@@ -343,6 +345,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
 
     ZeroMemory(pinfo->infoname, namelen);
 
+    
     /* Create name as FILE_INFORMATION_PREFIX_<ppid> */
     if(WCG(namesalt) == NULL)
     {
@@ -761,6 +764,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
                 result = FATAL_FILEMAP_NOFREE;
                 goto Finished;
             }
+
 
             /* Get the pointer to first free entry in the table */
             pentry = (filemap_information_entry *)((char *)pinfoh + FILEMAP_INFO_HEADER_SIZE);

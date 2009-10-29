@@ -34,6 +34,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- Fix VC6 compatibility.
 - Added total memory row for the file cache and opcode cache overview tables. Also re-ordered the colums in the file cache list to be consistent with opcode cache list.
 - Added tooltip for statistics column in wincache.php file.
 - Added memory usage pie charts to wincache.php file.

@@ -77,17 +77,22 @@
  #undef _ASSERT
 #endif
 
+#ifndef IsDebuggerPresent
+# define IsDebuggerPresent() (0)
+#endif
+
 #ifdef WINCACHE_DEBUG
- #define WINCACHE_TEST
- #define _ASSERT(x)   if(!(x)) { dprintalways(#x); if(IsDebuggerPresent()) { DebugBreak(); } }
+# define WINCACHE_TEST
+# define _ASSERT(x)   if(!(x)) { dprintalways(#x); if(IsDebuggerPresent()) { DebugBreak(); } }
 #else
- #define _ASSERT(x)
+# define _ASSERT(x)
 #endif
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
+int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);
  #define memcpy_s(dst, size, src, cnt) memcpy(dst, src, cnt)
  #define sprintf_s(buffer, size, format) sprintf(buffer, format)
- #define _snprintf_s(buffer, s1, s2, format, va_alist) snprintf(buffer, s1, format, va_alist)
+ #define _snprintf_s wincache_php_snprintf_s
  #define vsprintf_s(buffer, size, format, va_alist) vsprintf(buffer, format, va_alist)
  #define strcpy_s(src, size, dst) strcpy(src, dst)
 #endif
