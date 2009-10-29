@@ -715,10 +715,6 @@ th {
                     <td class="v"><?php echo isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'Not set'; ?></td>
                 </tr>
                 <tr>
-                    <td class="e">Available memory</td>
-                    <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_total'] );?></td>
-                </tr>
-                <tr>
                     <td class="e">Cache uptime</td>
                     <td class="v"><?php echo ( isset( $ocache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $ocache_file_info['total_cache_uptime'] ) : "Unknown"; ?></td>
                 </tr>
@@ -765,7 +761,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo ini_get('wincache.ocachesize'), ' MB'; ?></td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_total'] ); ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -816,7 +812,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo ini_get('wincache.fcachesize'), ' MB'; ?></td>
+                    <td class="v"><?php echo convert_bytes_to_string( $fcache_mem_info['memory_total'] ); ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -883,7 +879,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo ini_get('wincache.ocachesize'), ' MB'; ?></td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_total'] ); ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -966,7 +962,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo ini_get('wincache.fcachesize'), ' MB'; ?></td>
+                    <td class="v"><?php echo convert_bytes_to_string( $fcache_mem_info['memory_total'] ); ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
