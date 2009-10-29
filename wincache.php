@@ -764,6 +764,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="v"><?php echo $ocache_file_info['total_miss_count']; ?></td>
                 </tr>
                 <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo ini_get('wincache.ocachesize'), ' MB'; ?></td>
+                </tr>
+                <tr>
                     <td class="e">Available memory</td>
                     <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_free'] ); ?></td>
                 </tr>
@@ -809,6 +813,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <tr>
                     <td class="e">Misses</td>
                     <td class="v"><?php echo $fcache_file_info['total_miss_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo ini_get('wincache.fcachesize'), ' MB'; ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -872,6 +880,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <tr>
                     <td class="e">Misses</td>
                     <td class="v"><?php echo $ocache_file_info['total_miss_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo ini_get('wincache.ocachesize'), ' MB'; ?></td>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -953,6 +965,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <td class="v"><?php echo $fcache_file_info['total_miss_count']; ?></td>
                 </tr>
                 <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo ini_get('wincache.fcachesize'), ' MB'; ?></td>
+                </tr>
+                <tr>
                     <td class="e">Available memory</td>
                     <td class="v"><?php echo convert_bytes_to_string( $fcache_mem_info['memory_free'] ); ?></td>
                 </tr>
@@ -976,20 +992,20 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </tr>
             <tr>
                 <th title="Name of the file">File name</th>
+                <th title="Size of the file in KB">File size</th>
                 <th title="Indicates total amount of time in seconds for which the file has been in the cache">Add time</th>
                 <th title="Total amount of time in seconds which has elapsed since the file was last used">Use time</th>
                 <th title="Indicates total amount of time in seconds which has elapsed since the file was last checked for file change">Last check</th>
-                <th title="Size of the file in KB">File size</th>
                 <th title="Number of times the file has been served from the cache">Hit Count</th>
         </tr>
 <?php 
     foreach ( $fcache_file_info['file_entries'] as $entry ) {
         echo '<tr title="', $entry['file_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_filename( $entry['file_name'], PATH_MAX_LENGTH ),'</td>', "\n";
+        echo '<td class="v">', convert_bytes_to_string( $entry['file_size'] ),'</td>', "\n";
         echo '<td class="v">', $entry['add_time'],'</td>', "\n";
         echo '<td class="v">', $entry['use_time'],'</td>', "\n";
         echo '<td class="v">', $entry['last_check'],'</td>', "\n";
-        echo '<td class="v">', convert_bytes_to_string( $entry['file_size'] ),'</td>', "\n";
         echo '<td class="v">', $entry['hit_count'],'</td>', "\n";
         echo "</tr>\n";
     }

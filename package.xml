@@ -34,6 +34,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- Added total memory row for the file cache and opcode cache overview tables. Also re-ordered the colums in the file cache list to be consistent with opcode cache list.
 - Added tooltip for statistics column in wincache.php file.
 - Added memory usage pie charts to wincache.php file.
 - Minor changes to php_wincache. Made is_free unsigned int. Made used_header similar to free_header by adding two dummy size_t.
