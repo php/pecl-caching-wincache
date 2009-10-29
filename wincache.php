@@ -984,7 +984,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
-                <th colspan="6">Opcode cache entries</th>
+                <th colspan="6">File cache entries</th>
             </tr>
             <tr>
                 <th title="Name of the file">File name</th>
