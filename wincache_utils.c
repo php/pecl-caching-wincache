@@ -32,7 +32,6 @@
 */
 
 #include "precomp.h"
-#include "php.h"
 
 static unsigned int crc32_generate(int n);
 
@@ -284,12 +283,14 @@ Finished:
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...) /* {{{ */
 {
-	va_list ap;
-	int cc;
-	va_start(ap, format);
-	cc = ap_php_snprintf(buf, len, format, ap);
-	va_end(ap);
-	return cc;
+    va_list arglist;
+    int     retval = 0;
+
+    va_start(arglist, format);
+    retval = ap_php_snprintf(buf, len, format, arglist);
+    va_end(arglist);
+    
+    return retval;
 }
 /* }}} */
 #endif

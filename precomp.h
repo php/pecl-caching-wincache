@@ -89,7 +89,6 @@
 #endif
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
-int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);
  #define memcpy_s(dst, size, src, cnt) memcpy(dst, src, cnt)
  #define sprintf_s(buffer, size, format) sprintf(buffer, format)
  #define _snprintf_s wincache_php_snprintf_s

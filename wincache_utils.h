@@ -41,4 +41,8 @@ extern char * utils_filepath(zend_file_handle * file_handle);
 extern char * utils_fullpath(const char * filename);
 extern int    utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
 
+#if (defined(_MSC_VER) && (_MSC_VER < 1500))
+extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);
+#endif
+
 #endif /* _WINCACHE_UTILS_H_ */
