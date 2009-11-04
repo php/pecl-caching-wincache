@@ -36,10 +36,16 @@
 #define PER_RUN_SCAVENGE_COUNT        256
 #define DO_PARTIAL_SCAVENGER_RUN      0
 #define DO_FULL_SCAVENGER_RUN         1
+
+#define SCAVENGER_STATUS_INVALID      255
+#define SCAVENGER_STATUS_INACTIVE     0
+#define SCAVENGER_STATUS_ACTIVE       1
+
 #define DO_FILE_CHANGE_CHECK          1
 #define NO_FILE_CHANGE_CHECK          0
 #define FILE_IS_NOT_CHANGED           0
 #define FILE_IS_CHANGED               1
+
 #define APLIST_VALUE(p, o)            ((aplist_value *)alloc_get_cachevalue(p, o))
 
 static int  findapath_in_cache(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue);
@@ -203,7 +209,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
 
     /* Allocate memory for cache entry in shared memory */
     pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
-    if(pbaseadr == NULL)
+    if(pbaseadr == NULL && pcache->scstatus == SCAVENGER_STATUS_ACTIVE)
     {
         lock_writelock(pcache->aprwlock);
 
@@ -471,7 +477,9 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
     unsigned int    ticks    = 0;
 
     dprintverbose("start run_aplist_scavenger");
-    _ASSERT(pcache != NULL);
+
+    _ASSERT(pcache           != NULL);
+    _ASSERT(pcache->scstatus == SCAVENGER_STATUS_ACTIVE);
 
     ticks    = GetTickCount();
     apalloc  = pcache->apalloc;
@@ -544,6 +552,8 @@ int aplist_create(aplist_context ** ppcache)
 
     pcache->id          = glcacheid++;
     pcache->islocal     = 0;
+    pcache->apctype     = APLIST_TYPE_INVALID;
+    pcache->scstatus    = SCAVENGER_STATUS_INVALID;
     pcache->hinitdone   = NULL;
     pcache->fchangefreq = 0;
 
@@ -553,6 +563,8 @@ int aplist_create(aplist_context ** ppcache)
     pcache->aprwlock    = NULL;
     pcache->apalloc     = NULL;
 
+    pcache->pglobal     = NULL;
+    pcache->prplist     = NULL;
     pcache->pfcache     = NULL;
     pcache->pocache     = NULL;
     pcache->resnumber   = -1;
@@ -587,7 +599,7 @@ void aplist_destroy(aplist_context * pcache)
     return;
 }
 
-int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
+int aplist_initialize(aplist_context * pcache, unsigned short apctype, aplist_context * pglobal, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          mapsize  = 0;
@@ -602,10 +614,26 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
 
     dprintverbose("start aplist_initialize");
 
-    _ASSERT(pcache      != NULL);
-    _ASSERT(filecount   >= 1024 &&  filecount   <= 16384);
-    _ASSERT(fchangefreq == 0    || (fchangefreq >= 2 && fchangefreq <= 300));
-    _ASSERT(ttlmax      >= 60   &&  ttlmax      <= 7200);
+    _ASSERT(pcache       != NULL);
+    _ASSERT(apctype      == APLIST_TYPE_GLOBAL  || apctype     == APLIST_TYPE_OPCODE_LOCAL);
+    _ASSERT(apctype      == APLIST_TYPE_GLOBAL  || pglobal     != NULL);
+    _ASSERT(filecount    >= NUM_FILES_MINIMUM   && filecount   <= NUM_FILES_MAXIMUM);
+    _ASSERT((fchangefreq >= FCHECK_FREQ_MINIMUM && fchangefreq <= FCHECK_FREQ_MAXIMUM) || fchangefreq == 0);
+    _ASSERT((ttlmax      >= TTL_VALUE_MINIMUM   && ttlmax      <= TTL_VALUE_MAXIMUM)   || ttlmax == 0);
+
+    /* If more APLIST_TYPE entries are added, add code to control value of islocal carefully */
+    pcache->apctype = apctype;
+
+    pcache->islocal = pcache->apctype;
+    pcache->pglobal = pglobal;
+
+    /* Disable scavenger if opcode cache is local only */
+    /* Or if ttlmax value is set to 0 */
+    pcache->scstatus = SCAVENGER_STATUS_ACTIVE;
+    if(pcache->apctype == APLIST_TYPE_OPCODE_LOCAL || ttlmax == 0)
+    {
+        pcache->scstatus = SCAVENGER_STATUS_INACTIVE;
+    }
 
     /* Initialize memory map to store file list */
     result = filemap_create(&pcache->apfilemap);
@@ -615,12 +643,10 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     mapsize = ((filecount + 1023) * 2) / 1024;
-    if(islocal)
+    if(pcache->islocal)
     {
         mapclass = FILEMAP_MAP_LRANDOM;
         locktype = LOCK_TYPE_LOCAL;
-
-        pcache->islocal = islocal;
     }
 
     result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, mapclass, mapsize TSRMLS_CC);
@@ -639,7 +665,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->apalloc, islocal, "FILELIST_SEGMENT", pcache->apfilemap->mapaddr, segsize TSRMLS_CC);
+    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", pcache->apfilemap->mapaddr, segsize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -675,16 +701,20 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    result = rplist_create(&pcache->prplist);
-    if(FAILED(result))
+    /* Do not create relative path cache for local opcode cache */
+    if(apctype != APLIST_TYPE_OPCODE_LOCAL)
     {
-        goto Finished;
-    }
+        result = rplist_create(&pcache->prplist);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
 
-    result = rplist_initialize(pcache->prplist, islocal, filecount TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
+        result = rplist_initialize(pcache->prplist, pcache->islocal, filecount TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
     }
 
     pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
@@ -696,7 +726,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
 
     if(GetLastError() == ERROR_ALREADY_EXISTS)
     {
-        _ASSERT(islocal == 0);
+        _ASSERT(pcache->islocal == 0);
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
@@ -704,13 +734,17 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* Initialize the aplist_header if this is the first process */
-    if(islocal || isfirst)
+    if(pcache->islocal || isfirst)
     {
         /* No need to get a write lock as other processes */
         /* are blocked waiting for hinitdone event */
 
         /* Initialize relative path cache header */
-        rplist_initheader(pcache->prplist, filecount);
+        if(pcache->prplist != NULL)
+        {
+            rplist_initheader(pcache->prplist, filecount);
+        }
+
         cticks = GetTickCount();
 
         /* We can set rdcount to 0 safely as other processes are */
@@ -722,12 +756,16 @@ int aplist_initialize(aplist_context * pcache, unsigned short islocal, unsigned 
 
         _ASSERT(filecount > PER_RUN_SCAVENGE_COUNT);
         
-        header->ttlmax       = ttlmax * 1000;
-        header->scfreq       = header->ttlmax/(filecount/PER_RUN_SCAVENGE_COUNT);
-        header->lscavenge    = cticks;
-        header->scstart      = 0;
+        /* Calculate scavenger frequency if ttlmax is not 0 */
+        if(ttlmax != 0)
+        {
+            header->ttlmax       = ttlmax * 1000;
+            header->scfreq       = header->ttlmax/(filecount/PER_RUN_SCAVENGE_COUNT);
+            header->lscavenge    = cticks;
+            header->scstart      = 0;
 
-        _ASSERT(header->scfreq   > 0);
+            _ASSERT(header->scfreq > 0);
+        }
 
         header->valuecount   = filecount;
         memset((void *)header->values, 0, sizeof(size_t) * filecount);
@@ -962,6 +1000,12 @@ void aplist_terminate(aplist_context * pcache)
     return;
 }
 
+void aplist_disable_scavenger(aplist_context * pcache)
+{
+    _ASSERT(pcache != NULL);
+    pcache->scstatus = SCAVENGER_STATUS_INACTIVE;
+}
+
 int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue)
 {
     int              result   = NONFATAL;
@@ -986,7 +1030,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     ticks    = GetTickCount();
     apheader = pcache->apheader;
 
-    if((ticks - apheader->lscavenge) > apheader->scfreq)
+    if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE && ((ticks - apheader->lscavenge) > apheader->scfreq))
     {
         /* Get write lock, do last scavenge check again */
         /* and run the partial scavenger if required */
@@ -1995,7 +2039,7 @@ void aplist_runtest()
     unsigned short   islocal   = 0;
     unsigned int     filecount = 1040;
     unsigned int     fchfreq   = 5;
-    unsigned int     ttlmax    = 60;
+    unsigned int     ttlmax    = 0;
     char *           filename  = "testfile.php";
 
     TSRMLS_FETCH();
@@ -2007,7 +2051,7 @@ void aplist_runtest()
         goto Finished;
     }
 
-    result = aplist_initialize(pcache, islocal, filecount, fchfreq, ttlmax TSRMLS_CC);
+    result = aplist_initialize(pcache, APLIST_TYPE_GLOBAL, NULL, filecount, fchfreq, ttlmax TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

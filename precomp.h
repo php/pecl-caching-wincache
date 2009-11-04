@@ -101,6 +101,10 @@
 #define CACHE_TYPE_FILECONTENT     3
 #define CACHE_TYPE_BYTECODES       4
 
+#define APLIST_TYPE_INVALID        255
+#define APLIST_TYPE_GLOBAL         0
+#define APLIST_TYPE_OPCODE_LOCAL   1
+
 #include "wincache_debug.h"
 #include "wincache_utils.h"
 #include "wincache_error.h"

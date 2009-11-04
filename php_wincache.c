@@ -388,7 +388,6 @@ PHP_MINIT_FUNCTION(wincache)
     int              result    = NONFATAL;
     aplist_context * plcache1  = NULL;
     aplist_context * plcache2  = NULL;
-    unsigned short   islocal   = 0;
     int              resnumber = -1;
     zend_extension   extension = {0};
 
@@ -414,8 +413,13 @@ PHP_MINIT_FUNCTION(wincache)
     WCG(fcachesize)  = (WCG(fcachesize)  > FCACHE_SIZE_MAXIMUM) ? FCACHE_SIZE_MAXIMUM : WCG(fcachesize);
     WCG(maxfilesize) = (WCG(maxfilesize) < FILE_SIZE_MINIMUM)   ? FILE_SIZE_MINIMUM   : WCG(maxfilesize);
     WCG(maxfilesize) = (WCG(maxfilesize) > FILE_SIZE_MAXIMUM)   ? FILE_SIZE_MAXIMUM   : WCG(maxfilesize);
-    WCG(ttlmax)      = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
-    WCG(ttlmax)      = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
+
+    /* ttlmax can be set to 0 which means scavenger is completely disabled */
+    if(WCG(ttlmax) != 0)
+    {
+        WCG(ttlmax)      = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
+        WCG(ttlmax)      = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
+    }
 
     /* fcchkfreq can be set to 0 which will mean check is completely disabled */
     if(WCG(fcchkfreq) != 0)
@@ -453,7 +457,7 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
-    result = aplist_initialize(plcache1, islocal, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
+    result = aplist_initialize(plcache1, APLIST_TYPE_GLOBAL, NULL, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -493,9 +497,8 @@ PHP_MINIT_FUNCTION(wincache)
         }
 
         /* Couldn't map opcode cache segment at same address */
-        /* Create a local copy instead */
-        plcache1 = NULL;
-        islocal  = 1;
+        /* Disable scavenger for global aplist and create a local ocache */
+        aplist_disable_scavenger(plcache1);
 
         result = aplist_create(&plcache2);
         if(FAILED(result))
@@ -503,7 +506,7 @@ PHP_MINIT_FUNCTION(wincache)
             goto Finished;
         }
 
-        result = aplist_initialize(plcache2, islocal, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
+        result = aplist_initialize(plcache2, APLIST_TYPE_OPCODE_LOCAL, plcache1, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
@@ -907,7 +910,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
 
     /* Use file cache to expand relative paths and also standardize all paths */
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
-    /* TBD?? Make sure all caches can be used regardless of enabled setting */
+    /* Make sure all caches can be used regardless of enabled setting */
     result = aplist_fcache_get(WCG(lfcache), filename, &fullpath, NULL TSRMLS_CC);
     if(FAILED(result))
     {
