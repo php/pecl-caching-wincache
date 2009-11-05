@@ -457,7 +457,7 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
-    result = aplist_initialize(plcache1, APLIST_TYPE_GLOBAL, NULL, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
+    result = aplist_initialize(plcache1, APLIST_TYPE_GLOBAL, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -496,17 +496,14 @@ PHP_MINIT_FUNCTION(wincache)
             goto Finished;
         }
 
-        /* Couldn't map opcode cache segment at same address */
-        /* Disable scavenger for global aplist and create a local ocache */
-        aplist_disable_scavenger(plcache1);
-
+        /* Couldn't map at same address, create a local ocache*/
         result = aplist_create(&plcache2);
         if(FAILED(result))
         {
             goto Finished;
         }
 
-        result = aplist_initialize(plcache2, APLIST_TYPE_OPCODE_LOCAL, plcache1, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
+        result = aplist_initialize(plcache2, APLIST_TYPE_OPCODE_LOCAL, WCG(numfiles), WCG(fcchkfreq), WCG(ttlmax) TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
@@ -517,6 +514,9 @@ PHP_MINIT_FUNCTION(wincache)
         {
             goto Finished;
         }
+
+        /* Disable scavenger and set polocal in global aplist */
+        aplist_setsc_olocal(plcache1, plcache2);
 
         WCG(locache) = plcache2;
         WCG(issame)  = 0;

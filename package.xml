@@ -34,6 +34,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- removing the local entry when an entry in global aplist gets created */
 - ttlmax value 0 disables scavenger. Also disabled scavenger in processes which create local opcode cache */
 - Fix VC6 compatibility.
 - Added total memory row for the file cache and opcode cache overview tables. Also re-ordered the colums in the file cache list to be consistent with opcode cache list.

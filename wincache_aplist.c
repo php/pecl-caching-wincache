@@ -54,6 +54,7 @@ static int  create_aplist_data(aplist_context * pcache, const char * filename, a
 static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue);
 static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue);
 static void remove_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue);
+static void delete_aplist_fileentry(aplist_context * pcache, const char * filename);
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull);
 static int  set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue TSRMLS_DC);
 
@@ -465,6 +466,31 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
 }
 
 /* Call this method under write lock */
+static void delete_aplist_fileentry(aplist_context * pcache, const char * filename)
+{
+    unsigned int   findex = 0;
+    aplist_value * pvalue = NULL;
+
+    dprintverbose("start aplist_delete_entry");
+
+    _ASSERT(pcache   != NULL);
+    _ASSERT(filename != NULL);
+    _ASSERT(IS_ABSOLUTE(filename, strlen(filename)));
+
+    findex = utils_getindex(filename, pcache->apheader->valuecount);
+    findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue);
+    
+    /* If an entry is found for this file, remove it */
+    if(pvalue != NULL)
+    {
+        remove_aplist_entry(pcache, findex, pvalue);
+    }
+
+    dprintverbose("end aplist_delete_entry");
+    return;
+}
+
+/* Call this method under write lock */
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
 {
     unsigned int    sindex   = 0;
@@ -563,7 +589,7 @@ int aplist_create(aplist_context ** ppcache)
     pcache->aprwlock    = NULL;
     pcache->apalloc     = NULL;
 
-    pcache->pglobal     = NULL;
+    pcache->polocal     = NULL;
     pcache->prplist     = NULL;
     pcache->pfcache     = NULL;
     pcache->pocache     = NULL;
@@ -599,7 +625,7 @@ void aplist_destroy(aplist_context * pcache)
     return;
 }
 
-int aplist_initialize(aplist_context * pcache, unsigned short apctype, aplist_context * pglobal, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
+int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          mapsize  = 0;
@@ -616,16 +642,13 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, aplist_co
 
     _ASSERT(pcache       != NULL);
     _ASSERT(apctype      == APLIST_TYPE_GLOBAL  || apctype     == APLIST_TYPE_OPCODE_LOCAL);
-    _ASSERT(apctype      == APLIST_TYPE_GLOBAL  || pglobal     != NULL);
     _ASSERT(filecount    >= NUM_FILES_MINIMUM   && filecount   <= NUM_FILES_MAXIMUM);
     _ASSERT((fchangefreq >= FCHECK_FREQ_MINIMUM && fchangefreq <= FCHECK_FREQ_MAXIMUM) || fchangefreq == 0);
     _ASSERT((ttlmax      >= TTL_VALUE_MINIMUM   && ttlmax      <= TTL_VALUE_MAXIMUM)   || ttlmax == 0);
 
     /* If more APLIST_TYPE entries are added, add code to control value of islocal carefully */
     pcache->apctype = apctype;
-
     pcache->islocal = pcache->apctype;
-    pcache->pglobal = pglobal;
 
     /* Disable scavenger if opcode cache is local only */
     /* Or if ttlmax value is set to 0 */
@@ -1000,10 +1023,15 @@ void aplist_terminate(aplist_context * pcache)
     return;
 }
 
-void aplist_disable_scavenger(aplist_context * pcache)
+void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal)
 {
     _ASSERT(pcache != NULL);
+    _ASSERT(plocal != NULL);
+
     pcache->scstatus = SCAVENGER_STATUS_INACTIVE;
+    pcache->polocal  = plocal;
+
+    return;
 }
 
 int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue)
@@ -1073,6 +1101,15 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     /* or if the cache entry is stale, create a new entry */
     if(fchange == FILE_IS_CHANGED || pvalue == NULL)
     {
+        /* If we are about to create an entry in global aplist, */
+        /* remove the cache entry in local cache if one is present */
+        if(pcache->polocal != NULL)
+        {
+            lock_writelock(pcache->polocal->aprwlock);
+            delete_aplist_fileentry(pcache->polocal, filename);
+            lock_writeunlock(pcache->polocal->aprwlock);
+        }
+
         result = create_aplist_data(pcache, filename, &pnewval);
         if(FAILED(result))
         {
@@ -2051,7 +2088,7 @@ void aplist_runtest()
         goto Finished;
     }
 
-    result = aplist_initialize(pcache, APLIST_TYPE_GLOBAL, NULL, filecount, fchfreq, ttlmax TSRMLS_CC);
+    result = aplist_initialize(pcache, APLIST_TYPE_GLOBAL, filecount, fchfreq, ttlmax TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

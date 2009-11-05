@@ -89,7 +89,7 @@ struct aplist_context
     lock_context *     aprwlock;    /* Reader writer lock for aplist header */
     alloc_context *    apalloc;     /* Alloc context for aplist segment */
 
-    aplist_context *   pglobal;     /* Absolute path cache shared by other processes */
+    aplist_context *   polocal;     /* Absolute path cache with local opcode cache*/
     rplist_context *   prplist;     /* Relative path cache to resolve relative paths */
     fcache_context *   pfcache;     /* File cache containing file content */
     ocache_context *   pocache;     /* Opcode cache containing opcodes */
@@ -119,10 +119,10 @@ struct cache_info
 
 extern int  aplist_create(aplist_context ** ppcache);
 extern void aplist_destroy(aplist_context * pcache);
-extern int  aplist_initialize(aplist_context * pcache, unsigned short apctype, aplist_context * pglobal, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC);
+extern int  aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC);
 extern void aplist_terminate(aplist_context * pcache);
 
-extern void aplist_disable_scavenger(aplist_context * pcache);
+extern void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal);
 extern int  aplist_getinfo(aplist_context * pcache, unsigned char type, cache_info ** ppinfo);
 extern void aplist_freeinfo(unsigned char type, cache_info * pinfo);
 extern int  aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue);
