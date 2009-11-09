@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.0.1012.0"
+#define PHP_WINCACHE_EXTVER    "1.0.1109.0"
 
 /* comment following line for release builds */
 //#define WINCACHE_DEBUG
@@ -77,10 +77,6 @@
  #undef _ASSERT
 #endif
 
-#ifndef IsDebuggerPresent
-# define IsDebuggerPresent() (0)
-#endif
-
 #ifdef WINCACHE_DEBUG
 # define WINCACHE_TEST
 # define _ASSERT(x)   if(!(x)) { dprintalways(#x); if(IsDebuggerPresent()) { DebugBreak(); } }
@@ -89,11 +85,12 @@
 #endif
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
- #define memcpy_s(dst, size, src, cnt) memcpy(dst, src, cnt)
- #define sprintf_s(buffer, size, format) sprintf(buffer, format)
- #define _snprintf_s wincache_php_snprintf_s
- #define vsprintf_s(buffer, size, format, va_alist) vsprintf(buffer, format, va_alist)
- #define strcpy_s(src, size, dst) strcpy(src, dst)
+# define IsDebuggerPresent() (0)
+# define memcpy_s(dst, size, src, cnt) memcpy(dst, src, cnt)
+# define sprintf_s(buffer, size, format) sprintf(buffer, format)
+# define _snprintf_s wincache_php_snprintf_s
+# define vsprintf_s(buffer, size, format, va_alist) vsprintf(buffer, format, va_alist)
+# define strcpy_s(src, size, dst) strcpy(src, dst)
 #endif
 
 #define CACHE_TYPE_FILELIST        1

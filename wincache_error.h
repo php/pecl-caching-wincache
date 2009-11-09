@@ -49,6 +49,7 @@
 #define FATAL_NEED_MORE_MEMORY              16
 #define FATAL_UNEXPECTED_DATA               17
 
+#define FATAL_ZEND_BAILOUT                  98
 #define FATAL_UNKNOWN_FATAL                 99
 
 /* Error codes used by lock functionality */

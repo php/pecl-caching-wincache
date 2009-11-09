@@ -878,6 +878,11 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     ocache_value *   povalue  = NULL;
     unsigned char    cenabled = 0;
 
+    dprintverbose("start wincache_compile_file");
+
+    _ASSERT(WCG(locache)          != NULL);
+    _ASSERT(WCG(locache)->pocache != NULL);
+
     cenabled = WCG(ocenabled);
 
     /* If ocenabled is not modified in php code and toggle is set, change cenabled */
@@ -887,22 +892,15 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         cenabled = !cenabled;
     }
 
-    /* If effective value of wincache.ocenabled is 0, use original_compile_file */
-    /* or if file_handle is passed null, use original_compile_file */
-    if(!cenabled || file_handle == NULL)
+    /* If effective value of wincache.ocenabled is 0,  or if file_handle is passed null, */
+    /* or if filename is test_file or if the file is in ignorelist, use original_compile_file */
+    if(cenabled && file_handle != NULL)
     {
-        oparray = original_compile_file(file_handle, type TSRMLS_CC);
-        goto Finished;
+        filename = utils_filepath(file_handle);
     }
 
-    dprintverbose("start wincache_compile_file");
-
-    _ASSERT(WCG(locache)          != NULL);
-    _ASSERT(WCG(locache)->pocache != NULL);
-
-    /* If filename is not set, use original_compile_file */
-    filename = utils_filepath(file_handle);
-    if(filename == NULL)
+    /* Nothing to cleanup. So original_compile triggering bailout is fine */
+    if(filename == NULL || strstr(filename, WINCACHE_TEST_FILE) != NULL || isin_ignorelist(WCG(ignorelist), filename))
     {
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
         goto Finished;
@@ -917,16 +915,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         goto Finished;
     }
 
-    dprintimportant("compile_file called for %s", fullpath);
-
-    /* Hook so that test file is not added to cache */
-    if(strstr(filename, WINCACHE_TEST_FILE) != NULL || isin_ignorelist(WCG(ignorelist), filename))
-    {
-        dprintimportant("cache is disabled for the file because of ignore list");
-        
-        oparray = original_compile_file(file_handle, type TSRMLS_CC);
-        goto Finished;
-    }
+    dprintimportant("wincache_compile_file called for %s", fullpath);
 
     /* Add the file before calling compile_file so that file is */
     /* engine doesn't try to compile file again if it detects so */
@@ -992,7 +981,7 @@ Finished:
         fullpath = NULL;
     }
 
-    if(FAILED(result))
+    if(FAILED(result) && result != FATAL_ZEND_BAILOUT)
     {
         if(result != FATAL_OPCOPY_MISSING_PARENT)
         {

@@ -336,20 +336,25 @@ int ocache_createval(ocache_context * pcache, const char * filename, zend_file_h
     oldclc = zend_hash_num_elements(CG(class_table));
     oldtnc = zend_hash_num_elements(EG(zend_constants));
 
-    /* There is a possibility that original_compile_file call never */
-    /* returns. Clear errmsglist before we call original_compile_file again */
-    if(WCG(errmsglist) != NULL)
-    {
-        zend_llist_destroy(WCG(errmsglist));
-        alloc_efree(WCG(errmsglist));
-        WCG(errmsglist) = NULL;
-    }
-
     /* set zend_error_cb to collect messages generated at compile time */
     /* call function which will produce opcodes by parsing php code */
     /* and set zend_error_cb back to original valie */
     zend_error_cb = wincache_error_cb;
-    oparray = original_compile_file(file_handle, type TSRMLS_CC);
+
+    /* Call to original_compile_file might trigger a bailout */
+    /* Catch the bailout, do cleanup and retrigger bailout */
+    zend_try
+    {
+        oparray = original_compile_file(file_handle, type TSRMLS_CC);
+    }
+    zend_catch
+    {
+        result  = FATAL_ZEND_BAILOUT;
+        goto Finished;
+    }
+    zend_end_try();
+
+    /* Revert back to original error handler */
     zend_error_cb = original_error_cb;
 
     if(oparray == NULL)
@@ -446,6 +451,15 @@ Finished:
         WCG(errmsglist) = NULL;
     }
 
+    /* After cleanup, do an official bailout */
+    if(result == FATAL_ZEND_BAILOUT)
+    {
+        zend_error_cb = original_error_cb;
+        result = NONFATAL;
+
+        zend_bailout();
+    }
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_createval", result);
@@ -511,11 +525,12 @@ void ocache_destroyval(ocache_context * pocache, ocache_value * pvalue)
 
 int ocache_useval(ocache_context * pcache, ocache_value * pvalue, zend_op_array ** pparray TSRMLS_DC)
 {
-    int              result  = NONFATAL;
-    opcopy_context * popcopy = NULL;
-    unsigned int     hcount  = 9999;
-    unsigned int     index   = 0;
-    zend_op_array *  oparray = NULL;
+    int                 result   = NONFATAL;
+    opcopy_context *    popcopy  = NULL;
+    unsigned int        hcount   = 9999;
+    unsigned int        index    = 0;
+    zend_op_array *     oparray  = NULL;
+    zend_execute_data * execdata = NULL;
 
     dprintverbose("start ocache_useval");
 
@@ -566,12 +581,27 @@ int ocache_useval(ocache_context * pcache, ocache_value * pvalue, zend_op_array 
     popcopy->optype = OPCOPY_OPERATION_COPYOUT;
     popcopy->cacheopa = NULL;
 
-    result = opcopy_zend_copyout(popcopy, pvalue TSRMLS_CC);
-    if(FAILED(result))
+    /* copyout might trigger a bailout which needs to be ignored */
+    execdata = EG(current_execute_data);
+    zend_try
     {
+        result = opcopy_zend_copyout(popcopy, pvalue TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+    zend_catch
+    {
+        CG(unclean_shutdown) = 0;
+        EG(current_execute_data) = execdata;
+        EG(in_execution) = 1;
+
+        result = FATAL_ZEND_BAILOUT;
         goto Finished;
     }
-        
+    zend_end_try();
+
     _ASSERT(popcopy->cacheopa != NULL);
     oparray = popcopy->cacheopa;
 
