@@ -34,6 +34,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- First file executed appears duplicate in included_files list because WinCache adds the file in lowercase which is different from PHP core.
 - Taken care of zend bailout properly.
 - Removing the local entry when an entry in global aplist gets created.
 - Scavenger gets disabled if ttlmax value is 0. Also disabled scavenger in processes which create local opcode cache.

@@ -915,11 +915,18 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         goto Finished;
     }
 
-    dprintimportant("wincache_compile_file called for %s", fullpath);
-
-    /* Add the file before calling compile_file so that file is */
-    /* engine doesn't try to compile file again if it detects so */
-    zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
+    /* Add the file before calling compile_file so that engine doesn't */
+    /* try to compile file again if it detects it in included_files list */
+    if(file_handle->opened_path != NULL)
+    {
+        dprintimportant("wincache_compile_file called for %s", file_handle->opened_path);
+        zend_hash_add(&EG(included_files), file_handle->opened_path, strlen(file_handle->opened_path) + 1, (void *)&dummy, sizeof(int), NULL);
+    }
+    else
+    {
+        dprintimportant("wincache_compile_file called for %s", fullpath);
+        zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
+    }
 
     result = aplist_ocache_get(WCG(locache), fullpath, file_handle, type, &oparray, &povalue TSRMLS_CC);
     if(FAILED(result))
