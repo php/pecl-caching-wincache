@@ -125,8 +125,8 @@ $sort_key = null;
 
 function cmp($a, $b)
 {
-	global $sort_key;
-	return strcmp(get_trimmed_filename( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_filename( $b[$sort_key], PATH_MAX_LENGTH ));
+    global $sort_key;
+    return strcmp( get_trimmed_filename( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_filename( $b[$sort_key], PATH_MAX_LENGTH ) );
 }
 
 function convert_bytes_to_string( $bytes ) {
@@ -928,8 +928,8 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Number of times cache has been hit">Hit count</th>
             </tr>
 <?php 
-	$sort_key = 'file_name';
-	usort($ocache_file_info['file_entries'], "cmp");
+    $sort_key = 'file_name';
+    usort( $ocache_file_info['file_entries'], 'cmp' );
     foreach ( $ocache_file_info['file_entries'] as $entry ) {
         echo '<tr title="', $entry['file_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_filename( $entry['file_name'], PATH_MAX_LENGTH ),'</td>', "\n";
@@ -1004,8 +1004,8 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Number of times the file has been served from the cache">Hit Count</th>
         </tr>
 <?php 
-	$sort_key = 'file_name';
-	usort($fcache_file_info['file_entries'], "cmp");
+    $sort_key = 'file_name';
+    usort( $fcache_file_info['file_entries'], 'cmp' );
     foreach ( $fcache_file_info['file_entries'] as $entry ) {
         echo '<tr title="', $entry['file_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_filename( $entry['file_name'], PATH_MAX_LENGTH ),'</td>', "\n";
@@ -1058,8 +1058,8 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th>Subkey data</th>
         </tr>
 <?php 
-	$sort_key = 'relative_path';
-	usort($rpcache_file_info['file_entries'], "cmp");
+    $sort_key = 'relative_path';
+    usort( $rpcache_file_info['file_entries'], 'cmp' );
     foreach ( $rpcache_file_info['rplist_entries'] as $entry ) {
         echo '<tr title="',$entry['subkey_data'], '">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['relative_path'], PATH_MAX_LENGTH ),'</td>', "\n";
