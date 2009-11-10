@@ -71,8 +71,8 @@ if ( USE_AUTHENTICATION == 1 ) {
             exit;
         }
     }
-    else if ( !isset($_SERVER['PHP_AUTH_USER'] ) || !isset( $_SERVER['PHP_AUTH_PW'] ) ||	
-    $_SERVER['PHP_AUTH_USER'] != USERNAME || $_SERVER['PHP_AUTH_PW'] != PASSWORD ) {
+    else if ( !isset($_SERVER['PHP_AUTH_USER'] ) || !isset( $_SERVER['PHP_AUTH_PW'] ) ||
+              $_SERVER['PHP_AUTH_USER'] != USERNAME || $_SERVER['PHP_AUTH_PW'] != PASSWORD ) {
         header( 'WWW-Authenticate: Basic realm="WINCACHE Log In!"' );
         header( 'HTTP/1.0 401 Unauthorized' );
         exit;
@@ -176,7 +176,7 @@ function get_trimmed_string( $input, $max_len ) {
     if ( strlen( $result ) > $max_len ) 
         $result = substr( $result, 0, $max_len - 3 ). '...';
         
-    return $result;	
+    return $result;
 }
 
 function get_trimmed_ini_value( $input, $max_len, $separators = array('|', ',') ) {
@@ -245,7 +245,7 @@ if ( $img > 0 ) {
             $hit_percent = round( $hits / ( $hits + $misses ) * 100, 2 );
             $miss_percent = round( $misses / ( $hits + $misses ) * 100, 2 );
         }
-        $data = array( 'Hits' => $hit_percent, 'Misses' => $miss_percent );		
+        $data = array( 'Hits' => $hit_percent, 'Misses' => $miss_percent );
         
         $image = imagecreate( $width, $height ); 
 
@@ -499,7 +499,7 @@ function get_chart_markup( $data_type, $chart_type ) {
 
 function init_cache_info( $cache_type = SUMMARY_DATA )
 {
-    global	$ocache_mem_info, 
+    global  $ocache_mem_info, 
             $ocache_file_info,
             $ocache_summary_info,
             $fcache_mem_info,
@@ -516,7 +516,7 @@ function init_cache_info( $cache_type = SUMMARY_DATA )
     if ( $cache_type == SUMMARY_DATA || $cache_type == FCACHE_DATA ) {
         $fcache_mem_info = wincache_fcache_meminfo();
         $fcache_file_info = wincache_fcache_fileinfo();
-        $fcache_summary_info = get_fcache_summary( $fcache_file_info['file_entries'] );		
+        $fcache_summary_info = get_fcache_summary( $fcache_file_info['file_entries'] );
     }
     if ( $cache_type == SUMMARY_DATA || $cache_type == RCACHE_DATA ){
         $rpcache_mem_info = wincache_rplist_meminfo();
@@ -557,7 +557,7 @@ h1 {
     width: 100%;
     overflow: hidden;
     border-bottom: 1px solid black;
-/*bottom horizontal line that runs beneath tabs*/	margin-bottom: 1em;
+    margin-bottom: 1em; /*bottom horizontal line that runs beneath tabs*/
 }
 #menu ul {
     margin: 0;
@@ -577,8 +577,8 @@ h1 {
     text-decoration: none;
     margin: 0;
     padding: 7px 8px;
-/*padding inside each tab*/	border-right: 1px solid white;
-/*right divider between tabs*/	color: white;
+    border-right: 1px solid white; /*padding inside each tab*/
+    color: white; /*right divider between tabs*/
     background: #5C87B2; /*background of tabs (default state)*/
 }
 #menu li a:visited {

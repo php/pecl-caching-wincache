@@ -35,10 +35,10 @@
 
 #define NUM_FILES_MINIMUM           1024
 #define NUM_FILES_MAXIMUM           16384
-#define OCACHE_SIZE_MINIMUM         32
+#define OCACHE_SIZE_MINIMUM         16
 #define OCACHE_SIZE_MAXIMUM         256
-#define FCACHE_SIZE_MINIMUM         32
-#define FCACHE_SIZE_MAXIMUM         256
+#define FCACHE_SIZE_MINIMUM         8
+#define FCACHE_SIZE_MAXIMUM         128
 #define FILE_SIZE_MINIMUM           10
 #define FILE_SIZE_MAXIMUM           2048
 #define FCHECK_FREQ_MINIMUM         2
@@ -158,8 +158,8 @@ PHP_INI_BEGIN()
 /* index 0 */  STD_PHP_INI_BOOLEAN("wincache.fcenabled", "1", PHP_INI_ALL, OnUpdateBool, fcenabled, zend_wincache_globals, wincache_globals)
 /* index 1 */  STD_PHP_INI_BOOLEAN("wincache.ocenabled", "1", PHP_INI_ALL, OnUpdateBool, ocenabled, zend_wincache_globals, wincache_globals)
 /* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
-/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "128", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
-/* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "128", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)
+/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "32", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
+/* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "96", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)
 /* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
 /* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
 /* index 7 */  STD_PHP_INI_ENTRY("wincache.chkinterval", "30", PHP_INI_SYSTEM, OnUpdateLong, fcchkfreq, zend_wincache_globals, wincache_globals)
@@ -188,8 +188,8 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(fcenabled)   = 1;    /* File cache enabled by default */
     WCG(ocenabled)   = 1;    /* Opcode cache enabled by default */
     WCG(enablecli)   = 0;    /* WinCache not enabled by default for CLI */
-    WCG(fcachesize)  = 128;  /* File cache size is 128 MB by default */
-    WCG(ocachesize)  = 128;  /* Opcode cache size is 128 MB by default */
+    WCG(fcachesize)  = 32;   /* File cache size is 32 MB by default */
+    WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
     WCG(maxfilesize) = 256;  /* Maximum file size to cache is 256 KB */
     WCG(numfiles)    = 4096; /* 4096 hashtable keys */
     WCG(fcchkfreq)   = 30;   /* File change check done every 30 secs */
