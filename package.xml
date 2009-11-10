@@ -34,6 +34,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- WINCACHE.PHP will now display files in Output cache and File cache in lexicographical sorted way. The same holds true for relative path cache tab.
 - First file executed appears duplicate in included_files list because WinCache adds the file in lowercase which is different from PHP core.
 - Taken care of zend bailout properly.
 - Removing the local entry when an entry in global aplist gets created.

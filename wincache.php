@@ -921,6 +921,11 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Number of times cache has been hit">Hit count</th>
             </tr>
 <?php 
+	function cmp($a, $b)
+	{
+		return strcmp(get_trimmed_filename( $a['file_name'], PATH_MAX_LENGTH ), get_trimmed_filename( $b['file_name'], PATH_MAX_LENGTH ));
+	}
+	usort($ocache_file_info['file_entries'], "cmp");
     foreach ( $ocache_file_info['file_entries'] as $entry ) {
         echo '<tr title="', $entry['file_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_filename( $entry['file_name'], PATH_MAX_LENGTH ),'</td>', "\n";
@@ -995,6 +1000,11 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Number of times the file has been served from the cache">Hit Count</th>
         </tr>
 <?php 
+	function cmp($a, $b)
+	{
+		return strcmp(get_trimmed_filename( $a['file_name'], PATH_MAX_LENGTH ), get_trimmed_filename( $b['file_name'], PATH_MAX_LENGTH ));
+	}
+	usort($fcache_file_info['file_entries'], "cmp");
     foreach ( $fcache_file_info['file_entries'] as $entry ) {
         echo '<tr title="', $entry['file_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_filename( $entry['file_name'], PATH_MAX_LENGTH ),'</td>', "\n";
@@ -1047,6 +1057,11 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th>Subkey data</th>
         </tr>
 <?php 
+	function cmp($a, $b)
+	{
+		return strcmp(get_trimmed_filename( $a['relative_path'], PATH_MAX_LENGTH ), get_trimmed_filename( $b['relative_path'], PATH_MAX_LENGTH ));
+	}
+	usort($rpcache_file_info['file_entries'], "cmp");
     foreach ( $rpcache_file_info['rplist_entries'] as $entry ) {
         echo '<tr title="',$entry['subkey_data'], '">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['relative_path'], PATH_MAX_LENGTH ),'</td>', "\n";
