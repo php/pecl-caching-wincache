@@ -350,9 +350,13 @@ int ocache_createval(ocache_context * pcache, const char * filename, zend_file_h
     zend_catch
     {
         result  = FATAL_ZEND_BAILOUT;
-        goto Finished;
     }
     zend_end_try();
+
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
 
     /* Revert back to original error handler */
     zend_error_cb = original_error_cb;
@@ -586,10 +590,6 @@ int ocache_useval(ocache_context * pcache, ocache_value * pvalue, zend_op_array 
     zend_try
     {
         result = opcopy_zend_copyout(popcopy, pvalue TSRMLS_CC);
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
     }
     zend_catch
     {
@@ -598,9 +598,13 @@ int ocache_useval(ocache_context * pcache, ocache_value * pvalue, zend_op_array 
         EG(in_execution) = 1;
 
         result = FATAL_ZEND_BAILOUT;
-        goto Finished;
     }
     zend_end_try();
+
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
 
     _ASSERT(popcopy->cacheopa != NULL);
     oparray = popcopy->cacheopa;
