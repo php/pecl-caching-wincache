@@ -126,7 +126,12 @@ $sort_key = null;
 function cmp($a, $b)
 {
     global $sort_key;
-    return strcmp( get_trimmed_filename( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_filename( $b[$sort_key], PATH_MAX_LENGTH ) );
+    if ( $sort_key == 'file_name' )
+        return strcmp( get_trimmed_filename( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_filename( $b[$sort_key], PATH_MAX_LENGTH ) );
+    else if ( $sort_key == 'relative_path' )
+        return strcmp( get_trimmed_string( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_string( $b[$sort_key], PATH_MAX_LENGTH ) );
+    else
+        return 0;
 }
 
 function convert_bytes_to_string( $bytes ) {
@@ -1059,7 +1064,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         </tr>
 <?php 
     $sort_key = 'relative_path';
-    usort( $rpcache_file_info['file_entries'], 'cmp' );
+    usort( $rpcache_file_info['rplist_entries'], 'cmp' );
     foreach ( $rpcache_file_info['rplist_entries'] as $entry ) {
         echo '<tr title="',$entry['subkey_data'], '">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['relative_path'], PATH_MAX_LENGTH ),'</td>', "\n";
