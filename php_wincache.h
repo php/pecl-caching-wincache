@@ -37,6 +37,13 @@
 extern zend_module_entry wincache_module_entry;
 #define phpext_wincache_ptr &wincache_module_entry
 
+/* For static builds we need all the headers as this 
+ * file is included in main/internal_functions.c
+ */
+#ifndef COMPILE_DL_WINCACHE
+#include "precomp.h"
+#endif
+
 typedef struct ocacheval_list ocacheval_list;
 struct ocacheval_list
 {
