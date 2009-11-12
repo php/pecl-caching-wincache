@@ -444,7 +444,7 @@ if ( $img > 0 ) {
         case OCACHE_DATA: {
             if ( $chart_type == PIE_CHART ){
                 $ocache_mem_info = wincache_ocache_meminfo();
-                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, ini_get('wincache.ocachesize') * 1048576 - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'], 'Memory Usage by Opcode Cache (in %)' );
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, $ocache_mem_info['memory_total'] - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'], 'Memory Usage by Opcode Cache (in %)' );
             }
             else{
                 $ocache_file_info = wincache_ocache_fileinfo();
@@ -455,7 +455,7 @@ if ( $img > 0 ) {
         case FCACHE_DATA: {
             if ( $chart_type == PIE_CHART ){
                 $fcache_mem_info = wincache_fcache_meminfo();
-                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, ini_get('wincache.fcachesize') * 1048576 - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'], 'Memory Usage by File Cache (in %)' );
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, $fcache_mem_info['memory_total'] - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'], 'Memory Usage by File Cache (in %)' );
             }
             else{
                 $fcache_file_info = wincache_fcache_fileinfo();
