@@ -23,14 +23,14 @@
     <email>ksingla@microsoft.com</email>
     <active>yes</active>
   </lead>
-  <date>2009-10-22</date>
+  <date>2009-11-12</date>
   <version>
-    <release>1.0.0-dev</release>
-    <api>1.0.0-dev</api>
+    <release>1.0.0beta</release>
+    <api>1.0.0beta</api>
   </version>
   <stability>
-    <release>RC</release>
-    <api>RC</api>
+    <release>beta</release>
+    <api>beta</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
@@ -95,6 +95,7 @@
     </required>
   </dependencies>
   <providesextension>wincache</providesextension>
+  <extsrcrelease/>
   <changelog>
  </changelog>
 </package>
