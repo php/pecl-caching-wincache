@@ -55,7 +55,7 @@ error_context wincache_errors[] =
     { FATAL_FCACHE_GETFILESIZE, "Fatal: GetFileSize call failed" },
     { FATAL_FCACHE_READFILE, "Fatal: ReadFile call failed" },
     { FATAL_FCACHE_INITIALIZE, "Fatal: Failure while initializing file cache module" },
-    { FATAL_FCACHE_TOOBIG, "Warning: File too big for file cache" },
+    { WARNING_FCACHE_TOOBIG, "Warning: File too big for file cache" },
     { FATAL_FCACHE_FILEINFO, "Fatal: Failure in FileInfo" }
 };
 

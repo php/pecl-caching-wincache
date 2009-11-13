@@ -82,7 +82,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end lock_create");
@@ -305,7 +305,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plock->haccess != NULL)
         {
@@ -403,7 +403,7 @@ void lock_readlock(lock_context * plock)
     long   rcount    = 0;
     HANDLE hArray[2];
 
-    dprintverbose("start lock_readlock");
+    dprintdecorate("start lock_readlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -441,7 +441,7 @@ void lock_readlock(lock_context * plock)
 
     plock->state = LOCK_STATE_READLOCK;
 
-    dprintverbose("end lock_readlock");
+    dprintdecorate("end lock_readlock");
     return;
 }
 
@@ -450,7 +450,7 @@ void lock_readunlock(lock_context * plock)
 {
     long rcount = 0;
 
-    dprintverbose("start lock_readunlock");
+    dprintdecorate("start lock_readunlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -488,7 +488,7 @@ void lock_readunlock(lock_context * plock)
 
     plock->state = LOCK_STATE_UNLOCKED;
 
-    dprintverbose("end lock_readunlock");
+    dprintdecorate("end lock_readunlock");
     return;
 }
 
@@ -497,7 +497,7 @@ void lock_writelock(lock_context * plock)
 {
     HANDLE hArray[3] = {0};
 
-    dprintverbose("start lock_writelock");
+    dprintdecorate("start lock_writelock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -534,14 +534,14 @@ void lock_writelock(lock_context * plock)
 
     plock->state = LOCK_STATE_WRITELOCK;
 
-    dprintverbose("end lock_writelock");
+    dprintdecorate("end lock_writelock");
     return;
 }
 
 /* Release write lock */
 void lock_writeunlock(lock_context * plock)
 {
-    dprintverbose("start lock_writeunlock");
+    dprintdecorate("start lock_writeunlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -574,7 +574,7 @@ void lock_writeunlock(lock_context * plock)
 
     plock->state = LOCK_STATE_UNLOCKED;
 
-    dprintverbose("end lock_writeunlock");
+    dprintdecorate("end lock_writeunlock");
     return;
 }
 
@@ -611,7 +611,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_getnewname", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end lock_getnewname");

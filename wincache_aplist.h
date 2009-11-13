@@ -48,6 +48,7 @@ struct aplist_value
     unsigned int    add_ticks;      /* Ticks when this entry was created */
     unsigned int    use_ticks;      /* Ticks when this entry was last used */
     unsigned int    last_check;     /* Ticks when last file change check was made */
+    unsigned short  is_deleted;     /* If set to 1, value is marked for deletion */
 
     size_t          fcacheval;      /* File cache value offset */
     size_t          ocacheval;      /* Opcode cache value offset */

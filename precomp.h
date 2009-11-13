@@ -102,6 +102,19 @@
 #define APLIST_TYPE_GLOBAL         0
 #define APLIST_TYPE_OPCODE_LOCAL   1
 
+#define NUM_FILES_MINIMUM          1024
+#define NUM_FILES_MAXIMUM          16384
+#define OCACHE_SIZE_MINIMUM        16
+#define OCACHE_SIZE_MAXIMUM        256
+#define FCACHE_SIZE_MINIMUM        8
+#define FCACHE_SIZE_MAXIMUM        128
+#define FILE_SIZE_MINIMUM          10
+#define FILE_SIZE_MAXIMUM          2048
+#define FCHECK_FREQ_MINIMUM        2
+#define FCHECK_FREQ_MAXIMUM        300
+#define TTL_VALUE_MINIMUM          60
+#define TTL_VALUE_MAXIMUM          7200
+
 #include "wincache_debug.h"
 #include "wincache_utils.h"
 #include "wincache_error.h"

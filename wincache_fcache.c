@@ -88,8 +88,8 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in read_file_security", result);
-        _ASSERT(FALSE);
+	dprintimportant("failure %d in read_file_security", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(psec_desc != NULL)
         {
@@ -172,7 +172,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in read_file_content", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end read_file_content");
@@ -215,7 +215,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end fcache_create");
@@ -251,8 +251,8 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     dprintverbose("start fcache_initialize");
 
     _ASSERT(pfcache   != NULL);
-    _ASSERT(cachesize >= 32 && cachesize <= 256);
-    _ASSERT(maxfsize  >= 10 && maxfsize  <= 2048);
+    _ASSERT(cachesize >= FCACHE_SIZE_MINIMUM && cachesize <= FCACHE_SIZE_MAXIMUM);
+    _ASSERT(maxfsize  >= FILE_SIZE_MINIMUM   && maxfsize  <= FILE_SIZE_MAXIMUM);
 
     /* Initialize memory map to store code files */
     result = filemap_create(&pfcache->pfilemap);
@@ -364,7 +364,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pfcache->palloc != NULL)
         {
@@ -504,7 +504,7 @@ int fcache_createval(fcache_context * pfcache, const char * filename, fcache_val
     /* Dont cache files bigger than maxfsize */
     if(filesize > pfcache->maxfsize)
     {
-        result = FATAL_FCACHE_TOOBIG;
+        result = WARNING_FCACHE_TOOBIG;
         goto Finished;
     }
 
@@ -563,8 +563,8 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_createval", result);
-        _ASSERT(FALSE);
-
+        _ASSERT(result > WARNING_COMMON_BASE);
+	
         if(buffer != NULL)
         {
             alloc_sfree(pfcache->palloc, buffer);
@@ -694,7 +694,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_useval", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fhandle != NULL)
         {
@@ -785,7 +785,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_getinfo", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end fcache_getinfo");

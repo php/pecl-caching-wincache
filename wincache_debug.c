@@ -38,16 +38,18 @@
 #define WINCACHE_DEBUG_MTYPE_CRITICAL  201
 #define WINCACHE_DEBUG_MTYPE_IMPORTANT 301
 #define WINCACHE_DEBUG_MTYPE_VERBOSE   401
+#define WINCACHE_DEBUG_MTYPE_DECORATE  501
 
 unsigned int gdebuglevel = 0;
 
 void dprintsetlevel(unsigned int level)
 {
-    if(level == WINCACHE_DEBUG_MTYPE_DISABLED ||
-       level == WINCACHE_DEBUG_MTYPE_ALWAYS ||
-       level == WINCACHE_DEBUG_MTYPE_CRITICAL ||
+    if(level == WINCACHE_DEBUG_MTYPE_DISABLED  ||
+       level == WINCACHE_DEBUG_MTYPE_ALWAYS    ||
+       level == WINCACHE_DEBUG_MTYPE_CRITICAL  ||
        level == WINCACHE_DEBUG_MTYPE_IMPORTANT ||
-       level == WINCACHE_DEBUG_MTYPE_VERBOSE)
+       level == WINCACHE_DEBUG_MTYPE_VERBOSE   || 
+       level == WINCACHE_DEBUG_MTYPE_DECORATE)
     {
         gdebuglevel = level;
     }
@@ -105,5 +107,13 @@ void dprintverbose(char * format, ...)
     va_list args;
     va_start(args, format);
     dprintmessage(WINCACHE_DEBUG_MTYPE_VERBOSE, format, args);
+    va_end(args);
+}
+
+void dprintdecorate(char * format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    dprintmessage(WINCACHE_DEBUG_MTYPE_DECORATE, format, args);
     va_end(args);
 }

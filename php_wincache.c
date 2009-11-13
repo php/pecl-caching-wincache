@@ -33,19 +33,6 @@
 
 #include "precomp.h"
 
-#define NUM_FILES_MINIMUM           1024
-#define NUM_FILES_MAXIMUM           16384
-#define OCACHE_SIZE_MINIMUM         16
-#define OCACHE_SIZE_MAXIMUM         256
-#define FCACHE_SIZE_MINIMUM         8
-#define FCACHE_SIZE_MAXIMUM         128
-#define FILE_SIZE_MINIMUM           10
-#define FILE_SIZE_MAXIMUM           2048
-#define FCHECK_FREQ_MINIMUM         2
-#define FCHECK_FREQ_MAXIMUM         300
-#define TTL_VALUE_MINIMUM           60
-#define TTL_VALUE_MAXIMUM           7200
-
 #define NAMESALT_LENGTH_MAXIMUM     8
 #define OCENABLED_INDEX_IN_GLOBALS  1
 #define FCENABLED_INDEX_IN_GLOBALS  0
@@ -541,7 +528,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in php_minit", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plcache1 != NULL)
         {
@@ -774,7 +761,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("wincache_resolve_path failed with error %u", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(resolve_path != NULL)
         {
@@ -852,7 +839,7 @@ Finished:
         /* We can fail for big files or if we are not able to find file */
         /* If we fail, let original stream open function do its job */
         dprintimportant("wincache_stream_open_function failed with error %u", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fullpath != NULL)
         {
@@ -926,6 +913,9 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     {
         dprintimportant("wincache_compile_file called for %s", fullpath);
         zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
+
+	/* Set opened_path to fullpath */
+	file_handle->opened_path = alloc_estrdup(fullpath);
     }
 
     result = aplist_ocache_get(WCG(locache), fullpath, file_handle, type, &oparray, &povalue TSRMLS_CC);
@@ -947,11 +937,6 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
 
         /* If everything went file, add the file handle to open_files */
         /* list for PHP core to call the destructor when done */
-        if(file_handle->opened_path == NULL)
-        {
-           file_handle->opened_path = alloc_estrdup(filename);
-        }
-
         zend_llist_add_element(&CG(open_files), file_handle);
 
         _ASSERT(SUCCEEDED(result));
@@ -990,11 +975,8 @@ Finished:
 
     if(FAILED(result) && result != FATAL_ZEND_BAILOUT)
     {
-        if(result != FATAL_OPCOPY_MISSING_PARENT)
-        {
-            dprintimportant("failure %d in wincache_compile_file", result);
-            _ASSERT(FALSE);
-        }
+        dprintimportant("failure %d in wincache_compile_file", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* If we fail to compile file, let PHP core give a try */
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
@@ -1427,7 +1409,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in wincache_refresh_if_changed", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -1448,7 +1430,6 @@ PHP_FUNCTION(wincache_runtests)
     ocache_runtest();
     opcopy_runtest();
     fcache_runtest();
-    optimizer_runtest();
     
     dprintverbose("end wincache_runtests");
     return;

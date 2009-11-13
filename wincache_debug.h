@@ -40,5 +40,6 @@ extern void dprintalways(char * format, ...);
 extern void dprintcritical(char * format, ...);
 extern void dprintimportant(char * format, ...);
 extern void dprintverbose(char * format, ...);
+extern void dprintdecorate(char * format, ...);
 
 #endif /* _WINCACHE_DEBUG_H_ */

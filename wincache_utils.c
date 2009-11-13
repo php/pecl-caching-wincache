@@ -132,7 +132,7 @@ unsigned int utils_crc32(const char * str, unsigned int strlen)
     char         chvalue     = 0;
     char         toldiff     = 'a' - 'A';
 
-    dprintverbose("start utils_crc32");
+    dprintdecorate("start utils_crc32");
 
     for(index = 0; index < strlen; index++)
     {
@@ -146,7 +146,7 @@ unsigned int utils_crc32(const char * str, unsigned int strlen)
         crcvalue = ((crcvalue >> 8) & 0x00FFFFFF) ^ crc32_table[table_index];
     }
 
-    dprintverbose("end utils_crc32");
+    dprintdecorate("end utils_crc32");
 
     return ~crcvalue;
 }
@@ -161,7 +161,7 @@ unsigned int utils_getindex(const char * filename, unsigned int numfiles)
     unsigned int hash   = 0;
     unsigned int length = 0;
 
-    dprintverbose("start utils_getindex");
+    dprintdecorate("start utils_getindex");
     _ASSERT(filename != NULL);
 
     length = strlen(filename);
@@ -170,7 +170,7 @@ unsigned int utils_getindex(const char * filename, unsigned int numfiles)
     hash = utils_hashcalc(filename, length);
     hash = hash % numfiles;
 
-    dprintverbose("end utils_getindex");
+    dprintdecorate("end utils_getindex");
 
     return hash;
 }
@@ -272,7 +272,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in utils_cwdcxec", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end utils_cwdcexec");

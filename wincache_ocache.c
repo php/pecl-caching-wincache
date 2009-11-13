@@ -75,7 +75,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_create");
@@ -112,7 +112,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
 
     _ASSERT(pcache    != NULL);
     _ASSERT(resnumber != -1);
-    _ASSERT(cachesize >= 32);
+    _ASSERT(cachesize >= OCACHE_SIZE_MINIMUM && cachesize <= OCACHE_SIZE_MAXIMUM);
 
     /* Initialize memory map to store opcodes */
     result = filemap_create(&pcache->pfilemap);
@@ -223,7 +223,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcache->pfilemap != NULL)
         {
@@ -467,7 +467,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_createval", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pvalue != NULL)
         {
@@ -624,7 +624,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_useval", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_useval");
@@ -702,7 +702,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_getinfo", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_getinfo");

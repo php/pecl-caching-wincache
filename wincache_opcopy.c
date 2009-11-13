@@ -102,7 +102,7 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
     zval *  pnewz     = NULL;
 
     TSRMLS_FETCH();
-    dprintverbose("start copy_zval");
+    dprintdecorate("start copy_zval");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(poldz   != NULL);
@@ -181,6 +181,7 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
         case IS_CONSTANT_ARRAY:
             /* Copy zval pointers in the hashtable */
             pnewz->value.ht = NULL;
+	    dprintverbose("copy_zval calling copy_hashtable");
             result = copy_hashtable(popcopy, poldz->value.ht, copy_flag_zval_ref | copy_flag_pDataPtr, &pnewz->value.ht, NULL, NULL);
             if(FAILED(result))
             {
@@ -209,7 +210,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zval", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewz != NULL)
         {
@@ -226,7 +227,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zval");
+    dprintdecorate("end copy_zval");
 
     return result;
 }
@@ -329,7 +330,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zval_ref", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(ppnewz != NULL)
         {
@@ -443,7 +444,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_property_info", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewp != NULL)
         {
@@ -572,7 +573,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_arg_info", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewarg != NULL)
         {
@@ -679,7 +680,7 @@ Finished:
     if(result != NONFATAL)
     {
         dprintimportant("failure %d in copy_zend_arg_info_array", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnew != NULL)
         {
@@ -779,7 +780,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_znode", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewz != NULL)
         {
@@ -880,7 +881,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_op", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewop != NULL)
         {
@@ -1206,7 +1207,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_op_array", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewopa != NULL)
         {
@@ -1378,7 +1379,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_function", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewf != NULL)
         {
@@ -1483,7 +1484,7 @@ Finished:
     if(result != NONFATAL)
     {
         dprintimportant("failure %d in copy_zend_function_entry", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewfe !=  NULL)
         {
@@ -1664,7 +1665,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_hashtable", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewh != NULL)
         {
@@ -1900,7 +1901,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_hashtable_bucket", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewb != NULL)
         {
@@ -2247,7 +2248,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_class_entry", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copy_zend_class_entry");
@@ -2373,7 +2374,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copy_zend_constant_entry", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewt != NULL)
         {
@@ -2441,7 +2442,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in opcopy_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end opcopy_create");
@@ -2540,7 +2541,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_zend_op_array", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copyin_zend_op_array");
@@ -2626,7 +2627,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_zend_functions", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fnvalue != NULL)
         {
@@ -2736,7 +2737,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_zend_classes", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(clvalue != NULL)
         {
@@ -2827,7 +2828,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_zend_constants", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(tnvalue != NULL)
         {
@@ -2898,7 +2899,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_messages", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(messages != NULL)
         {
@@ -2993,7 +2994,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_auto_globals", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(aglobals != NULL)
         {
@@ -3085,7 +3086,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in opcopy_zend_copyin", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end opcopy_zend_copyin");
@@ -3117,7 +3118,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_zend_op_array", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copyout_zend_op_array");
@@ -3147,7 +3148,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_zend_function", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copyout_zend_function");
@@ -3177,7 +3178,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_zend_class", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copyout_zend_class");
@@ -3207,7 +3208,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_zend_constant", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end copyout_zend_constant");
@@ -3278,7 +3279,7 @@ int opcopy_zend_copyout(opcopy_context * popcopy, ocache_value * pvalue TSRMLS_D
                         zend_hash_del(EG(class_table), pclass->cname, pclass->cnamelen + 1);
                     }
                     
-                    result = FATAL_OPCOPY_MISSING_PARENT;
+                    result = WARNING_OPCOPY_MISSING_PARENT;
                     goto Finished;
                 }
                 else
@@ -3389,7 +3390,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in opcopy_zend_copyout", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end opcopy_zend_copyout");

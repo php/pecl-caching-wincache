@@ -90,7 +90,7 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     alloc_free_header *    pfree   = NULL;
     alloc_used_header *    usedh   = NULL;
 
-    dprintverbose("start allocate_memory");
+    dprintdecorate("start allocate_memory");
 
     _ASSERT(palloc         != NULL);
     _ASSERT(palloc->rwlock != NULL);
@@ -236,10 +236,10 @@ Finished:
         _ASSERT(*ppaddr == NULL);
 
         dprintimportant("failure %d in allocate_memory", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
-    dprintverbose("end allocate_memory");
+    dprintdecorate("end allocate_memory");
 
     return result;
 }
@@ -258,7 +258,7 @@ static void free_memory(alloc_context * palloc, void * paddr)
     alloc_free_header *    freeh  = NULL;
     alloc_free_header *    pfree  = NULL;
 
-    dprintverbose("start free_memory");
+    dprintdecorate("start free_memory");
 
     _ASSERT(palloc != NULL);
     _ASSERT(paddr  != NULL);
@@ -377,7 +377,7 @@ Finished:
         flock = 0;
     }
     
-    dprintverbose("end free_memory");
+    dprintdecorate("end free_memory");
 
     return;
 }
@@ -558,7 +558,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end alloc_create");
@@ -703,7 +703,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(palloc != NULL)
         {
@@ -797,7 +797,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_create_mpool", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end alloc_create_mpool");
@@ -976,7 +976,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_getinfo", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pinfo != NULL)
         {
@@ -1088,7 +1088,7 @@ void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
     size_t                bsize  = 0;
     unsigned char         ctype  = 0;
 
-    dprintverbose("start alloc_ommalloc");
+    dprintdecorate("start alloc_ommalloc");
 
     _ASSERT(palloc  != NULL);
     _ASSERT(hoffset >  0);
@@ -1211,7 +1211,7 @@ Finished:
         pchunk = NULL;
     }
 
-    dprintverbose("end alloc_ommalloc");
+    dprintdecorate("end alloc_ommalloc");
     return addr;
 }
 

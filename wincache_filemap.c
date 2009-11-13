@@ -134,7 +134,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in getppid", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end getppid");
@@ -175,7 +175,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_rwlock", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plock != NULL)
         {
@@ -433,7 +433,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_information_filemap", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pinfo != NULL)
         {
@@ -576,7 +576,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_global_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fgcontext != NULL)
         {
@@ -665,7 +665,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_create", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end filemap_create");
@@ -949,7 +949,7 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_initialize", result);
-        _ASSERT(FALSE);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* mapcount and entry_count are updated in the last */
         /* so no need to worry about that getting messed up */

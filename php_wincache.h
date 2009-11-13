@@ -37,9 +37,8 @@
 extern zend_module_entry wincache_module_entry;
 #define phpext_wincache_ptr &wincache_module_entry
 
-/* For static builds we need all the headers as this 
- * file is included in main/internal_functions.c
- */
+/* For static builds we need all the headers as this */
+/* file is included in main/internal_functions.c */
 #ifndef COMPILE_DL_WINCACHE
 #include "precomp.h"
 #endif
@@ -66,7 +65,7 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned int             maxfilesize; /* Max file size (kb) allowed in fcache */
     zend_bool                ocenabled;   /* Opcode cache enabled or disabled */
     unsigned int             ocachesize;  /* Opcode cache size in MB */
-    unsigned int             debuglevel;  /* Debug dump level (0/101/201/301/401) */
+    unsigned int             debuglevel;  /* Debug dump level (0/101/201/301/401/501) */
     char *                   ignorelist;  /* Pipe-separated list of files to ignore */
     char *                   ocefilter;   /* Comma-separated sitelist having ocenabled toggled */
     char *                   fcefilter;   /* Comma-separated sitelist having fcenabled toggled */
