@@ -88,7 +88,7 @@ Finished:
 
     if(FAILED(result))
     {
-	dprintimportant("failure %d in read_file_security", result);
+        dprintimportant("failure %d in read_file_security", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         if(psec_desc != NULL)
@@ -564,7 +564,7 @@ Finished:
     {
         dprintimportant("failure %d in fcache_createval", result);
         _ASSERT(result > WARNING_COMMON_BASE);
-	
+
         if(buffer != NULL)
         {
             alloc_sfree(pfcache->palloc, buffer);

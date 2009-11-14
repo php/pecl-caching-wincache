@@ -1521,7 +1521,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             }
         }
 
-        /* If no valid apsentry is found so far, get the fullpath from php-core */
+        /* If no valid absentry is found so far, get the fullpath from php-core */
         if(pvalue == NULL)
         {
 #ifdef PHP_VERSION_52
@@ -1569,7 +1569,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             }
 
             /* Convert to lower case and change / to \\ */
-            _strlwr(fullpath);
             length = strlen(fullpath);
             for(findex = 0; findex < length; findex++)
             {

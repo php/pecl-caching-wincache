@@ -741,7 +741,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     dprintimportant("zend_resolve_path called for %s", filename);
 
     /* Hook so that test file is not added to cache */
-    if(strstr(filename, WINCACHE_TEST_FILE) != NULL || isin_ignorelist(WCG(ignorelist), filename))
+    if(isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
         return original_resolve_path(filename, filename_len TSRMLS_CC);
@@ -801,7 +801,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
     dprintimportant("zend_stream_open_function called for %s", filename);
 
     /* Hook so that test file is not added to cache */
-    if(strstr(filename, WINCACHE_TEST_FILE) != NULL || isin_ignorelist(WCG(ignorelist), filename))
+    if(isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
@@ -887,7 +887,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     }
 
     /* Nothing to cleanup. So original_compile triggering bailout is fine */
-    if(filename == NULL || strstr(filename, WINCACHE_TEST_FILE) != NULL || isin_ignorelist(WCG(ignorelist), filename))
+    if(filename == NULL || isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
     {
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
         goto Finished;
@@ -914,8 +914,8 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         dprintimportant("wincache_compile_file called for %s", fullpath);
         zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
 
-	/* Set opened_path to fullpath */
-	file_handle->opened_path = alloc_estrdup(fullpath);
+        /* Set opened_path to fullpath */
+        file_handle->opened_path = alloc_estrdup(fullpath);
     }
 
     result = aplist_ocache_get(WCG(locache), fullpath, file_handle, type, &oparray, &povalue TSRMLS_CC);

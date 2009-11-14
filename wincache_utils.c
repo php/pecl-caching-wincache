@@ -220,7 +220,6 @@ char * utils_fullpath(const char * filename)
         strcpy(filepath, filename);
     }
 
-    _strlwr(filepath);
     for(index = 0; index < fplength; index++)
     {
         if(filepath[index] == '/')
