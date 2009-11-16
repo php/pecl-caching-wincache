@@ -40,6 +40,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- Made strings in rplist_value aligned to dword boundary. Other miscellaneous code improvements.
 - Converting opened_path to lowercase makes case-sensitive comparison of __FILE__ with realpath() fail. Fixed.
 - Process with local opcode cache never does complete remove_aplist_entry now. Added debuglevel 501 and warning codes. Modified asserts.
 - Changed cache size default values. Default size of file cache is 32 MB and opcode cache is 96 MB.

@@ -478,12 +478,12 @@ PHP_MINIT_FUNCTION(wincache)
     result = aplist_ocache_initialize(plcache1, resnumber, WCG(ocachesize) TSRMLS_CC);
     if(FAILED(result))
     {
-        if(result != FATAL_FILEMAP_MAPVIEW)
+        if(result != WARNING_FILEMAP_MAPVIEW)
         {
             goto Finished;
         }
 
-        /* Couldn't map at same address, create a local ocache*/
+        /* Couldn't map at same address, create a local ocache */
         result = aplist_create(&plcache2);
         if(FAILED(result))
         {
@@ -576,10 +576,13 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         WCG(lfcache) = NULL;
     }
 
-    if(!WCG(issame) && WCG(locache) != NULL)
+    if(WCG(locache) != NULL)
     {
-        aplist_terminate(WCG(locache));
-        aplist_destroy(WCG(locache));
+        if(!WCG(issame))
+        {
+            aplist_terminate(WCG(locache));
+            aplist_destroy(WCG(locache));
+        }
 
         WCG(locache) = NULL;
     }

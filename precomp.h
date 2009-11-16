@@ -38,7 +38,7 @@
 #define PHP_WINCACHE_EXTVER    "1.0.1115.0"
 
 /* comment following line for release builds */
-//#define WINCACHE_DEBUG
+#define WINCACHE_DEBUG
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)
@@ -62,8 +62,8 @@
 
 #include <tlhelp32.h>
 
-#define ALIGNDWORD(size)   ((size % 4) ? (size+(4-(size % 4))) : (size))
-#define ALIGNQWORD(size)   ((size % 8) ? (size+(8-(size % 8))) : (size))
+#define ALIGNDWORD(size)   (((size) % 4) ? ((size)+(4-((size) % 4))) : (size))
+#define ALIGNQWORD(size)   (((size) % 8) ? ((size)+(8-((size) % 8))) : (size))
 
 #if PHP_VERSION_ID >= 60000
  #define PHP_VERSION_60

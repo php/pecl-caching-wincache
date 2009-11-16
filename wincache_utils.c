@@ -162,7 +162,9 @@ unsigned int utils_getindex(const char * filename, unsigned int numfiles)
     unsigned int length = 0;
 
     dprintdecorate("start utils_getindex");
+
     _ASSERT(filename != NULL);
+    _ASSERT(numfiles != 0);
 
     length = strlen(filename);
     _ASSERT(length != 0);

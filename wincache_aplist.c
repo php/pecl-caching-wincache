@@ -249,9 +249,6 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue = (aplist_value *)pbaseadr;
     pvalue->file_path = 0;
     
-    /* TBD?? Canoncalize the path in php_wincache */
-    /* Avoid ::$Data bug */
-
     /* Open the file in shared read mode */
     openflags |= FILE_ATTRIBUTE_ENCRYPTED;
     openflags |= FILE_FLAG_OVERLAPPED;
@@ -427,10 +424,22 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     _ASSERT(pvalue->file_path != 0);
 
     /* Delete all relative path entries */
+    /* This should be done immediately so that relative path */
+    /* stop handing pointer to aplist entries marked deleted */
     if(pvalue->relentry != 0)
     {
+        _ASSERT(pcache->prplist != NULL);
+        
         rplist_deleteval(pcache->prplist, pvalue->relentry);
         pvalue->relentry = 0;
+    }
+
+    /* If entry from global cache is removed by a process which has */
+    /* a local cache, mark the entry deleted but do not delete it */
+    if(pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache == NULL && pcache->polocal != NULL)
+    {
+        pvalue->is_deleted = 1;
+        goto Finished;
     }
 
     /* Delete file cache entry */
@@ -445,16 +454,8 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         if(pfvalue->refcount == 0)
         {
             fcache_destroyval(pcache->pfcache, pfvalue);
-            pfvalue = 0;
+            pfvalue = NULL;
         }
-    }
-
-    /* If entry from global cache is removed by a process which has */
-    /* a local cache, mark the entry deleted but do not delete it */
-    if(pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache == NULL && pcache->polocal != NULL)
-    {
-        pvalue->is_deleted = 1;
-        goto Finished;
     }
 
     /* Delete opcode cache entry */
@@ -531,6 +532,7 @@ static void delete_aplist_fileentry(aplist_context * pcache, const char * filena
     if(pvalue != NULL)
     {
         remove_aplist_entry(pcache, findex, pvalue);
+        pvalue = NULL;
     }
 
     dprintverbose("end delete_aplist_fileentry");
@@ -567,7 +569,7 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
     else
     {
         sindex = apheader->scstart;
-        eindex = apheader->scstart + PER_RUN_SCAVENGE_COUNT;
+        eindex = sindex + PER_RUN_SCAVENGE_COUNT;
         apheader->scstart = eindex;
 
         if(eindex >= apheader->valuecount)
@@ -588,18 +590,14 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
         pvalue = APLIST_VALUE(apalloc, apheader->values[sindex]);
         while(pvalue != NULL)
         {
+            ptemp = pvalue;
+            pvalue = APLIST_VALUE(apalloc, pvalue->next_value);
+            
             /* Remove entry if its marked deleted or is unsed for ttlmax time */
-            if(pvalue->is_deleted || ((ticks - pvalue->use_ticks) > apheader->ttlmax))
+            if(ptemp->is_deleted || ((ticks - ptemp->use_ticks) > apheader->ttlmax))
             {
-                ptemp = pvalue;
-                pvalue = APLIST_VALUE(apalloc, pvalue->next_value);
-
                 remove_aplist_entry(pcache, sindex, ptemp);
                 ptemp = NULL;
-            }
-            else
-            {
-                pvalue = APLIST_VALUE(apalloc, pvalue->next_value);
             }
         }
     }
@@ -774,8 +772,8 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    /* Do not create relative path cache for local opcode cache */
-    if(apctype != APLIST_TYPE_OPCODE_LOCAL)
+    /* Create relative path cache for global aplist cache */
+    if(apctype == APLIST_TYPE_GLOBAL)
     {
         result = rplist_create(&pcache->prplist);
         if(FAILED(result))
@@ -1204,7 +1202,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         if(pnewval != NULL)
         {
             pvalue = pnewval;
-            pnewval = NULL;         
+            pnewval = NULL;
 
             add_aplist_entry(pcache, findex, pvalue);
         }
@@ -1460,6 +1458,8 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
 
     if(!IS_ABSOLUTE_PATH(filename, strlen(filename)))
     {
+        _ASSERT(pcache->prplist != NULL);
+
         /* Look for absolute path in relative path cache */
         result = rplist_getentry(pcache->prplist, filename, &rpvalue, &relentry TSRMLS_CC);
         if(FAILED(result))
@@ -1493,9 +1493,9 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                     {
                         findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
                         remove_aplist_entry(pcache, findex, pvalue);
+                        pvalue   = NULL;
 
                         /* Deleting the aplist entry will delete rplist entries as well */
-                        pvalue   = NULL;
                         rpvalue  = NULL;
                         relentry = 0;
                     }
@@ -1593,6 +1593,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */
+    /* Relative path cache entry won't have a corresponding absentry offset */
     if(ppvalue == NULL)
     {
         *ppfullpath = fullpath;

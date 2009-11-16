@@ -919,7 +919,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
     pfilemap->mapaddr = map_viewof_file(pfilemap->hfilemap, mapaddr);
     if(pfilemap->mapaddr == NULL)
     {
-        result = FATAL_FILEMAP_MAPVIEW;
+        result = WARNING_FILEMAP_MAPVIEW;
         goto Finished;
     }
 

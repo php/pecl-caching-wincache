@@ -71,13 +71,12 @@ static int findrpath_in_cache(rplist_context * pcache, const char * filename, co
            ((PG(open_basedir) == NULL && strlen(pcache->rpmemaddr + pvalue->open_based) == 0) ||
             (PG(open_basedir) != NULL && _stricmp(pcache->rpmemaddr + pvalue->open_based, PG(open_basedir)) == 0)))
         {
+            *ppvalue = pvalue;
             break;
         }
 
         pvalue = RPLIST_VALUE(pcache->rpalloc, pvalue->next_value);
     }
-
-    *ppvalue = pvalue;
 
     dprintverbose("end findrpath_in_cache");
 
@@ -96,6 +95,7 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     unsigned int   incplen  = 0;
     unsigned int   openblen = 0;
     unsigned int   alloclen = 0;
+    unsigned int   memlen   = 0;
     char *         pbaseadr = NULL;
 
     dprintverbose("start create_rplist_data");
@@ -120,7 +120,7 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
         openblen = strlen(PG(open_basedir));
     }
 
-    alloclen = sizeof(rplist_value) + flength + 1 + cclength + 1 + incplen + 1 + openblen + 1;
+    alloclen = sizeof(rplist_value) + ALIGNDWORD(flength + 1) + ALIGNDWORD(cclength + 1) + ALIGNDWORD(incplen + 1) + ALIGNDWORD(openblen + 1);
 
     /* Allocate memory for cache entry in shared memory */
     pbaseadr = (char *)alloc_smalloc(pcache->rpalloc, alloclen);
@@ -145,36 +145,42 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     pvalue->prev_value  = 0;
     pvalue->next_value  = 0;
     
-    /* Fill the details in rplist_value */
+    /* Append filepath and keep offset in file_path */
+    memlen = ALIGNDWORD(flength + 1);
     memcpy_s(pbaseadr, flength, filename, flength);
+    *(pbaseadr + flength) = 0;
     pvalue->file_path = pbaseadr - pcache->rpmemaddr;
-    pbaseadr += flength;
-    *pbaseadr = 0;
-    pbaseadr += 1;
+    pbaseadr += memlen;
 
+    /* Append current working directory and currently */
+    /* executing file. Store offset in cwd_cexec */
+    memlen = ALIGNDWORD(cclength + 1);
     memcpy_s(pbaseadr, cclength, cwdcexec, cclength);
+    *(pbaseadr + cclength) = 0;
     pvalue->cwd_cexec = pbaseadr - pcache->rpmemaddr;
-    pbaseadr += cclength;
-    *pbaseadr = 0;
-    pbaseadr += 1;
+    pbaseadr += memlen;
 
+    /* Append current include_path value and save offset */
+    memlen = ALIGNDWORD(incplen + 1);
     if(PG(include_path) != NULL)
     {
         memcpy_s(pbaseadr, incplen, PG(include_path), incplen);
     }
+    *(pbaseadr + incplen) = 0;
     pvalue->inc_path = pbaseadr - pcache->rpmemaddr;
-    pbaseadr += incplen;
-    *pbaseadr = 0;
-    pbaseadr += 1;
+    pbaseadr += memlen;
 
+    /* Append current open_basedir value and save offset */
+    memlen = ALIGNDWORD(openblen + 1);
     if(PG(open_basedir) != NULL)
     {
         memcpy_s(pbaseadr, openblen, PG(open_basedir), openblen);
     }
+    *(pbaseadr + openblen) = 0;
     pvalue->open_based = pbaseadr - pcache->rpmemaddr;
-    pbaseadr += openblen;
-    *pbaseadr = 0;
+    pbaseadr += memlen;
 
+    /* Fill the pointer value */
     *ppvalue = pvalue;
 
     _ASSERT(SUCCEEDED(result));
@@ -321,11 +327,11 @@ int rplist_create(rplist_context ** ppcache)
         goto Finished;
     }
 
-    pcache->rpmemaddr   = NULL;
-    pcache->rpheader    = NULL;
-    pcache->rpfilemap   = NULL;
-    pcache->rprwlock    = NULL;
-    pcache->rpalloc     = NULL;
+    pcache->rpmemaddr = NULL;
+    pcache->rpheader  = NULL;
+    pcache->rpfilemap = NULL;
+    pcache->rprwlock  = NULL;
+    pcache->rpalloc   = NULL;
 
     *ppcache = pcache;
 
@@ -368,7 +374,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     dprintverbose("start rplist_initialize");
 
     _ASSERT(pcache    != NULL);
-    _ASSERT(filecount >= 1024 && filecount <= 16384);
+    _ASSERT(filecount >= NUM_FILES_MINIMUM && filecount <= NUM_FILES_MAXIMUM);
 
     /* Create relpaths segment */
     result = filemap_create(&pcache->rpfilemap);
@@ -446,6 +452,8 @@ void rplist_initheader(rplist_context * pcache, unsigned int filecount)
 {
      rplist_header * rpheader = NULL;
 
+     dprintverbose("start rplist_initheader");
+     
      _ASSERT(pcache           != NULL);
      _ASSERT(pcache->rpheader != NULL);
      _ASSERT(filecount        >  0);
@@ -460,6 +468,8 @@ void rplist_initheader(rplist_context * pcache, unsigned int filecount)
      rpheader->rdcount    = 0;
      rpheader->valuecount = filecount;
      memset((void *)rpheader->values, 0, sizeof(size_t) * filecount);
+
+     dprintverbose("end rplist_initheader");
 
      return;
 }

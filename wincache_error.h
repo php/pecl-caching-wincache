@@ -68,8 +68,7 @@
 #define FATAL_FILEMAP_CREATE_SNAPSHOT       FATAL_FILEMAP_BASE + 4
 #define FATAL_FILEMAP_INITIALIZE            FATAL_FILEMAP_BASE + 5
 #define FATAL_FILEMAP_NOFREE                FATAL_FILEMAP_BASE + 6
-#define FATAL_FILEMAP_MAPVIEW               FATAL_FILEMAP_BASE + 7
-#define FATAL_FILEMAP_INIT_EVENT            FATAL_FILEMAP_BASE + 8
+#define FATAL_FILEMAP_INIT_EVENT            FATAL_FILEMAP_BASE + 7
 
 /* Error codes used by shared memory allocator */
 #define FATAL_ALLOC_BASE                    300
@@ -125,6 +124,7 @@
 #define WARNING_COMMON_BASE                 5000
 #define WARNING_FCACHE_TOOBIG               WARNING_COMMON_BASE + 1
 #define WARNING_OPCOPY_MISSING_PARENT       WARNING_COMMON_BASE + 2
+#define WARNING_FILEMAP_MAPVIEW             WARNING_COMMON_BASE + 3
 
 /* SUCCEEDED and FAILED macros */
 #ifdef SUCCEEDED

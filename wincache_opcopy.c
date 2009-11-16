@@ -920,16 +920,16 @@ static void free_zend_op(opcopy_context * popcopy, zend_op * pvalue, unsigned ch
 
 static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa, zend_op_array ** ppnewopa)
 {
-    int          result    = NONFATAL;
-    int          allocated = 0;
-    int          opcount   = 0;
-    int          index     = 0;
-    unsigned int msize     = 0;
+    int             result    = NONFATAL;
+    int             allocated = 0;
+    int             opcount   = 0;
+    int             index     = 0;
+    unsigned int    msize     = 0;
 
-    zend_op *             pnewop  = NULL;
-    zend_op *             poldop  = NULL;
-    zend_op_array *       pnewopa = NULL;
-    unsigned int *        pdata   = NULL;
+    zend_op *       pnewop    = NULL;
+    zend_op *       poldop    = NULL;
+    zend_op_array * pnewopa   = NULL;
+    unsigned int *  pdata     = NULL;
 
     dprintverbose("start copy_zend_op_array");
 
@@ -2563,9 +2563,8 @@ static int copyin_zend_functions(opcopy_context * popcopy, ocache_value * pvalue
 
     dprintverbose("start copyin_zend_functions");
 
-    _ASSERT(popcopy         != NULL);
-    _ASSERT(popcopy->oldfncount > 0);
-    _ASSERT(pvalue          != NULL);
+    _ASSERT(popcopy != NULL);
+    _ASSERT(pvalue  != NULL);
 
     newcount = popcopy->newfncount - popcopy->oldfncount;
     if(newcount <= 0)
@@ -2655,9 +2654,8 @@ static int copyin_zend_classes(opcopy_context * popcopy, ocache_value * pvalue T
 
     dprintverbose("start copyin_zend_classes");
     
-    _ASSERT(popcopy          != NULL);
-    _ASSERT(popcopy->oldclcount > 0);
-    _ASSERT(pvalue           != NULL);
+    _ASSERT(popcopy != NULL);
+    _ASSERT(pvalue  != NULL);
 
     newcount = popcopy->newclcount - popcopy->oldclcount;
     if(newcount <= 0)
@@ -3304,10 +3302,13 @@ int opcopy_zend_copyout(opcopy_context * popcopy, ocache_value * pvalue TSRMLS_D
     }
 
     /* Copy the opcode array */
-    result = copyout_zend_op_array(popcopy, pvalue->oparray, &poparray);
-    if(FAILED(result))
+    if(pvalue->oparray != NULL)
     {
-        goto Finished;
+        result = copyout_zend_op_array(popcopy, pvalue->oparray, &poparray);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
     }
 
     /* Copy constants which are declared in the file */

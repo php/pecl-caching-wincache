@@ -896,8 +896,8 @@ void * alloc_get_cacheheader(alloc_context * palloc, unsigned int valuecount, un
         {
             /* Some other process allocated before this process could do */
             lock_writeunlock(palloc->rwlock);
-            pvoid = (void *)((char *)palloc->memaddr + header->cacheheader);
             free_memory(palloc, pvoid);
+            pvoid = (void *)((char *)palloc->memaddr + header->cacheheader);
         }
         else
         {
@@ -920,6 +920,7 @@ __inline
 void * alloc_get_cachevalue(alloc_context * palloc, size_t offset)
 {
     _ASSERT(palloc != NULL);
+
     if(offset != 0)
     {
         return (void *)((char *)palloc->memaddr + offset);
@@ -934,9 +935,15 @@ __inline
 size_t alloc_get_valueoffset(alloc_context * palloc, void * pvalue)
 {
     _ASSERT(palloc != NULL);
-    _ASSERT(pvalue != NULL);
-
-    return POINTER_OFFSET(palloc->memaddr, pvalue);
+    
+    if(pvalue != NULL)
+    {
+        return POINTER_OFFSET(palloc->memaddr, pvalue);
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 int alloc_getinfo(alloc_context * palloc, alloc_info ** ppinfo)
