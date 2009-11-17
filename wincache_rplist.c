@@ -64,7 +64,9 @@ static int findrpath_in_cache(rplist_context * pcache, const char * filename, co
 
     while(pvalue != NULL)
     {
-        if(!_stricmp(pcache->rpmemaddr + pvalue->file_path, filename) &&
+        /* Ignore deleted entries */
+        if(pvalue->is_deleted == 0 &&
+           !_stricmp(pcache->rpmemaddr + pvalue->file_path, filename) &&
            !_stricmp(pcache->rpmemaddr + pvalue->cwd_cexec, cwd_cexec) &&
            ((PG(include_path) == NULL && strlen(pcache->rpmemaddr + pvalue->inc_path) == 0) ||
             (PG(include_path) != NULL && _stricmp(pcache->rpmemaddr + pvalue->inc_path, PG(include_path)) == 0)) &&
@@ -140,6 +142,8 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     pvalue->cwd_cexec   = 0;
     pvalue->inc_path    = 0;
     pvalue->open_based  = 0;
+
+    pvalue->is_deleted  = 0;
     pvalue->absentry    = 0;
     pvalue->same_value  = 0;
     pvalue->prev_value  = 0;
@@ -666,6 +670,38 @@ void rplist_deleteval(rplist_context * pcache, size_t valoffset)
     lock_writeunlock(pcache->rprwlock);
 
     dprintverbose("end rplist_deleteval");
+    return;
+}
+
+void rplist_markdeleted(rplist_context * pcache, size_t valoffset)
+{
+    unsigned int   index  = 0;
+    rplist_value * pvalue = NULL;
+
+    dprintverbose("start rplist_markdeleted");
+
+    _ASSERT(pcache    != NULL);
+    _ASSERT(valoffset != 0);
+
+    lock_writelock(pcache->rprwlock);
+
+    pvalue = RPLIST_VALUE(pcache->rpalloc, valoffset);
+    while(pvalue != NULL)
+    {
+        pvalue->is_deleted = 1;
+        
+        /* Continue until all entries pointing to same aplist value are marked deleted */
+        if(pvalue->same_value == 0)
+        {
+            break;
+        }
+
+        pvalue = RPLIST_VALUE(pcache->rpalloc, pvalue->same_value);
+    }
+
+    lock_writeunlock(pcache->rprwlock);
+
+    dprintverbose("end rplist_markdeleted");
     return;
 }
 

@@ -44,6 +44,8 @@ struct rplist_value
     size_t             cwd_cexec;  /* cwdir|cexec */
     size_t             inc_path;   /* current include path */
     size_t             open_based; /* open_basedir set */
+
+    unsigned int       is_deleted; /* If set to 1, entry is marked deleted */
     size_t             absentry;   /* offset of entry in aplist */
     size_t             same_value; /* rplist entry pointing to same absentry */
     size_t             prev_value; /* previous rplist_value offset */
@@ -94,6 +96,7 @@ extern void rplist_terminate(rplist_context * pcache);
 extern int  rplist_getentry(rplist_context * pcache, const char * filename, rplist_value ** ppvalue, size_t * poffset TSRMLS_DC);
 extern void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t absentry, size_t prevsame);
 extern void rplist_deleteval(rplist_context * pcache, size_t valoffset);
+extern void rplist_markdeleted(rplist_context * pcache, size_t valoffset);
 extern int  rplist_getinfo(rplist_context * pcache, rplist_info ** ppinfo);
 extern void rplist_freeinfo(rplist_info * pinfo);
 

@@ -101,6 +101,7 @@ static int findapath_in_cache(aplist_context * pcache, const char * filename, un
                     *ppdelete = pvalue;
                 }
 
+                pvalue = APLIST_VALUE(pcache->apalloc, pvalue->next_value);
                 continue;
             }
 
@@ -229,17 +230,26 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
 
     /* Allocate memory for cache entry in shared memory */
     pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
-    if(pbaseadr == NULL && pcache->scstatus == SCAVENGER_STATUS_ACTIVE)
+    if(pbaseadr == NULL)
     {
-        lock_writelock(pcache->aprwlock);
+        /* If scavenger is active, run it and try allocating again */
+        if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE)
+        {
+            lock_writelock(pcache->aprwlock);
 
-        run_aplist_scavenger(pcache, DO_FULL_SCAVENGER_RUN);
-        pcache->apheader->lscavenge = GetTickCount();
+            run_aplist_scavenger(pcache, DO_FULL_SCAVENGER_RUN);
+            pcache->apheader->lscavenge = GetTickCount();
 
-        lock_writeunlock(pcache->aprwlock);
+            lock_writeunlock(pcache->aprwlock);
 
-        pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
-        if(pbaseadr == NULL)
+            pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
+            if(pbaseadr == NULL)
+            {
+                result = FATAL_OUT_OF_SMEMORY;
+                goto Finished;
+            }
+        }
+        else
         {
             result = FATAL_OUT_OF_SMEMORY;
             goto Finished;
@@ -423,23 +433,29 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     _ASSERT(pvalue            != NULL);
     _ASSERT(pvalue->file_path != 0);
 
-    /* Delete all relative path entries */
-    /* This should be done immediately so that relative path */
-    /* stop handing pointer to aplist entries marked deleted */
-    if(pvalue->relentry != 0)
-    {
-        _ASSERT(pcache->prplist != NULL);
-        
-        rplist_deleteval(pcache->prplist, pvalue->relentry);
-        pvalue->relentry = 0;
-    }
-
     /* If entry from global cache is removed by a process which has */
     /* a local cache, mark the entry deleted but do not delete it */
     if(pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache == NULL && pcache->polocal != NULL)
     {
+        /* Mark relative path entries deleted so that it rplist stop */
+        /* handing pointer to aplist entries which are marked deleted */
+        if(pvalue->relentry != 0)
+        {
+            _ASSERT(pcache->prplist != NULL);
+            rplist_markdeleted(pcache->prplist, pvalue->relentry);
+        }
+
         pvalue->is_deleted = 1;
         goto Finished;
+    }
+
+    /* Delete relative path cache entries */
+    if(pvalue->relentry != 0)
+    {
+        _ASSERT(pcache->prplist != NULL);
+
+        rplist_deleteval(pcache->prplist, pvalue->relentry);
+        pvalue->relentry = 0;
     }
 
     /* Delete file cache entry */
@@ -1115,7 +1131,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         lock_writelock(pcache->aprwlock);
         
         if((ticks - apheader->lscavenge) > apheader->scfreq)
-        {        
+        {
             run_aplist_scavenger(pcache, DO_PARTIAL_SCAVENGER_RUN);
             apheader->lscavenge = GetTickCount();
         }

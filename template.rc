@@ -35,7 +35,7 @@
 # error dont edit with MSVC
 #endif
 
-#include "winres.h"
+#include "winresrc.h"
 #include "main/php_version.h"
 
 #define WINCACHE_VMAJOR     1
