@@ -232,6 +232,16 @@ function get_fcache_summary( $entries ) {
     return $result;
 }
 
+function get_ocache_size_markup( $size ) {
+    $size_string = convert_bytes_to_string( $size );
+
+    if ( $size > ( ini_get( 'wincache.ocachesize' ) * pow( 1024, 2 ) ) ) {
+        return '<td class="n" title="The opcode cache size has been automatically increased to be at least 3 times bigger than file cache size.">'.$size_string.'</td>';
+    }
+
+    return '<td class="v">'.$size_string.'</td>';    
+}
+
 function gd_loaded() {
     return extension_loaded( 'gd' );
 }
@@ -649,6 +659,11 @@ th {
     background-color: #E7E7E7;
     color: #000000;
 }
+.n{
+    background-color: #FFFF00;
+    color: #000000;
+    font-weight: bold;
+}
 .notice {
     display: block;
     margin-top: 1.5em;
@@ -773,7 +788,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_total'] ); ?></td>
+                    <?php echo get_ocache_size_markup( $ocache_mem_info['memory_total'] ); ?>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
@@ -891,7 +906,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
-                    <td class="v"><?php echo convert_bytes_to_string( $ocache_mem_info['memory_total'] ); ?></td>
+                    <?php echo get_ocache_size_markup( $ocache_mem_info['memory_total'] ); ?>
                 </tr>
                 <tr>
                     <td class="e">Available memory</td>
