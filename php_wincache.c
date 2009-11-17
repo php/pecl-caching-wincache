@@ -1396,14 +1396,8 @@ PHP_FUNCTION(wincache_refresh_if_changed)
         goto Finished;
     }
 
-    if(WCG(lfcache) != WCG(locache))
-    {
-        result = aplist_force_fccheck(WCG(locache), filelist TSRMLS_CC);
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
-    }
+    /* No need to call on locache as lfcache will trigger deletion */
+    /* from locache which inturn will populate the ocache entry again */
 
     _ASSERT(SUCCEEDED(result));
 

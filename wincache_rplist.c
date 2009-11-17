@@ -626,6 +626,8 @@ Finished:
 
 void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t absentry, size_t prevsame)
 {
+    size_t coffset = 0;
+
     dprintverbose("start rplist_setabsval");
 
     _ASSERT(pcache   != NULL);
@@ -633,7 +635,14 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
     _ASSERT(absentry != 0);
 
     pvalue->absentry   = absentry;
-    pvalue->same_value = prevsame;
+
+    /* Set same_value to make a list only if */
+    /* prevsame is pointing to a different entry */
+    coffset = (char *)pvalue - pcache->rpmemaddr;
+    if(coffset != prevsame)
+    {
+        pvalue->same_value = prevsame;
+    }
 
     dprintverbose("end rplist_setabsval");
     return;

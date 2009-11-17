@@ -226,7 +226,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     *ppvalue = NULL;
 
     flength = strlen(filename);
-    alloclen = sizeof(aplist_value) + flength + 1;
+    alloclen = sizeof(aplist_value) + ALIGNDWORD(flength + 1);
 
     /* Allocate memory for cache entry in shared memory */
     pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
