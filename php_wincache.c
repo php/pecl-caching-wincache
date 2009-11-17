@@ -157,6 +157,9 @@ PHP_INI_BEGIN()
 /* index 12 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
 /* index 13 */ STD_PHP_INI_ENTRY("wincache.namesalt", NULL, PHP_INI_SYSTEM, OnUpdateString, namesalt, zend_wincache_globals, wincache_globals)
 /* index 14 */ STD_PHP_INI_ENTRY("wincache.localheap", "0", PHP_INI_SYSTEM, OnUpdateBool, localheap, zend_wincache_globals, wincache_globals)
+#ifdef WINCACHE_TEST
+/* index 15 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+#endif
 PHP_INI_END()
 
 /* END OF PHP EXTENSION MACROS STUFF */
@@ -187,6 +190,9 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(fcefilter)   = NULL; /* List of sites for which fcenabled is toggled */
     WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
+#ifdef WINCACHE_TEST
+    WCG(olocaltest)  = 0;    /* Local opcode test disabled by default */
+#endif
 
     WCG(lasterror)   = 0;    /* GetLastError() value set by wincache */
     WCG(lfcache)     = NULL; /* Aplist to use for file/rpath cache */
@@ -427,6 +433,12 @@ PHP_MINIT_FUNCTION(wincache)
         _strlwr(WCG(ignorelist));
     }
 
+    /* Enforce opcode cache size to be at least 3 times the file cache size */
+    if(WCG(ocachesize) < 3 * WCG(fcachesize))
+    {
+        WCG(ocachesize) = 3 * WCG(fcachesize);
+    }
+
     /* Even if enabled is set to false, create cache and set */
     /* the hook because scripts can selectively enable it */
 
@@ -475,7 +487,20 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
+#ifdef WINCACHE_TEST
+    /* If olocaltest is set, force a local opcode cache sometimes */
+    if(WCG(olocaltest) != 0 && plcache1->apheader->mapcount % 2 == 0)
+    {
+        result = WARNING_FILEMAP_MAPVIEW;
+    }
+    else
+    {
+        result = aplist_ocache_initialize(plcache1, resnumber, WCG(ocachesize) TSRMLS_CC);
+    }
+#else
     result = aplist_ocache_initialize(plcache1, resnumber, WCG(ocachesize) TSRMLS_CC);
+#endif
+
     if(FAILED(result))
     {
         if(result != WARNING_FILEMAP_MAPVIEW)

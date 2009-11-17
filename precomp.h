@@ -104,10 +104,10 @@
 
 #define NUM_FILES_MINIMUM          1024
 #define NUM_FILES_MAXIMUM          16384
-#define OCACHE_SIZE_MINIMUM        16
-#define OCACHE_SIZE_MAXIMUM        256
-#define FCACHE_SIZE_MINIMUM        8
-#define FCACHE_SIZE_MAXIMUM        128
+#define OCACHE_SIZE_MINIMUM        15
+#define OCACHE_SIZE_MAXIMUM        255
+#define FCACHE_SIZE_MINIMUM        5
+#define FCACHE_SIZE_MAXIMUM        85
 #define FILE_SIZE_MINIMUM          10
 #define FILE_SIZE_MAXIMUM          2048
 #define FCHECK_FREQ_MINIMUM        2

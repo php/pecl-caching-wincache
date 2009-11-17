@@ -71,6 +71,9 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     char *                   fcefilter;   /* Comma-separated sitelist having fcenabled toggled */
     char *                   namesalt;    /* Salt to use in all the names */
     zend_bool                localheap;   /* Local heap is enabled or disabled */
+#ifdef WINCACHE_TEST
+    zend_bool                olocaltest;  /* Local opcode cache test configuration */
+#endif
 
     ocacheval_list *         oclisthead;  /* List of ocache_value entries in use */
     ocacheval_list *         oclisttail;  /* Tail of ocache_value entries list */
