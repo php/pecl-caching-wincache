@@ -40,6 +40,7 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
+- Final v1 RTW build is version 1117.
 - Updated the wincache.php to show a warning if opcode cache size is too small and it has been automatically increased.
 - Changed minimum/maximum values of fcachesize, ocachesize. Added olocaltest. Forced ocachesize to be atleast 3 times fcachesize.
 - Prevent rplist_value same_value field from pointing to itself, else deleteval does double free on same rplist value.
