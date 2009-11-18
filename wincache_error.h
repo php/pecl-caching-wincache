@@ -83,6 +83,7 @@
 /* Error codes used by rplist code */
 #define FATAL_RPLIST_BASE                   500
 #define FATAL_RPLIST_CREATION               FATAL_RPLIST_BASE + 1
+#define FATAL_RPLIST_INITIALIZE             FATAL_RPLIST_BASE + 2
 
 /* Error codes used by file cache */
 #define FATAL_FCACHE_BASE                   600

@@ -420,7 +420,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     pcache->rpheader = (rplist_header *)alloc_get_cacheheader(pcache->rpalloc, filecount, CACHE_TYPE_RELPATHS);
     if(pcache->rpheader == NULL)
     {
-        result = FATAL_FCACHE_INITIALIZE;
+        result = FATAL_RPLIST_INITIALIZE;
         goto Finished;
     }
 
@@ -583,7 +583,7 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
         else
         {
             pvalue = pnewval;
-            pnewval = NULL;         
+            pnewval = NULL;
 
             add_rplist_entry(pcache, findex, pvalue);        
         }
@@ -634,6 +634,9 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
     _ASSERT(pvalue   != NULL);
     _ASSERT(absentry != 0);
 
+    /* Acquire write lock before changing absentry */
+    lock_writelock(pcache->rprwlock);
+
     pvalue->absentry   = absentry;
 
     /* Set same_value to make a list only if */
@@ -643,6 +646,8 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
     {
         pvalue->same_value = prevsame;
     }
+
+    lock_writeunlock(pcache->rprwlock);
 
     dprintverbose("end rplist_setabsval");
     return;
