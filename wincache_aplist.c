@@ -1199,10 +1199,15 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
             pdelete = NULL;
         }
 
-        if(fchange == FILE_IS_CHANGED && pvalue != NULL)
+        if(pvalue != NULL)
         {
             if(pvalue->add_ticks == addtick)
             {
+                /* Only possible if a file change was detected. Remove this */
+                /* entry from the hashtable. If some other process already */
+                /* deleted and added the entry add_ticks value won't match */
+                _ASSERT(fchange == FILE_IS_CHANGED);
+
                 remove_aplist_entry(pcache, findex, pvalue);
                 pvalue = NULL;
             }
