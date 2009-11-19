@@ -29,41 +29,18 @@
     <email>pajoye@php.net</email>
     <active>yes</active>
   </helper>
-  <date>2009-11-12</date>
+  <date>2009-11-19</date>
   <version>
-    <release>1.0.0</release>
-    <api>1.0.0</api>
+    <release>1.1.0</release>
+    <api>1.1.0</api>
   </version>
   <stability>
-    <release>stable</release>
-    <api>stable</api>
+    <release>beta</release>
+    <api>beta</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-- Setting absentry and same_value in rplist_value under writelock.
-- Final v1 RTW build is version 1117.
-- Updated the wincache.php to show a warning if opcode cache size is too small and it has been automatically increased.
-- Changed minimum/maximum values of fcachesize, ocachesize. Added olocaltest. Forced ocachesize to be atleast 3 times fcachesize.
-- Prevent rplist_value same_value field from pointing to itself, else deleteval does double free on same rplist value.
-- Rplist, fcache, ocache entries are deleted by same process. Only marking rplist entries deleted when needed.
-- Made strings in rplist_value aligned to dword boundary. Other miscellaneous code improvements.
-- Converting opened_path to lowercase makes case-sensitive comparison of __FILE__ with realpath() fail. Fixed.
-- Process with local opcode cache never does complete remove_aplist_entry now. Added debuglevel 501 and warning codes. Modified asserts.
-- Changed cache size default values. Default size of file cache is 32 MB and opcode cache is 96 MB.
-- WINCACHE.PHP will now display files in Output cache and File cache in lexicographical sorted way. The same holds true for relative path cache tab.
-- First file executed appears duplicate in included_files list because WinCache adds the file in lowercase which is different from PHP core.
-- Taken care of zend bailout properly.
-- Removing the local entry when an entry in global aplist gets created.
-- Scavenger gets disabled if ttlmax value is 0. Also disabled scavenger in processes which create local opcode cache.
-- Fix VC6 compatibility.
-- Added total memory row for the file cache and opcode cache overview tables. Also re-ordered the colums in the file cache list to be consistent with opcode cache list.
-- Added tooltip for statistics column in wincache.php file.
-- Added memory usage pie charts to wincache.php file.
-- Minor changes to php_wincache. Made is_free unsigned int. Made used_header similar to free_header by adding two dummy size_t.
-- Implemented new INI directive FCENABLEDFILER for file cache which is similar to OCENABLEDFILTER for output cache.
-- Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication.
-- Added the "filelist" id's to the file list tables to allow usage of page anchors in navigation.
-- Modified the chart in wincache.php to display the numbers rounded to 2 digits after decimal point.
+1.1.0 release:
  </notes>
   <contents>
     <dir name="/">
@@ -112,6 +89,43 @@
   <providesextension>wincache</providesextension>
   <extsrcrelease/>
   <changelog>
+   <release>
+     <stability>
+       <release>stable</release>
+       <api>stable</api>
+     </stability>
+     <version>
+       <release>1.0.0</release>
+       <api>1.0.0</api>
+     </version>
+     <date>2009-11-19</date>
+     <notes>
+- Setting absentry and same_value in rplist_value under writelock.
+- Final v1 RTW build is version 1117.
+- Updated the wincache.php to show a warning if opcode cache size is too small and it has been automatically increased.
+- Changed minimum/maximum values of fcachesize, ocachesize. Added olocaltest. Forced ocachesize to be atleast 3 times fcachesize.
+- Prevent rplist_value same_value field from pointing to itself, else deleteval does double free on same rplist value.
+- Rplist, fcache, ocache entries are deleted by same process. Only marking rplist entries deleted when needed.
+- Made strings in rplist_value aligned to dword boundary. Other miscellaneous code improvements.
+- Converting opened_path to lowercase makes case-sensitive comparison of __FILE__ with realpath() fail. Fixed.
+- Process with local opcode cache never does complete remove_aplist_entry now. Added debuglevel 501 and warning codes. Modified asserts.
+- Changed cache size default values. Default size of file cache is 32 MB and opcode cache is 96 MB.
+- WINCACHE.PHP will now display files in Output cache and File cache in lexicographical sorted way. The same holds true for relative path cache tab.
+- First file executed appears duplicate in included_files list because WinCache adds the file in lowercase which is different from PHP core.
+- Taken care of zend bailout properly.
+- Removing the local entry when an entry in global aplist gets created.
+- Scavenger gets disabled if ttlmax value is 0. Also disabled scavenger in processes which create local opcode cache.
+- Fix VC6 compatibility.
+- Added total memory row for the file cache and opcode cache overview tables. Also re-ordered the colums in the file cache list to be consistent with opcode cache list.
+- Added tooltip for statistics column in wincache.php file.
+- Added memory usage pie charts to wincache.php file.
+- Minor changes to php_wincache. Made is_free unsigned int. Made used_header similar to free_header by adding two dummy size_t.
+- Implemented new INI directive FCENABLEDFILER for file cache which is similar to OCENABLEDFILTER for output cache.
+- Fixed the wincache.php authenticaiton logic to not conflict with IIS built-in authentication.
+- Added the "filelist" id's to the file list tables to allow usage of page anchors in navigation.
+- Modified the chart in wincache.php to display the numbers rounded to 2 digits after decimal point.
+     </notes> 
+   </release>
  </changelog>
 </package>
 <!--
