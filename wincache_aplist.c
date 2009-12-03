@@ -1604,6 +1604,14 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     }
     else
     {
+#ifndef PHP_VERSION_52
+        /* Get fullpath by calling original resolve path function */
+        /*This is required because path can be included in different case*/
+        /*and can be absolute. In that case we need to ensure that both paths*/
+        /*like C:\Temp\a.php and c:\temp\A.PHP resolves in a similar path*/
+        filename = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
+            
+#endif
         /* Standardize absolute paths as well */
         fullpath = utils_fullpath(filename);
         if(fullpath == NULL)
