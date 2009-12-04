@@ -1609,9 +1609,24 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         /*This is required because path can be included in different case*/
         /*and can be absolute. In that case we need to ensure that both paths*/
         /*like C:\Temp\a.php and c:\temp\A.PHP resolves in a similar path*/
-        filename = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
+        fullpath = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
+        if(fullpath == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
+
+        /*Change / to \\ */
+        length = strlen(fullpath);
+        for(findex = 0; findex < length; findex++)
+        {
+            if(fullpath[findex] == '/')
+            {
+                fullpath[findex] = '\\';
+            }
+        }
             
-#endif
+#else
         /* Standardize absolute paths as well */
         fullpath = utils_fullpath(filename);
         if(fullpath == NULL)
@@ -1619,6 +1634,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             result = FATAL_OUT_OF_LMEMORY;
             goto Finished;
         }
+#endif
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */
