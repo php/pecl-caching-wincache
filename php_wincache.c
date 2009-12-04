@@ -956,7 +956,9 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     {
         _ASSERT(povalue != NULL);
 
+        lock_writelock((WCG(locache))->aprwlock);
         result = aplist_ocache_use(WCG(locache), povalue, &oparray TSRMLS_CC);
+        lock_writeunlock(WCG(locache)->aprwlock);
         if(FAILED(result))
         {
             aplist_ocache_close(WCG(locache), povalue);
