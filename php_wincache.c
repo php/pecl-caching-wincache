@@ -157,8 +157,9 @@ PHP_INI_BEGIN()
 /* index 12 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
 /* index 13 */ STD_PHP_INI_ENTRY("wincache.namesalt", NULL, PHP_INI_SYSTEM, OnUpdateString, namesalt, zend_wincache_globals, wincache_globals)
 /* index 14 */ STD_PHP_INI_ENTRY("wincache.localheap", "0", PHP_INI_SYSTEM, OnUpdateBool, localheap, zend_wincache_globals, wincache_globals)
+/* index 15 */ STD_PHP_INI_ENTRY("wincache.nolocalcache", "0", PHP_INI_SYSTEM, OnUpdateBool, nolocalcache, zend_wincache_globals, wincache_globals)
 #ifdef WINCACHE_TEST
-/* index 15 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+/* index 16 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
 
@@ -169,27 +170,30 @@ static void globals_terminate(zend_wincache_globals * globals TSRMLS_DC);
 static unsigned char isin_ignorelist(const char * ignorelist, const char * filename);
 static unsigned char isin_cseplist(const char * cseplist, const char * szinput);
 static void errmsglist_dtor(void * pvoid);
+static ocache_initialized = 0;
+static fcache_initialized = 0;
 
 /* Initialize globals */
 static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
 {
     dprintverbose("start globals_initialize");
 
-    WCG(fcenabled)   = 1;    /* File cache enabled by default */
-    WCG(ocenabled)   = 1;    /* Opcode cache enabled by default */
-    WCG(enablecli)   = 0;    /* WinCache not enabled by default for CLI */
-    WCG(fcachesize)  = 24;   /* File cache size is 24 MB by default */
-    WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
-    WCG(maxfilesize) = 256;  /* Maximum file size to cache is 256 KB */
-    WCG(numfiles)    = 4096; /* 4096 hashtable keys */
-    WCG(fcchkfreq)   = 30;   /* File change check done every 30 secs */
-    WCG(ttlmax)      = 1200; /* File removed if not used for 1200 secs */
-    WCG(debuglevel)  = 0;    /* Debug dump not enabled by default */
-    WCG(ignorelist)  = NULL; /* List of files to ignore for caching */
-    WCG(ocefilter)   = NULL; /* List of sites for which ocenabled is toggled */
-    WCG(fcefilter)   = NULL; /* List of sites for which fcenabled is toggled */
-    WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
-    WCG(localheap)   = 0;    /* Local heap is disabled by default */
+    WCG(fcenabled)    = 1;    /* File cache enabled by default */
+    WCG(ocenabled)    = 1;    /* Opcode cache enabled by default */
+    WCG(enablecli)    = 0;    /* WinCache not enabled by default for CLI */
+    WCG(fcachesize)   = 24;   /* File cache size is 24 MB by default */
+    WCG(ocachesize)   = 96;   /* Opcode cache size is 96 MB by default */
+    WCG(maxfilesize)  = 256;  /* Maximum file size to cache is 256 KB */
+    WCG(numfiles)     = 4096; /* 4096 hashtable keys */
+    WCG(fcchkfreq)    = 30;   /* File change check done every 30 secs */
+    WCG(ttlmax)       = 1200; /* File removed if not used for 1200 secs */
+    WCG(debuglevel)   = 0;    /* Debug dump not enabled by default */
+    WCG(ignorelist)   = NULL; /* List of files to ignore for caching */
+    WCG(ocefilter)    = NULL; /* List of sites for which ocenabled is toggled */
+    WCG(fcefilter)    = NULL; /* List of sites for which fcenabled is toggled */
+    WCG(namesalt)     = NULL; /* Salt to use in names used by wincache */
+    WCG(localheap)    = 0;    /* Local heap is disabled by default */
+    WCG(nolocalcache) = 0;    /* Local output cache enabled by default */
 #ifdef WINCACHE_TEST
     WCG(olocaltest)  = 0;    /* Local opcode test disabled by default */
 #endif
@@ -439,6 +443,22 @@ PHP_MINIT_FUNCTION(wincache)
         WCG(ocachesize) = 3 * WCG(fcachesize);
     }
 
+    dprintverbose("Installed function hooks for stream_open");
+    original_stream_open_function = zend_stream_open_function;
+    zend_stream_open_function = wincache_stream_open_function;
+
+    dprintverbose("Installed function hooks for compile_file");
+    original_compile_file = zend_compile_file;
+    zend_compile_file = wincache_compile_file;
+
+#ifndef PHP_VERSION_52
+    original_resolve_path = zend_resolve_path;
+    zend_resolve_path = wincache_resolve_path;
+#endif
+
+    /* Also keep zend_error_cb pointer for saving generating messages */
+    original_error_cb = zend_error_cb;
+
     /* Even if enabled is set to false, create cache and set */
     /* the hook because scripts can selectively enable it */
 
@@ -467,18 +487,12 @@ PHP_MINIT_FUNCTION(wincache)
     {
         goto Finished;
     }
+    else
+    {
+        fcache_initialized = 1;
+    }
 
     WCG(lfcache) = plcache1;
-
-    original_stream_open_function = zend_stream_open_function;
-    zend_stream_open_function = wincache_stream_open_function;
-
-#ifndef PHP_VERSION_52
-    original_resolve_path = zend_resolve_path;
-    zend_resolve_path = wincache_resolve_path;
-#endif
-
-    dprintverbose("Installed function hooks for stream_open");
 
     resnumber = zend_get_resource_handle(&extension);
     if(resnumber == -1)
@@ -500,10 +514,9 @@ PHP_MINIT_FUNCTION(wincache)
 #else
     result = aplist_ocache_initialize(plcache1, resnumber, WCG(ocachesize) TSRMLS_CC);
 #endif
-
     if(FAILED(result))
     {
-        if(result != WARNING_FILEMAP_MAPVIEW)
+        if((result != WARNING_FILEMAP_MAPVIEW) || WCG(nolocalcache))
         {
             goto Finished;
         }
@@ -532,19 +545,13 @@ PHP_MINIT_FUNCTION(wincache)
 
         WCG(locache) = plcache2;
         WCG(issame)  = 0;
+        ocache_initialized = 1;
     }
     else
     {
         WCG(locache) = plcache1;
+        ocache_initialized = 1;
     }
-
-    original_compile_file = zend_compile_file;
-    zend_compile_file = wincache_compile_file;
-
-    /* Also keep zend_error_cb pointer for saving generating messages */
-    original_error_cb = zend_error_cb;
-
-    dprintverbose("Installed function hooks for compile_file");
 
     _ASSERT(SUCCEEDED(result));
 
@@ -555,20 +562,28 @@ Finished:
         dprintimportant("failure %d in php_minit", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
-        if(plcache1 != NULL)
+		/* If fcache is initialized properly and ocache failed we should not do this cleanup */
+        /* The same holds true for ocache too meaning if ocache is initialized but fcache not, no cleanup please */
+        if (!(fcache_initialized || ocache_initialized))
         {
-            aplist_terminate(plcache1);
-            aplist_destroy(plcache1);
+            if(plcache1 != NULL)
+            {
+                aplist_terminate(plcache1);
+                aplist_destroy(plcache1);
 
-            plcache1 = NULL;
-        }
+                plcache1 = NULL;
+            }
 
-        if(plcache2 != NULL)
-        {
-            aplist_terminate(plcache2);
-            aplist_destroy(plcache2);
+            if(plcache2 != NULL)
+            {
+                aplist_terminate(plcache2);
+                aplist_destroy(plcache2);
 
-            plcache2 = NULL;
+                plcache2 = NULL;
+            }
+
+            WCG(lfcache) = NULL;
+            WCG(locache) = NULL;
         }
     }
 
@@ -767,11 +782,17 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     }
     
     dprintimportant("zend_resolve_path called for %s", filename);
-
+	
     /* Hook so that test file is not added to cache */
     if(isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
+        return original_resolve_path(filename, filename_len TSRMLS_CC);
+    }
+
+    /* If the catch is not initialized yet, call the original function */
+    if (!fcache_initialized)
+    {
         return original_resolve_path(filename, filename_len TSRMLS_CC);
     }
 
@@ -835,6 +856,12 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
 
+    /* If cache is not initialized, return the original zend function */
+    if (!fcache_initialized)
+    {
+        return original_stream_open_function(filename, file_handle TSRMLS_CC);
+    }
+	
     result = aplist_fcache_get(WCG(lfcache), filename, &fullpath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -921,6 +948,12 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         goto Finished;
     }
 
+    /* If cache is not initialized, call original zend function */
+    if (!ocache_initialized)
+    {
+        oparray = original_compile_file(file_handle, type TSRMLS_CC);
+        goto Finished;
+    }
     /* Use file cache to expand relative paths and also standardize all paths */
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
     /* Make sure all caches can be used regardless of enabled setting */
@@ -1043,6 +1076,11 @@ void wincache_error_cb(int type, const char * error_filename, const uint error_l
     char *              buffer  = NULL;
 
     TSRMLS_FETCH();
+    /*Do we need to do all this if cache is not initialized, doesn't make sense */
+    if (!ocache_initialized)
+    {
+        goto Finished;
+    }
 
     /* First call to wincache_error_cb creates the errmsglist */
     if(WCG(errmsglist) == NULL)

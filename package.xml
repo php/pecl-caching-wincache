@@ -41,7 +41,9 @@
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
 1.0.1 release:
-- Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
+- Bug16976 - Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
+- Bug16969 - Crash in error recovery logic
+- Bug16970 - Introduce new WINCACHE directive nolocalcache to get rid of local cache
  </notes>
   <contents>
     <dir name="/">
