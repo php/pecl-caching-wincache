@@ -40,7 +40,7 @@
 typedef struct rplist_value rplist_value;
 struct rplist_value
 {
-    size_t             file_path;  /* relative file path */
+    size_t             file_path;  /* resolve file path */
     size_t             cwd_cexec;  /* cwdir|cexec */
     size_t             inc_path;   /* current include path */
     size_t             open_based; /* open_basedir set */
@@ -74,7 +74,7 @@ struct rplist_context
 typedef struct rplist_entry_info rplist_entry_info;
 struct rplist_entry_info
 {
-    char *              pathkey;   /* relative file path */
+    char *              pathkey;   /* resolve file path */
     char *              subkey;    /* cwdir|cexec subkey entry */
     char *              abspath;   /* absolute path to use */
     rplist_entry_info * next;      /* next entry */

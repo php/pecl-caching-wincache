@@ -33,9 +33,6 @@
 
 #include "precomp.h"
 
-#define NOT_MARKED_FOR_DELETION     0
-#define MARKED_FOR_DELETION         1
-
 /* Globals */
 unsigned int gocacheid = 1;
 
@@ -423,7 +420,7 @@ int ocache_createval(ocache_context * pcache, const char * filename, zend_file_h
     pvalue->mcount     = 0;
     pvalue->aglobals   = NULL;
     pvalue->acount     = 0;
-    pvalue->is_deleted = NOT_MARKED_FOR_DELETION;
+    pvalue->is_deleted = 0;
     pvalue->hitcount   = 0;
     pvalue->refcount   = 0;
 
@@ -661,7 +658,8 @@ void ocache_refdec(ocache_context * pocache, ocache_value * pvalue)
 
     InterlockedDecrement(&pvalue->refcount);
 
-    if(pvalue->is_deleted == MARKED_FOR_DELETION && pvalue->refcount == 0)
+    if(InterlockedCompareExchange(&pvalue->is_deleted, 1, 1) == 1 &&
+       InterlockedCompareExchange(&pvalue->refcount, 0, 0) == 0)
     {
         ocache_destroyval(pocache, pvalue);
         pvalue = NULL;

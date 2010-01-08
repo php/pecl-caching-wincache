@@ -96,7 +96,7 @@ struct ocache_value
     ocache_user_message *  messages;   /* array of messages generated */
     unsigned int           mcount;     /* count of messages */
 
-    unsigned short         is_deleted; /* if 1, this entry is marked for deletion */
+    unsigned int           is_deleted; /* if 1, this entry is marked for deletion */
     unsigned int           hitcount;   /* hitcount for this entry */
     unsigned int           refcount;   /* refcount for this value */
 };
@@ -113,23 +113,23 @@ struct ocache_header
 typedef struct ocache_context ocache_context;
 struct ocache_context
 {
-    unsigned short    id;          /* unique identifier for cache */
-    unsigned short    islocal;     /* is cache local to process */
-    HANDLE            hinitdone;   /* event to indicate memory is initialized */
-    int               resnumber;   /* resource number to use */
-    char *            memaddr;     /* base memory address of segment */
-    ocache_header *   header;      /* cache header */
-    filemap_context * pfilemap;    /* filemap where opcodes are kept */
-    lock_context *    prwlock;     /* writer lock for opcode cache */
-    alloc_context *   palloc;      /* alloc context for opcode segment */
+    unsigned short     id;        /* unique identifier for cache */
+    unsigned short     islocal;   /* is cache local to process */
+    HANDLE             hinitdone; /* event to indicate memory is initialized */
+    int                resnumber; /* resource number to use */
+    char *             memaddr;   /* base memory address of segment */
+    ocache_header *    header;    /* cache header */
+    filemap_context *  pfilemap;  /* filemap where opcodes are kept */
+    lock_context *     prwlock;   /* writer lock for opcode cache */
+    alloc_context *    palloc;    /* alloc context for opcode segment */
 };
 
 typedef struct ocache_entry_info ocache_entry_info;
 struct ocache_entry_info
 {
-    unsigned int      hitcount;    /* hitcount for this entry */
-    unsigned int      fcount;      /* Number of functions in the entry */
-    unsigned int      ccount;      /* Number of classes in the entry */
+    unsigned int       hitcount;  /* hitcount for this entry */
+    unsigned int       fcount;    /* Number of functions in the entry */
+    unsigned int       ccount;    /* Number of classes in the entry */
 };
 
 extern int  ocache_create(ocache_context ** pcache);

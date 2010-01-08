@@ -33,9 +33,7 @@
 
 #include "precomp.h"
 
-#define READAHEAD_MAXIMUM           0x10000000
-#define NOT_MARKED_FOR_DELETION     0
-#define MARKED_FOR_DELETION         1
+#define READAHEAD_MAXIMUM 0x10000000
 
 static int read_file_security(fcache_context * pfcache, const char * filename, unsigned char ** ppsec);
 static int read_file_content(HANDLE hFile, unsigned int filesize, void ** ppbuffer);
@@ -536,7 +534,7 @@ int fcache_createval(fcache_context * pfcache, const char * filename, fcache_val
     pvalue->file_size     = filesize;
     pvalue->file_sec      = psec - pfcache->memaddr;
     pvalue->file_content  = ((char *)buffer - pfcache->memaddr);
-    pvalue->is_deleted    = NOT_MARKED_FOR_DELETION;
+    pvalue->is_deleted    = 0;
     pvalue->hitcount      = 0;
     pvalue->refcount      = 0;
 
@@ -745,7 +743,8 @@ void fcache_refdec(fcache_context * pfcache, fcache_value * pvalue)
 
     InterlockedDecrement(&pvalue->refcount);
 
-    if(pvalue->is_deleted == MARKED_FOR_DELETION && pvalue->refcount == 0)
+    if(InterlockedCompareExchange(&pvalue->is_deleted, 1, 1) == 1 &&
+       InterlockedCompareExchange(&pvalue->refcount, 0, 0) == 0)
     {
         fcache_destroyval(pfcache, pvalue);
         pvalue = NULL;

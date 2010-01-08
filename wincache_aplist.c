@@ -437,7 +437,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     /* a local cache, mark the entry deleted but do not delete it */
     if(pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache == NULL && pcache->polocal != NULL)
     {
-        /* Mark relative path entries deleted so that it rplist stop */
+        /* Mark resolve path entries deleted so that it rplist stop */
         /* handing pointer to aplist entries which are marked deleted */
         if(pvalue->relentry != 0)
         {
@@ -449,7 +449,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         goto Finished;
     }
 
-    /* Delete relative path cache entries */
+    /* Delete resolve path cache entries */
     if(pvalue->relentry != 0)
     {
         _ASSERT(pcache->prplist != NULL);
@@ -464,10 +464,10 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         _ASSERT(pcache->pfcache != NULL);
         pfvalue = fcache_getvalue(pcache->pfcache, pvalue->fcacheval);
 
-        pfvalue->is_deleted = 1;
-        pvalue->fcacheval   = 0;
+        InterlockedCompareExchange(&pfvalue->is_deleted, 1, 0);;
+        pvalue->fcacheval = 0;
 
-        if(pfvalue->refcount == 0)
+        if(InterlockedCompareExchange(&pfvalue->refcount, 0, 0) == 0)
         {
             fcache_destroyval(pcache->pfcache, pfvalue);
             pfvalue = NULL;
@@ -480,10 +480,10 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         _ASSERT(pcache->pocache != NULL);
         povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
         
-        povalue->is_deleted = 1;
-        pvalue->ocacheval   = 0;
+        InterlockedCompareExchange(&povalue->is_deleted, 1, 0);
+        pvalue->ocacheval = 0;
 
-        if(povalue->refcount == 0)
+        if(InterlockedCompareExchange(&povalue->refcount, 0, 0) == 0)
         {
             ocache_destroyval(pcache->pocache, povalue);
             povalue = NULL;
@@ -788,7 +788,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    /* Create relative path cache for global aplist cache */
+    /* Create resolve path cache for global aplist cache */
     if(apctype == APLIST_TYPE_GLOBAL)
     {
         result = rplist_create(&pcache->prplist);
@@ -826,7 +826,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         /* No need to get a write lock as other processes */
         /* are blocked waiting for hinitdone event */
 
-        /* Initialize relative path cache header */
+        /* Initialize resolve path cache header */
         if(pcache->prplist != NULL)
         {
             rplist_initheader(pcache->prplist, filecount);
@@ -1455,7 +1455,7 @@ Finished:
 
 /* Used by wincache_resolve_path and wincache_stream_open_function */
 /* If ppvalue is passed as null, this function return the standardized form of */
-/* filename which can include relative path to absolute path mapping as well */
+/* filename which can include resolve path to absolute path mapping as well */
 /* Make sure this function is called without write lock when ppvalue is non-null */
 int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC)
 {
@@ -1477,138 +1477,111 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     _ASSERT(filename   != NULL);
     _ASSERT(ppfullpath != NULL);
 
-    if(!IS_ABSOLUTE_PATH(filename, strlen(filename)))
-    {
-        _ASSERT(pcache->prplist != NULL);
+    _ASSERT(pcache->prplist != NULL);
 
-        /* Look for absolute path in relative path cache */
-        result = rplist_getentry(pcache->prplist, filename, &rpvalue, &relentry TSRMLS_CC);
-        if(FAILED(result))
+    /* Look for absolute path in resolve path cache first */
+    /* All paths in resolve path cache are resolved using */
+    /* include_path and don't need checks against open_basedir */
+    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &relentry TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(rpvalue  != NULL);
+    _ASSERT(relentry != 0);
+
+    /* If found, use new path to look into absolute path cache */
+    if(rpvalue->absentry != 0)
+    {
+        pvalue = APLIST_VALUE(pcache->apalloc, rpvalue->absentry);
+
+        /* If pvalue came directly from resolve path absentry, and if the */
+        /* call is not just to get the fullpath, do a file change check here */
+        if(pvalue != NULL && ppvalue != NULL)
         {
+            lock_readlock(pcache->aprwlock);
+
+            if(is_file_changed(pcache, pvalue))
+            {
+                addticks = pvalue->add_ticks;
+
+                lock_readunlock(pcache->aprwlock);
+                lock_writelock(pcache->aprwlock);
+
+                /* If the entry is unchanged during lock change, remove it from hashtable */
+                if(pvalue->add_ticks == addticks)
+                {
+                    findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
+                    remove_aplist_entry(pcache, findex, pvalue);
+                    pvalue   = NULL;
+
+                    /* Deleting the aplist entry will delete rplist entries as well */
+                    rpvalue  = NULL;
+                    relentry = 0;
+                }
+
+                lock_writeunlock(pcache->aprwlock);
+            }
+            else
+            {
+                lock_readunlock(pcache->aprwlock);
+            }
+        }
+
+        if(pvalue != NULL)
+        {
+            fullpath = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);    
+            if(fullpath == NULL)
+            {    
+                result = FATAL_OUT_OF_LMEMORY;
+                goto Finished;
+            }
+
+            dprintimportant("stored fullpath in aplist is %s", fullpath);
+        }
+    }
+
+    /* If no valid absentry is found so far, get the fullpath from php-core */
+    if(pvalue == NULL)
+    {
+#ifdef PHP_VERSION_52
+        /* Get fullpath by calling original stream open function */
+        result = original_stream_open_function(filename, &fhandle TSRMLS_CC);
+        if(result != SUCCESS)
+        {
+            result = FATAL_FCACHE_ORIGINAL_OPEN;
             goto Finished;
         }
 
-        _ASSERT(rpvalue  != NULL);
-        _ASSERT(relentry != 0);
+        _ASSERT(fhandle.opened_path != NULL);
+        fullpath = utils_fullpath(fhandle.opened_path);
 
-        /* If found, use new path to look into absolute path cache */
-        if(rpvalue->absentry != 0)
+        if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
         {
-            pvalue = APLIST_VALUE(pcache->apalloc, rpvalue->absentry);
-
-            /* If pvalue came directly from relative path absentry, and if the */
-            /* call is not just to get the fullpath, do a file change check here */
-            if(pvalue != NULL && ppvalue != NULL)
-            {
-                lock_readlock(pcache->aprwlock);
-
-                if(is_file_changed(pcache, pvalue))
-                {
-                    addticks = pvalue->add_ticks;
-                    
-                    lock_readunlock(pcache->aprwlock);
-                    lock_writelock(pcache->aprwlock);
-
-                    /* If the entry is unchanged during lock change, remove it from hashtable */
-                    if(pvalue->add_ticks == addticks)
-                    {
-                        findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
-                        remove_aplist_entry(pcache, findex, pvalue);
-                        pvalue   = NULL;
-
-                        /* Deleting the aplist entry will delete rplist entries as well */
-                        rpvalue  = NULL;
-                        relentry = 0;
-                    }
-
-                    lock_writeunlock(pcache->aprwlock);
-                }
-                else
-                {
-                    lock_readunlock(pcache->aprwlock);
-                }
-            }
-
-            if(pvalue != NULL)
-            {
-                fullpath = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);    
-                if(fullpath == NULL)
-                {    
-                    result = FATAL_OUT_OF_LMEMORY;
-                    goto Finished;
-                }
-
-                dprintimportant("stored fullpath in aplist is %s", fullpath);
-            }
+            fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
+            fhandle.handle.stream.handle = NULL;
         }
 
-        /* If no valid absentry is found so far, get the fullpath from php-core */
-        if(pvalue == NULL)
+        if(fhandle.opened_path)
         {
-#ifdef PHP_VERSION_52
-            /* Get fullpath by calling original stream open function */
-            result = original_stream_open_function(filename, &fhandle TSRMLS_CC);
-            if(result != SUCCESS)
-            {
-                result = FATAL_FCACHE_ORIGINAL_OPEN;
-                goto Finished;
-            }
+            efree(fhandle.opened_path);
+            fhandle.opened_path = NULL;
+        }
 
-            _ASSERT(fhandle.opened_path != NULL);
-            fullpath = utils_fullpath(fhandle.opened_path);
+        if(fhandle.free_filename && fhandle.filename)
+        {
+            efree(fhandle.filename);
+            fhandle.filename = NULL;
+        }
 
-            if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
-            {
-                fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
-                fhandle.handle.stream.handle = NULL;
-            }
-
-            if(fhandle.opened_path)
-            {
-                efree(fhandle.opened_path);
-                fhandle.opened_path = NULL;
-            }
-
-            if(fhandle.free_filename && fhandle.filename)
-            {
-                efree(fhandle.filename);
-                fhandle.filename = NULL;
-            }
-
-            if(fullpath == NULL)
-            {
-                result = FATAL_OUT_OF_LMEMORY;
-                goto Finished;
-            }
+        if(fullpath == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
 #else
-            /* Get fullpath by calling original resolve path function */
-            fullpath = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
-            if(fullpath == NULL)
-            {
-                result = FATAL_OUT_OF_LMEMORY;
-                goto Finished;
-            }
-
-            /* Convert to lower case and change / to \\ */
-            length = strlen(fullpath);
-            for(findex = 0; findex < length; findex++)
-            {
-                if(fullpath[findex] == '/')
-                {
-                    fullpath[findex] = '\\';
-                }
-            }
-#endif
-            dprintimportant("relative path resolved as %s", fullpath);
-        }
-    }
-    else
-    {
-#ifndef PHP_VERSION_52
         /* Get fullpath by calling original resolve path function */
-        /*This is required because path can be included in different case*/
-        /*and can be absolute. In that case we need to ensure that both paths*/
-        /*like C:\Temp\a.php and c:\temp\A.PHP resolves in a similar path*/
         fullpath = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
         if(fullpath == NULL)
         {
@@ -1616,7 +1589,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             goto Finished;
         }
 
-        /*Change / to \\ */
+        /* Convert to lower case and change / to \\ */
         length = strlen(fullpath);
         for(findex = 0; findex < length; findex++)
         {
@@ -1625,16 +1598,8 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                 fullpath[findex] = '\\';
             }
         }
-            
-#else
-        /* Standardize absolute paths as well */
-        fullpath = utils_fullpath(filename);
-        if(fullpath == NULL)
-        {
-            result = FATAL_OUT_OF_LMEMORY;
-            goto Finished;
-        }
 #endif
+        dprintimportant("Path resolved as %s", fullpath);
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */
@@ -1727,17 +1692,22 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     {
         _ASSERT(pvalue->fcacheval != 0);
         pfvalue = fcache_getvalue(pcache->pfcache, pvalue->fcacheval);
+        _ASSERT(pfvalue != NULL);
     }
 
-    lock_readunlock(pcache->aprwlock);
- 
-    _ASSERT(pfvalue != NULL);
+    if(pfvalue != NULL)
+    {
+        /* Increment refcount while holding aplist readlock */
+        fcache_refinc(pcache->pfcache, pfvalue);
+    }
 
     /* If this is the first time this entry */
     /* got created, let original function do its job */
     *ppvalue = pfvalue;
     *ppfullpath = fullpath;
 
+    lock_readunlock(pcache->aprwlock);
+ 
     _ASSERT(SUCCEEDED(result));
 
 Finished:
@@ -1769,7 +1739,6 @@ int aplist_fcache_use(aplist_context * pcache, const char * fullpath, fcache_val
     _ASSERT(fullpath != NULL);
     _ASSERT(pphandle != NULL);
 
-    fcache_refinc(pcache->pfcache, pfvalue);
     result = fcache_useval(pcache->pfcache, fullpath, pfvalue, pphandle);
     if(FAILED(result))
     {
@@ -1859,10 +1828,17 @@ int aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_
         povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
     }
 
-    lock_readunlock(pcache->aprwlock);
-    
     _ASSERT(povalue != NULL);
     *ppvalue = povalue;
+
+    if(*poparray == NULL)
+    {
+        /* We found an entry in the opcode cache */
+        /* Do ref increment before releasing the readlock */
+        ocache_refinc(pcache->pocache, povalue);
+    }
+
+    lock_readunlock(pcache->aprwlock);
 
     _ASSERT(SUCCEEDED(result));
 
@@ -1911,12 +1887,16 @@ int aplist_ocache_get_value(aplist_context * pcache, const char * filename, ocac
     }
 
     povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-    lock_readunlock(pcache->aprwlock);
 
     _ASSERT(povalue != NULL);
     *ppvalue = povalue;
 
+    /* Do refinc while holding the lock so that ocache */
+    /* entry doesn't get deleted while before refinc */
     ocache_refinc(pcache->pocache, povalue);
+
+    lock_readunlock(pcache->aprwlock);
+
     _ASSERT(SUCCEEDED(result));
 
 Finished:
@@ -1941,7 +1921,6 @@ int aplist_ocache_use(aplist_context * pcache, ocache_value * povalue, zend_op_a
     _ASSERT(povalue     != NULL);
     _ASSERT(pparray     != NULL);
 
-    ocache_refinc(pcache->pocache, povalue);
     result = ocache_useval(pcache->pocache, povalue, pparray TSRMLS_CC);
     if(FAILED(result))
     {
