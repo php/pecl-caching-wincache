@@ -112,6 +112,7 @@ typedef struct cache_info cache_info;
 struct cache_info
 {
     unsigned int       initage;     /* Seconds elapsed after cache init */
+    unsigned int       islocal;     /* Is the aplist local or global */
     unsigned int       itemcount;   /* Total number of items in subcache */
     unsigned int       hitcount;    /* Hit count of subcache */
     unsigned int       misscount;   /* Miss count of subcache */

@@ -2066,6 +2066,8 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, cache_info ** pp
     flock = 1;
 
     pcinfo->initage = (ticks - pcache->apheader->init_ticks)/1000;
+    pcinfo->islocal = pcache->islocal;
+
     if(type == CACHE_TYPE_FILECONTENT)
     {
         pcinfo->itemcount = pcache->pfcache->header->itemcount;
