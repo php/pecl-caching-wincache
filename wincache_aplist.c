@@ -464,7 +464,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         _ASSERT(pcache->pfcache != NULL);
         pfvalue = fcache_getvalue(pcache->pfcache, pvalue->fcacheval);
 
-        InterlockedCompareExchange(&pfvalue->is_deleted, 1, 0);;
+        InterlockedExchange(&pfvalue->is_deleted, 1);
         pvalue->fcacheval = 0;
 
         if(InterlockedCompareExchange(&pfvalue->refcount, 0, 0) == 0)
@@ -480,7 +480,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         _ASSERT(pcache->pocache != NULL);
         povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
         
-        InterlockedCompareExchange(&povalue->is_deleted, 1, 0);
+        InterlockedExchange(&povalue->is_deleted, 1);
         pvalue->ocacheval = 0;
 
         if(InterlockedCompareExchange(&povalue->refcount, 0, 0) == 0)
@@ -543,7 +543,7 @@ static void delete_aplist_fileentry(aplist_context * pcache, const char * filena
 
     findex = utils_getindex(filename, pcache->apheader->valuecount);
     findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
-    
+
     /* If an entry is found for this file, remove it */
     if(pvalue != NULL)
     {
@@ -595,7 +595,7 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
         }
     }
 
-    dprintimportant("sindex = %d, eindex = %d", sindex, eindex);
+    dprintimportant("scavenger run sindex = %d, eindex = %d", sindex, eindex);
     for( ;sindex < eindex; sindex++)
     {
         if(apheader->values[sindex] == 0)
@@ -971,10 +971,43 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
 {
     int              result  = NONFATAL;
     ocache_context * pocache = NULL;
-    
+    HANDLE           hfirst  = NULL;
+    unsigned char    isfirst = 1;
+    char             evtname[  MAX_PATH];
+
+    unsigned int     count   = 0;
+    aplist_value *   pvalue  = NULL;
+    unsigned int     index   = 0;
+    size_t           offset  = 0;
+ 
     dprintverbose("start aplist_ocache_initialize");
 
     _ASSERT(plcache != NULL);
+
+    if(!plcache->islocal)
+    {
+        /* Create a new eventname using aplist lockname */
+        result = lock_getnewname(plcache->aprwlock, "GLOBAL_OCACHE_FINIT", evtname, MAX_PATH);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        /* First process reaching here will set all ocacheval to 0 if required */
+        hfirst = CreateEvent(NULL, TRUE, FALSE, evtname);
+        if(hfirst == NULL)
+        {
+            result = FATAL_APLIST_INIT_EVENT;
+            goto Finished;
+        }
+
+        /* If this is not first process, wait for first process to be done with ocache init */
+        if(GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            isfirst = 0;
+            WaitForSingleObject(hfirst, INFINITE);
+        }
+    }
 
     result = ocache_create(&pocache);
     if(FAILED(result))
@@ -988,6 +1021,44 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         goto Finished;
     }
 
+    if(!plcache->islocal && isfirst)
+    {
+        _ASSERT(hfirst != NULL);
+
+        /* A new opcode cache is created for global aplist. It is possible that */
+        /* global aplist is old with obsolete ocacheval offsets. Set ocachevals to 0 */
+        lock_writelock(plcache->aprwlock);
+       
+        count = plcache->apheader->valuecount;
+        for(index = 0; index < count; index++)
+        {
+            offset = plcache->apheader->values[index];
+            if(offset == 0)
+            {
+                continue;
+            }
+
+            pvalue = (aplist_value *)alloc_get_cachevalue(plcache->apalloc, offset);
+            while(pvalue != NULL)
+            {
+                pvalue->ocacheval = 0;
+
+                offset = pvalue->next_value;
+                if(offset == 0)
+                {
+                    break;
+                }
+
+                pvalue = (aplist_value *)alloc_get_cachevalue(plcache->apalloc, offset);
+            }
+        }
+
+        lock_writeunlock(plcache->aprwlock);
+
+        /* Set the event now that ocacheval is set to 0 */
+        SetEvent(hfirst);
+    }
+
     plcache->resnumber = resnumber;
     plcache->pocache   = pocache;
 
@@ -999,6 +1070,14 @@ Finished:
     {
         dprintimportant("failure %d in aplist_ocache_initialize", result);
         _ASSERT(result > WARNING_COMMON_BASE);
+
+        /* Make sure process with local cache doesn't increment */
+        /* refcount of named object created above */
+        if(hfirst != NULL)
+        {
+            CloseHandle(hfirst);
+            hfirst = NULL;
+        }
 
         if(pocache != NULL)
         {
@@ -1124,18 +1203,19 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     ticks    = GetTickCount();
     apheader = pcache->apheader;
 
+    /* Check if scavenger is active for this process and if yes run the partual scavenger */
     if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE && ((ticks - apheader->lscavenge) > apheader->scfreq))
     {
-        /* Get write lock, do last scavenge check again */
-        /* and run the partial scavenger if required */
+        /* run scavenger under write lock */
         lock_writelock(pcache->aprwlock);
-        
+        ticks = GetTickCount();
+
         if((ticks - apheader->lscavenge) > apheader->scfreq)
         {
             run_aplist_scavenger(pcache, DO_PARTIAL_SCAVENGER_RUN);
             apheader->lscavenge = GetTickCount();
         }
-        
+
         lock_writeunlock(pcache->aprwlock);
     }
 
@@ -1153,7 +1233,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     }
 
     lock_readunlock(pcache->aprwlock);
-    
+
     if(FAILED(result))
     {
         if(result != FATAL_FCACHE_FILECHANGED)
@@ -1170,7 +1250,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     {
         /* If we are about to create an entry in global aplist, */
         /* remove the cache entry in local cache if one is present */
-        if(pcache->polocal != NULL)
+        if(pcache->pocache == NULL && pcache->polocal != NULL)
         {
             lock_writelock(pcache->polocal->aprwlock);
             delete_aplist_fileentry(pcache->polocal, filename);
@@ -1186,6 +1266,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         lock_writelock(pcache->aprwlock);
         flock = 1;
 
+        /* Check again after getting write lock to see if something changed */
         result = findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
         if(FAILED(result))
         {
@@ -1239,6 +1320,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         lock_writelock(pcache->aprwlock);
         flock = 1;
 
+        /* Check again to see if anything changed before getting write lock */
         result = findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pdummy, &pdelete);
         if(FAILED(result))
         {
@@ -1913,7 +1995,7 @@ Finished:
 
 int aplist_ocache_use(aplist_context * pcache, ocache_value * povalue, zend_op_array ** pparray TSRMLS_DC)
 {
-    int result = NONFATAL;
+    int result         = NONFATAL;
 
     dprintverbose("start aplist_ocache_use");
 

@@ -94,10 +94,10 @@
 typedef struct filemap_information_header filemap_information_header;
 struct filemap_information_header
 {
-    size_t         size;        /* Total size of the memory map */
-    unsigned int   mapcount;    /* Total times this shared area got mapped */
-    unsigned short entry_count; /* How many other filemap objects are present */
-    unsigned short maxcount;    /* Maximum number of filemaps which can be created */
+    size_t         size;          /* Total size of the memory map */
+    unsigned int   mapcount;      /* Total times this shared area got mapped */
+    unsigned short entry_count;   /* How many other filemap objects are present */
+    unsigned short maxcount;      /* Maximum number of filemaps which can be created */
 };
 
 typedef struct filemap_information_entry filemap_information_entry;
@@ -106,7 +106,7 @@ struct filemap_information_entry
     unsigned short fmaptype;      /* Type which tells what is the purpose of this filemap */
     char           name[MAX_PATH];/* name of filemap */
     size_t         size;          /* Size of this filemap */
-    unsigned short mapcount;      /* How many processes mapped this filemap */
+    unsigned int   mapcount;      /* How many processes mapped this filemap */
     unsigned short cpid;          /* ProcessID of process which initially created this map */
     unsigned short opid;          /* Current ProcessID which is the owner */
     void *         mapaddr;       /* Map address where owner has this memory mapped */
