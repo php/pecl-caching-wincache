@@ -44,6 +44,8 @@
 - Bug16976 - Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
 - Bug16969 - Crash in error recovery logic
 - Bug16970 - Introduce new WINCACHE directive nolocalcache to get rid of local cache
+- Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
+- Updated the wincache.php to show whether information about a global or local cache instance is being displayed
  </notes>
   <contents>
     <dir name="/">

@@ -109,13 +109,35 @@ $page = isset( $_GET['page'] ) ? $_GET['page'] : SUMMARY_DATA;
 if ( !is_numeric( $page ) || $page < SUMMARY_DATA || $page > RCACHE_DATA )
     $page = SUMMARY_DATA;
 
-$img = isset( $_GET['img'] ) ? $_GET['img'] : 0;
-if ( !is_numeric( $img ) || $img < OCACHE_DATA || $img > FCACHE_DATA ) 
-    $img = 0;
-
-$chart_type = isset( $_GET['type'] ) ? $_GET['type'] : BAR_CHART;
-if ( !is_numeric( $chart_type ) || $chart_type < BAR_CHART || $chart_type > PIE_CHART )
-    $chart_type = BAR_CHART;
+$img = 0;
+if ( isset( $_GET['img'] ) && is_numeric( $_GET['img'] ) ) {
+    $img = $_GET['img'];
+    if ( $img < OCACHE_DATA || $img > FCACHE_DATA)
+        $img = 0;
+}
+$chart_type = BAR_CHART;
+if ( isset( $_GET['type'] ) && is_numeric( $_GET['type'] ) ) {
+    $chart_type = $_GET['type'];
+    if ( $chart_type < BAR_CHART || $chart_type > PIE_CHART)
+        $chart_type = BAR_CHART;
+}
+$chart_param1 = 0;
+if ( isset( $_GET['p1'] ) && is_numeric( $_GET['p1'] ) ) {
+    $chart_param1 = $_GET['p1'];
+    if ( $chart_param1 < 0 ) 
+        $chart_param1 = 0;
+    else if ( $chart_param1 > PHP_INT_MAX )
+        $chart_param1 = PHP_INT_MAX;
+}
+$chart_param2 = 0;
+if ( isset( $_GET['p2'] ) && is_numeric( $_GET['p2'] ) ) {
+    $chart_param2 = $_GET['p2'];
+    if ( $chart_param2 < 0 ) 
+        $chart_param2 = 0;
+    else if ( $chart_param2 > PHP_INT_MAX )
+        $chart_param2 = PHP_INT_MAX;
+}
+// End of input parameters check
 
 $ocache_mem_info = null;
 $ocache_file_info = null;
@@ -457,23 +479,19 @@ if ( $img > 0 ) {
     switch( $img ) {
         case OCACHE_DATA: {
             if ( $chart_type == PIE_CHART ){
-                $ocache_mem_info = wincache_ocache_meminfo();
-                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, $ocache_mem_info['memory_total'] - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'], 'Memory Usage by Opcode Cache (in %)' );
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, $chart_param1, $chart_param2, 'Memory Usage by Opcode Cache (in %)' );
             }
             else{
-                $ocache_file_info = wincache_ocache_fileinfo();
-                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT, $ocache_file_info['total_hit_count'], $ocache_file_info['total_miss_count'], 'Opcode Cache Hits & Misses (in %)' );
+                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'Opcode Cache Hits & Misses (in %)' );
             }
             break;
         }
         case FCACHE_DATA: {
             if ( $chart_type == PIE_CHART ){
-                $fcache_mem_info = wincache_fcache_meminfo();
-                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT, $fcache_mem_info['memory_total'] - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'], 'Memory Usage by File Cache (in %)' );
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'Memory Usage by File Cache (in %)' );
             }
             else{
-                $fcache_file_info = wincache_fcache_fileinfo();
-                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT, $fcache_file_info['total_hit_count'], $fcache_file_info['total_miss_count'], 'File Cache Hits & Misses (in %)' );                
+                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'File Cache Hits & Misses (in %)' );
            }
         }
     }
@@ -487,8 +505,9 @@ if ( $img > 0 ) {
     exit;
 }
 
-function get_chart_markup( $data_type, $chart_type ) {
-    global $PHP_SELF;
+function get_chart_markup( $data_type, $chart_type, $chart_param1, $chart_param2 ) {
+    global	$PHP_SELF;
+
     $result = '';
     $alt_title = '';
 
@@ -507,13 +526,21 @@ function get_chart_markup( $data_type, $chart_type ) {
         else
             return '';
 
-        $result = '<img src="'.$PHP_SELF.'?img='.$data_type.'&amp;type='.$chart_type.'" alt="'.$alt_title.'" width="'.IMG_WIDTH.'" height="'.IMG_HEIGHT.'" />';
+        $result = '<img src="'.$PHP_SELF;
+        $result .= '?img='.$data_type.'&amp;type='.$chart_type;
+        $result .= '&amp;p1='.$chart_param1.'&amp;p2='.$chart_param2.'" ';
+        $result .= 'alt="'.$alt_title.'" width="'.IMG_WIDTH.'" height="'.IMG_HEIGHT.'" />';
     }
     else {
         $result = '<p class="notice">Enable GD library (<em>php_gd2.dll</em>) in order to see the charts.</p>';
     }
 
     return $result;
+}
+
+function cache_scope_text( $is_local )
+{
+    return ( $is_local == true ) ? 'local' : 'global';
 }
 
 function init_cache_info( $cache_type = SUMMARY_DATA )
@@ -745,10 +772,6 @@ th {
                     <td class="e">Host name</td>
                     <td class="v"><?php echo isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'Not set'; ?></td>
                 </tr>
-                <tr>
-                    <td class="e">Cache uptime</td>
-                    <td class="v"><?php echo ( isset( $ocache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $ocache_file_info['total_cache_uptime'] ) : "Unknown"; ?></td>
-                </tr>
             </table>
         </div>
         <div class="widerightpanel">
@@ -778,6 +801,14 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <tr>
                     <th colspan="2">Opcode Cache Overview</th>
                 </tr>
+                <tr>
+                	<td class="e">Cache scope</td>
+                	<td class="v"><?php echo ( isset( $ocache_file_info['is_local_cache'] ) ) ? cache_scope_text( $ocache_file_info['is_local_cache'] ) : 'Unknown'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $ocache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $ocache_file_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>          
                 <tr>
                     <td class="e">Cached files</td>
                     <td class="v"><a href="<?php echo $PHP_SELF, '?page=2#filelist'; ?>"><?php echo $ocache_file_info['total_file_count']; ?></a></td>
@@ -813,10 +844,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART ); ?>
+            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART, $ocache_file_info['total_hit_count'], $ocache_file_info['total_miss_count'] ); ?>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART ); ?>
+            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART, $ocache_mem_info['memory_total'] - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'] ); ?>
         </div>
     </div>
     <div class="overview">
@@ -825,6 +856,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <tr>
                     <th colspan="2">File Cache Overview</th>
                 </tr>
+                <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $fcache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $fcache_file_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>                
                 <tr>
                     <td class="e">Cached files</td>
                     <td class="v"><a href="<?php echo $PHP_SELF, '?page=3#filelist'; ?>"><?php echo $fcache_file_info['total_file_count']; ?></a></td>
@@ -856,10 +891,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART ); ?>
+            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART, $fcache_file_info['total_hit_count'], $fcache_file_info['total_miss_count'] ); ?>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART ); ?>
+            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART, $fcache_mem_info['memory_total'] - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'] ); ?>
         </div>
     </div>
     <div class="overview">
@@ -897,6 +932,14 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <th colspan="2">Opcode Cache Overview</th>
                 </tr>
                 <tr>
+                    <td class="e">Cache scope</td>
+                    <td class="v"><?php echo ( isset( $ocache_file_info['is_local_cache'] ) ) ? cache_scope_text( $ocache_file_info['is_local_cache'] ) : 'Unknown'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $ocache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $ocache_file_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>          
+                <tr>
                     <td class="e">Cached files</td>
                     <td class="v"><?php echo $ocache_file_info['total_file_count']; ?></td>
                 </tr>
@@ -931,10 +974,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART ); ?>
+            <?php echo get_chart_markup( OCACHE_DATA, BAR_CHART, $ocache_file_info['total_hit_count'], $ocache_file_info['total_miss_count'] ); ?>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART ); ?>
+            <?php echo get_chart_markup( OCACHE_DATA, PIE_CHART, $ocache_mem_info['memory_total'] - $ocache_mem_info['memory_free'], $ocache_mem_info['memory_free'] ); ?>
         </div>
     </div>
     <div class="list" id="filelist">
@@ -978,6 +1021,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                     <th colspan="2">File Cache Overview</th>
                 </tr>
                 <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $fcache_file_info['total_cache_uptime'] ) ) ? seconds_to_words( $fcache_file_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>
+                <tr>
                     <td class="e">Cached files</td>
                     <td class="v"><?php echo $fcache_file_info['total_file_count']; ?></td>
                 </tr>
@@ -1008,10 +1055,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </table>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART ); ?>
+            <?php echo get_chart_markup( FCACHE_DATA, BAR_CHART, $fcache_file_info['total_hit_count'], $fcache_file_info['total_miss_count'] ); ?>
         </div>
         <div class="rightpanel">
-            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART ); ?>
+            <?php echo get_chart_markup( FCACHE_DATA, PIE_CHART, $fcache_mem_info['memory_total'] - $fcache_mem_info['memory_free'], $fcache_mem_info['memory_free'] ); ?>
         </div>
     </div>
     <div class="list" id="filelist">
