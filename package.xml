@@ -48,6 +48,7 @@
 - Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
 - Updated the wincache.php to show whether information about a global or local cache instance is being displayed
 - Changed variable names and comments to indicate rplist is resolve path cache and not just relative path cache
+- Changed wincache.php to use resolve_path instead of relative_path
  </notes>
   <contents>
     <dir name="/">
