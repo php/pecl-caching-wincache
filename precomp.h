@@ -94,7 +94,7 @@
 #endif
 
 #define CACHE_TYPE_FILELIST        1
-#define CACHE_TYPE_RELPATHS        2
+#define CACHE_TYPE_RESPATHS        2
 #define CACHE_TYPE_FILECONTENT     3
 #define CACHE_TYPE_BYTECODES       4
 

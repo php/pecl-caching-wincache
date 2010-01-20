@@ -758,9 +758,9 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
 
             if(WCG(namesalt) == NULL)
             {
-                if(pentry->fmaptype == FILEMAP_TYPE_RELPATHS)
+                if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RELPATHS_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
                 {
@@ -781,9 +781,9 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             }
             else
             {
-                if(pentry->fmaptype == FILEMAP_TYPE_RELPATHS)
+                if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RELPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
                 {
@@ -833,9 +833,9 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
 
         if(WCG(namesalt) == NULL)
         {
-            if(pentry->fmaptype == FILEMAP_TYPE_RELPATHS)
+            if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RELPATHS_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
             {
@@ -856,9 +856,9 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
         }
         else
         {
-            if(pentry->fmaptype == FILEMAP_TYPE_RELPATHS)
+            if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RELPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
             {

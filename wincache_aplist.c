@@ -317,7 +317,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->last_check  = ticks;
     pvalue->is_deleted  = 0;
 
-    pvalue->relentry    = 0;
+    pvalue->resentry    = 0;
     pvalue->fcacheval   = 0;
     pvalue->ocacheval   = 0;
     pvalue->prev_value  = 0;
@@ -352,7 +352,7 @@ Finished:
     return result;
 }
 
-/* Call this method under write lock if relentry can be non-zero so that */
+/* Call this method under write lock if resentry can be non-zero so that */
 /* rplist can never have an offset of aplist which is not valid */
 static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
 {
@@ -360,9 +360,9 @@ static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
 
     if(pvalue != NULL)
     {
-        /* Relative path cache, file cache and ocache entries */
+        /* Resolve path cache, file cache and ocache entries */
         /* should be deleted by a call to remove_aplist_entry */
-        _ASSERT(pvalue->relentry  == 0);
+        _ASSERT(pvalue->resentry  == 0);
         _ASSERT(pvalue->fcacheval == 0);
         _ASSERT(pvalue->ocacheval == 0);
 
@@ -439,10 +439,10 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     {
         /* Mark resolve path entries deleted so that it rplist stop */
         /* handing pointer to aplist entries which are marked deleted */
-        if(pvalue->relentry != 0)
+        if(pvalue->resentry != 0)
         {
             _ASSERT(pcache->prplist != NULL);
-            rplist_markdeleted(pcache->prplist, pvalue->relentry);
+            rplist_markdeleted(pcache->prplist, pvalue->resentry);
         }
 
         pvalue->is_deleted = 1;
@@ -450,12 +450,12 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     }
 
     /* Delete resolve path cache entries */
-    if(pvalue->relentry != 0)
+    if(pvalue->resentry != 0)
     {
         _ASSERT(pcache->prplist != NULL);
 
-        rplist_deleteval(pcache->prplist, pvalue->relentry);
-        pvalue->relentry = 0;
+        rplist_deleteval(pcache->prplist, pvalue->resentry);
+        pvalue->resentry = 0;
     }
 
     /* Delete file cache entry */
@@ -1549,7 +1549,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     aplist_value *   pvalue   = NULL;
     fcache_value *   pfvalue  = NULL;
     rplist_value *   rpvalue  = NULL;
-    size_t           relentry = 0;
+    size_t           resentry = 0;
     char *           fullpath = NULL;
     zend_file_handle fhandle  = {0};
 
@@ -1564,14 +1564,14 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     /* Look for absolute path in resolve path cache first */
     /* All paths in resolve path cache are resolved using */
     /* include_path and don't need checks against open_basedir */
-    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &relentry TSRMLS_CC);
+    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     _ASSERT(rpvalue  != NULL);
-    _ASSERT(relentry != 0);
+    _ASSERT(resentry != 0);
 
     /* If found, use new path to look into absolute path cache */
     if(rpvalue->absentry != 0)
@@ -1600,7 +1600,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
 
                     /* Deleting the aplist entry will delete rplist entries as well */
                     rpvalue  = NULL;
-                    relentry = 0;
+                    resentry = 0;
                 }
 
                 lock_writeunlock(pcache->aprwlock);
@@ -1685,7 +1685,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */
-    /* Relative path cache entry won't have a corresponding absentry offset */
+    /* Resolve path cache entry won't have a corresponding absentry offset */
     if(ppvalue == NULL)
     {
         *ppfullpath = fullpath;
@@ -1748,8 +1748,8 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             pvalue->fcacheval = fcache_getoffset(pcache->pfcache, pfvalue);
             if(rpvalue != NULL)
             {
-                rplist_setabsval(pcache->prplist, rpvalue, alloc_get_valueoffset(pcache->apalloc, pvalue), pvalue->relentry);
-                pvalue->relentry = relentry;
+                rplist_setabsval(pcache->prplist, rpvalue, alloc_get_valueoffset(pcache->apalloc, pvalue), pvalue->resentry);
+                pvalue->resentry = resentry;
             }
         }
         else
@@ -1765,8 +1765,8 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     {
         if(rpvalue != NULL && rpvalue->absentry == 0)
         {
-            rplist_setabsval(pcache->prplist, rpvalue, alloc_get_valueoffset(pcache->apalloc, pvalue), pvalue->relentry);
-            InterlockedExchange(&pvalue->relentry, relentry);
+            rplist_setabsval(pcache->prplist, rpvalue, alloc_get_valueoffset(pcache->apalloc, pvalue), pvalue->resentry);
+            InterlockedExchange(&pvalue->resentry, resentry);
         }
     }
 
