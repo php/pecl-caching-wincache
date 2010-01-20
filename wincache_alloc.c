@@ -552,7 +552,7 @@ int alloc_create(alloc_context ** ppalloc)
     palloc->localheap = 0;
 
     *ppalloc = palloc;
-    
+
 Finished:
 
     if(FAILED(result))
@@ -776,6 +776,8 @@ int alloc_create_mpool(alloc_context * palloc, size_t * phoffset)
 
     _ASSERT(palloc   != NULL);
     _ASSERT(phoffset != NULL);
+
+    *phoffset = 0;
 
     header = (alloc_mpool_header *)alloc_smalloc(palloc, sizeof(alloc_mpool_header));
     if(header == NULL)
@@ -1129,6 +1131,8 @@ void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
         ctype  = POOL_ALLOCATION_TYPE_HUGE;
     }
 
+    /* Check if chunk has enough space for this allocation */
+    /* Else we need to allocate a new chunk and use that */
     if(offset > 0)
     {
         pchunk = (alloc_mpool_segment *)((char *)palloc->memaddr + offset);
@@ -1149,7 +1153,7 @@ void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
 
         /* Initialize pchunk */
         pchunk->aoffset  = 0;
-        pchunk->size     = bsize;
+        pchunk->size     = 0;
         pchunk->position = 0;
         pchunk->next     = 0;
 
@@ -1160,7 +1164,9 @@ void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
         }
 
         /* Update aoffset to offset of allocated memory */
+        /* Also update size after allocating block */
         pchunk->aoffset = POINTER_OFFSET(palloc->memaddr, pvoid);
+        pchunk->size = bsize;
 
         offset = POINTER_OFFSET(palloc->memaddr, pchunk);
         if(header->foffset == 0)

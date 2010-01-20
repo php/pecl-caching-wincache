@@ -81,7 +81,7 @@ static unsigned short getppid(TSRMLS_D)
     {
         error_setlasterror();
         result = FATAL_FILEMAP_CREATE_SNAPSHOT;
-        
+
         goto Finished;
     }
 
@@ -217,31 +217,16 @@ static HANDLE create_file_mapping(char * name, size_t size)
     _ASSERT(name != NULL);
     _ASSERT(size >  0);
 
-    /* First check if some other process already created the memory */
-    /* map and initialized the filemap_information_header structure */
-    handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name);
+    /* Call CreateFileMapping to create new or open existing file mapping object */
+    handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, name);
+
+    /* handle value null means a fatal error */
     if(handle == NULL)
     {
-        /* Looks like this process is the first one */
-        handle = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, name);
-        if(handle == NULL)
-        {
-            if(GetLastError() == ERROR_ALREADY_EXISTS)
-            {
-                /* Some other process created the file mapping before */
-                /* we could. Try OpenFileMapping call again */
-                handle = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name);
-            }
-            
-            /* If handle is still null, give up */
-            if(handle == NULL)
-            {
-                error_setlasterror();
-                goto Finished;
-            }
-        }
+        error_setlasterror();
+        goto Finished;
     }
-
+    
 Finished:
 
     if(handle == NULL)
@@ -919,7 +904,17 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
     pfilemap->mapaddr = map_viewof_file(pfilemap->hfilemap, mapaddr);
     if(pfilemap->mapaddr == NULL)
     {
-        result = WARNING_FILEMAP_MAPVIEW;
+        if(fmclass == FILEMAP_MAP_SFIXED)
+        {
+            /* Error trying to map at a particular address is a warning to caller */
+            result = WARNING_FILEMAP_MAPVIEW;
+        }
+        else
+        {
+            /* Error mapping at a random address is fatal */
+            result = FATAL_FILEMAP_MAPVIEW;
+        }
+
         goto Finished;
     }
 

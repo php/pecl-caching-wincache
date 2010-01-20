@@ -410,15 +410,15 @@ PHP_MINIT_FUNCTION(wincache)
     /* ttlmax can be set to 0 which means scavenger is completely disabled */
     if(WCG(ttlmax) != 0)
     {
-        WCG(ttlmax)      = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
-        WCG(ttlmax)      = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
+        WCG(ttlmax)    = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
+        WCG(ttlmax)    = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
     }
 
     /* fcchkfreq can be set to 0 which will mean check is completely disabled */
     if(WCG(fcchkfreq) != 0)
     {
-        WCG(fcchkfreq)   = (WCG(fcchkfreq)   < FCHECK_FREQ_MINIMUM) ? FCHECK_FREQ_MINIMUM : WCG(fcchkfreq);
-        WCG(fcchkfreq)   = (WCG(fcchkfreq)   > FCHECK_FREQ_MAXIMUM) ? FCHECK_FREQ_MAXIMUM : WCG(fcchkfreq);
+        WCG(fcchkfreq) = (WCG(fcchkfreq)   < FCHECK_FREQ_MINIMUM) ? FCHECK_FREQ_MINIMUM : WCG(fcchkfreq);
+        WCG(fcchkfreq) = (WCG(fcchkfreq)   > FCHECK_FREQ_MAXIMUM) ? FCHECK_FREQ_MAXIMUM : WCG(fcchkfreq);
     }
 
     /* Truncate namesalt to 8 characters */
@@ -1212,6 +1212,7 @@ PHP_FUNCTION(wincache_fcache_fileinfo)
     array_init(return_value);
 
     add_assoc_long(return_value, "total_cache_uptime", pcinfo->initage);
+    add_assoc_bool(return_value, "is_local_cache", pcinfo->islocal);
     add_assoc_long(return_value, "total_file_count", pcinfo->itemcount);
     add_assoc_long(return_value, "total_hit_count", pcinfo->hitcount);
     add_assoc_long(return_value, "total_miss_count", pcinfo->misscount);
@@ -1313,6 +1314,7 @@ PHP_FUNCTION(wincache_ocache_fileinfo)
     array_init(return_value);
 
     add_assoc_long(return_value, "total_cache_uptime", pcinfo->initage);
+    add_assoc_bool(return_value, "is_local_cache", pcinfo->islocal);
     add_assoc_long(return_value, "total_file_count", pcinfo->itemcount);
     add_assoc_long(return_value, "total_hit_count", pcinfo->hitcount);
     add_assoc_long(return_value, "total_miss_count", pcinfo->misscount);

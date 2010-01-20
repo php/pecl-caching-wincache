@@ -66,8 +66,9 @@ struct lock_context
     unsigned       type:3;     /* Type of lock (shared/local/global) */
     unsigned       usetype:3;  /* Is this lock read/write or write lock */
     unsigned       state:2;    /* Current state of the lock for debugging */
+    unsigned       namelen:16; /* length of name buffers */
+
     char *         nameprefix; /* Name prefix to use for named objects */
-    unsigned short namelen;    /* length of name buffers */
     HANDLE         haccess;    /* Handle to mutex to synchronize access to methods */
     HANDLE         hcanread;   /* Handle to event which tells when read is allowed */
     HANDLE         hcanwrite;  /* Handle to event which tells when write is allowed */
