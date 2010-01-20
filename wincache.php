@@ -154,7 +154,7 @@ function cmp($a, $b)
     global $sort_key;
     if ( $sort_key == 'file_name' )
         return strcmp( get_trimmed_filename( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_filename( $b[$sort_key], PATH_MAX_LENGTH ) );
-    else if ( $sort_key == 'relative_path' )
+    else if ( $sort_key == 'resolve_path' )
         return strcmp( get_trimmed_string( $a[$sort_key], PATH_MAX_LENGTH ), get_trimmed_string( $b[$sort_key], PATH_MAX_LENGTH ) );
     else
         return 0;
@@ -720,7 +720,7 @@ th {
             <li <?php echo ($page == SUMMARY_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', SUMMARY_DATA; ?>">Summary</a></li>
             <li <?php echo ($page == OCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', OCACHE_DATA; ?>">Opcode Cache</a></li>
             <li <?php echo ($page == FCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', FCACHE_DATA; ?>">File System Cache</a></li>
-            <li <?php echo ($page == RCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', RCACHE_DATA; ?>">Relative Path Cache</a></li>
+            <li <?php echo ($page == RCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', RCACHE_DATA; ?>">Resolve Path Cache</a></li>
         </ul>
     </div>
 <?php if ( $page == SUMMARY_DATA ) { 
@@ -901,7 +901,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         <div class="leftpanel">
             <table style="width: 100%">
                 <tr>
-                    <th colspan="2">Relative Path Cache Overview</th>
+                    <th colspan="2">Resolve Path Cache Overview</th>
                 </tr>
                 <tr>
                     <td class="e">Cached entries</td>
@@ -1098,7 +1098,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         <div class="wideleftpanel">
             <table style="width: 100%">
                 <tr>
-                    <th colspan="2">Relative Path Cache Overview</th>
+                    <th colspan="2">Resolve Path Cache Overview</th>
                 </tr>
                 <tr>
                     <td class="e">Cached entries</td>
@@ -1122,18 +1122,18 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
-                <th colspan="2">Relative path cache entries</th>
+                <th colspan="2">Resolve path cache entries</th>
             </tr>
             <tr>
-                <th>Relative path</th>
+                <th>Resolve path</th>
                 <th>Subkey data</th>
         </tr>
 <?php 
-    $sort_key = 'relative_path';
+    $sort_key = 'resolve_path';
     usort( $rpcache_file_info['rplist_entries'], 'cmp' );
     foreach ( $rpcache_file_info['rplist_entries'] as $entry ) {
         echo '<tr title="',$entry['subkey_data'], '">', "\n";
-        echo '<td class="e">', get_trimmed_string( $entry['relative_path'], PATH_MAX_LENGTH ),'</td>', "\n";
+        echo '<td class="e">', get_trimmed_string( $entry['resolve_path'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', get_trimmed_string( $entry['subkey_data'], SUBKEY_MAX_LENGTH ), '</td>', "\n";
         echo "</tr>\n";
     }
