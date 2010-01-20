@@ -52,7 +52,7 @@ struct aplist_value
 
     size_t          fcacheval;      /* File cache value offset */
     size_t          ocacheval;      /* Opcode cache value offset */
-    size_t          relentry;       /* Offset of first entry in rplist */
+    size_t          resentry;       /* Offset of first entry in rplist */
     size_t          prev_value;     /* previous aplist_value offset */
     size_t          next_value;     /* next aplist_value offset */
 };
@@ -91,7 +91,7 @@ struct aplist_context
     alloc_context *    apalloc;     /* Alloc context for aplist segment */
 
     aplist_context *   polocal;     /* Absolute path cache with local opcode cache*/
-    rplist_context *   prplist;     /* Relative path cache to resolve relative paths */
+    rplist_context *   prplist;     /* Resolve path cache to resolve all paths */
     fcache_context *   pfcache;     /* File cache containing file content */
     ocache_context *   pocache;     /* Opcode cache containing opcodes */
     int                resnumber;   /* Resource number for this extension */

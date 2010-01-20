@@ -867,7 +867,7 @@ void * alloc_get_cacheheader(alloc_context * palloc, unsigned int valuecount, un
             _ASSERT(valuecount >  0);
             msize = sizeof(aplist_header) + (valuecount - 1) * sizeof(size_t);
         }
-        else if(type == CACHE_TYPE_RELPATHS)
+        else if(type == CACHE_TYPE_RESPATHS)
         {
             _ASSERT(valuecount > 0);
             msize = sizeof(rplist_header) + (valuecount - 1) * sizeof(size_t);

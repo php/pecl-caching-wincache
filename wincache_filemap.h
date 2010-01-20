@@ -54,7 +54,7 @@
 
 #define FILEMAP_TYPE_INVALID                0   /* Invalid value */
 #define FILEMAP_TYPE_FILELIST               1   /* File list map */
-#define FILEMAP_TYPE_RELPATHS               2   /* Relative paths cache */
+#define FILEMAP_TYPE_RESPATHS               2   /* Resolve path cache */
 #define FILEMAP_TYPE_FILECONTENT            3   /* File cache map */
 #define FILEMAP_TYPE_BYTECODES              4   /* Byte code map */
 #define FILEMAP_TYPE_UNUSED                 255 /* UNUSED SEGMENT MARKER */
@@ -76,8 +76,8 @@
 #define FILEMAP_FILELIST_PREFIX             "WINCACHE_FILEMAP_FILELIST"
 #define FILEMAP_FILELIST_PREFIX_LENGTH      (sizeof(FILEMAP_FILELIST_PREFIX))
 
-#define FILEMAP_RELPATHS_PREFIX             "WINCACHE_FILEMAP_RELPATHS"
-#define FILEMAP_RELPATHS_PREFIX_LENGTH      (sizeof(FILEMAP_RELPATHS_PREFIX))
+#define FILEMAP_RESPATHS_PREFIX             "WINCACHE_FILEMAP_RESPATHS"
+#define FILEMAP_RESPATHS_PREFIX_LENGTH      (sizeof(FILEMAP_RESPATHS_PREFIX))
 
 #define FILEMAP_FILECONTENT_PREFIX          "WINCACHE_FILEMAP_FILECONTENT"
 #define FILEMAP_FILECONTENT_PREFIX_LENGTH   (sizeof(FILEMAP_FILECONTENT_PREFIX))

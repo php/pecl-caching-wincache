@@ -47,6 +47,7 @@
 - Exposed is_local_cache property from ocache_fileinfo and fcache_fileinfo. Stats page will use this to indicate when local opcode data is shown.
 - Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
 - Updated the wincache.php to show whether information about a global or local cache instance is being displayed
+- Changed variable names and comments to indicate rplist is resolve path cache and not just relative path cache
  </notes>
   <contents>
     <dir name="/">

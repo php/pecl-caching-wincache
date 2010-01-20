@@ -1127,7 +1127,7 @@ PHP_FUNCTION(wincache_rplist_fileinfo)
         MAKE_STD_ZVAL(zfentry);
         array_init(zfentry);
 
-        add_assoc_string(zfentry, "relative_path", peinfo->pathkey, 1);
+        add_assoc_string(zfentry, "resolve_path", peinfo->pathkey, 1);
         add_assoc_string(zfentry, "subkey_data", peinfo->subkey, 1);
 
         if(peinfo->abspath != NULL)

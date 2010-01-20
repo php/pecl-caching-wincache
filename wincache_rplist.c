@@ -380,7 +380,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     _ASSERT(pcache    != NULL);
     _ASSERT(filecount >= NUM_FILES_MINIMUM && filecount <= NUM_FILES_MAXIMUM);
 
-    /* Create relpaths segment */
+    /* Create respaths segment */
     result = filemap_create(&pcache->rpfilemap);
     if(FAILED(result))
     {
@@ -394,7 +394,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
         locktype = LOCK_TYPE_LOCAL;
     }
 
-    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RELPATHS, mapclass, mapsize TSRMLS_CC);
+    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, mapclass, mapsize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -403,21 +403,21 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     pcache->rpmemaddr = (char *)pcache->rpfilemap->mapaddr;
     segsize = filemap_getsize(pcache->rpfilemap TSRMLS_CC);
 
-    /* Create allocator for relpaths segment */
+    /* Create allocator for respaths segment */
     result = alloc_create(&pcache->rpalloc);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->rpalloc, islocal, "RELPATHS_SEGMENT", pcache->rpfilemap->mapaddr, segsize TSRMLS_CC);
+    result = alloc_initialize(pcache->rpalloc, islocal, "RESPATHS_SEGMENT", pcache->rpfilemap->mapaddr, segsize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     /* Get memory for cache header */
-    pcache->rpheader = (rplist_header *)alloc_get_cacheheader(pcache->rpalloc, filecount, CACHE_TYPE_RELPATHS);
+    pcache->rpheader = (rplist_header *)alloc_get_cacheheader(pcache->rpalloc, filecount, CACHE_TYPE_RESPATHS);
     if(pcache->rpheader == NULL)
     {
         result = FATAL_RPLIST_INITIALIZE;
@@ -431,7 +431,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    result = lock_initialize(pcache->rprwlock, "RELPATHS_CACHE", 0, locktype, LOCK_USET_SREAD_XWRITE, &pcache->rpheader->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->rprwlock, "RESPATHS_CACHE", 0, locktype, LOCK_USET_SREAD_XWRITE, &pcache->rpheader->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
