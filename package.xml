@@ -29,10 +29,10 @@
     <email>pajoye@php.net</email>
     <active>yes</active>
   </helper>
-  <date>2009-11-19</date>
+  <date>2009-01-26</date>
   <version>
-    <release>1.1.0</release>
-    <api>1.1.0</api>
+    <release>1.0.2</release>
+    <api>1.0.2</api>
   </version>
   <stability>
     <release>beta</release>
@@ -40,15 +40,6 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-1.0.1 release:
-- Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
-- Changed relative path cache to act as resolve path cache. Incremented refcounts under aplist lock. Did comparison using InterlockedCompareExchange.
-- Fixed crashes which were happening because aplist refcount and opcode cache refcount can get out of sync due to local cache.
-- Exposed is_local_cache property from ocache_fileinfo and fcache_fileinfo. Stats page will use this to indicate when local opcode data is shown.
-- Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
-- Updated the wincache.php to show whether information about a global or local cache instance is being displayed
-- Changed variable names and comments to indicate rplist is resolve path cache and not just relative path cache
-- Changed wincache.php to use resolve_path instead of relative_path
  </notes>
   <contents>
     <dir name="/">
@@ -97,6 +88,27 @@
   <providesextension>wincache</providesextension>
   <extsrcrelease/>
   <changelog>
+     <release>
+    <stability>
+     <release>stable</release>
+     <api>stable</api>
+    </stability>
+    <version>
+     <release>1.0.1</release>
+     <api>1.0.1</api>
+    </version>
+    <date>2009-01-26</date>
+    <notes>
+- Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
+- Changed relative path cache to act as resolve path cache. Incremented refcounts under aplist lock. Did comparison using InterlockedCompareExchange.
+- Fixed crashes which were happening because aplist refcount and opcode cache refcount can get out of sync due to local cache.
+- Exposed is_local_cache property from ocache_fileinfo and fcache_fileinfo. Stats page will use this to indicate when local opcode data is shown.
+- Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
+- Updated the wincache.php to show whether information about a global or local cache instance is being displayed
+- Changed variable names and comments to indicate rplist is resolve path cache and not just relative path cache
+- Changed wincache.php to use resolve_path instead of relative_path
+    </notes>
+   </release>
    <release>
      <stability>
        <release>stable</release>
