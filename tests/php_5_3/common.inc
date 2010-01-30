@@ -2,7 +2,7 @@
 function myecho($str)
 {
 	$file = dirname(__FILE__);
-	$handle = fopen($file . "\\temp\\output.txt", "a+");
+	$handle = fopen($file . "\\..\\temp\\output.txt", "a+");
 	if ($handle == true)
 	{
 		fwrite($handle, $str);
@@ -17,7 +17,7 @@ function myecho($str)
 function logToFile($str)
 {
 	$file = dirname(__FILE__);
-	$handle = fopen($file . "\\temp\\result.txt", "a+");
+	$handle = fopen($file . "\\..\\temp\\result.txt", "a+");
 	if ($handle == true)
 	{
 		fwrite($handle, $str);
