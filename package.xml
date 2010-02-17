@@ -23,12 +23,6 @@
     <email>ksingla@microsoft.com</email>
     <active>yes</active>
   </lead>
-  <helper>
-    <name>Pierre-Alain Joye</name>
-    <user>pajoye</user>
-    <email>pajoye@php.net</email>
-    <active>yes</active>
-  </helper>
   <date>2009-11-19</date>
   <version>
     <release>1.1.0</release>
@@ -40,7 +34,10 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
- </notes>
+1.1.0 release:
+- Added wincache user cache which can be used to store php values in cache.
+- Added wincache session handler. Now wincache user cache can be used to store session data.
+  </notes>
   <contents>
     <dir name="/">
       <file role="doc" name="config.w32"/>
@@ -72,6 +69,10 @@
       <file role="src" name="wincache_rplist.h"/>
       <file role="src" name="wincache_utils.c"/>
       <file role="src" name="wincache_utils.h"/>
+      <file role="src" name="wincache_zvcache.h"/>
+      <file role="src" name="wincache_zvcache.c"/>
+      <file role="src" name="wincache_session.h"/>
+      <file role="src" name="wincache_session.c"/>
       <file role="php" name="wincache.php"/>
     </dir>
   </contents>

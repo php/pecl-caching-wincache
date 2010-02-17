@@ -422,7 +422,6 @@ void lock_readlock(lock_context * plock)
             WaitForMultipleObjects(2, hArray, TRUE, INFINITE);
 
             (*plock->prcount)++;
-            dprintverbose("Reader count = %d", *plock->prcount);
 
             ResetEvent(plock->hcanwrite);
             ReleaseMutex(plock->haccess);
@@ -466,7 +465,6 @@ void lock_readunlock(lock_context * plock)
 
             _ASSERT(*plock->prcount > 0);
             (*plock->prcount)--;
-            dprintverbose("Reader count = %d", *plock->prcount);
 
             if(*plock->prcount == 0)
             {

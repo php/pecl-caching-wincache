@@ -52,6 +52,11 @@
 /* alloc_mpool_header   - SHARED */
 /* alloc_mpool_segment  - SHARED */
 
+typedef void * (*fn_malloc)(void * palloc, size_t hoffset, size_t size);
+typedef void * (*fn_realloc)(void * palloc, size_t hoffset, void * addr, size_t size);
+typedef char * (*fn_strdup)(void * palloc, size_t hoffset, const char * str);
+typedef void   (*fn_free)(void * palloc, size_t hoffset, void * addr);
+
 /* TBD? Right now I am doing a custom implementation which will probably work */
 /* best for the problem at hand. Try a quick fit memory allocator later. Lock */
 /* is shared, xread, xwrite. Change to sread, xwrite lock if possible. */
@@ -161,12 +166,16 @@ extern void   alloc_pefree(void * addr);
 extern void   alloc_sfree(alloc_context * palloc, void * addr);
 
 extern void * alloc_oemalloc(alloc_context * palloc, size_t hoffset, size_t size);
+extern void * alloc_osmalloc(alloc_context * palloc, size_t hoffset, size_t size);
 extern void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size);
 extern void * alloc_oerealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size);
+extern void * alloc_osrealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size);
 extern void * alloc_omrealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size);
 extern char * alloc_oestrdup(alloc_context * palloc, size_t hoffset, const char * str);
+extern char * alloc_osstrdup(alloc_context * palloc, size_t hoffset, const char * str);
 extern char * alloc_omstrdup(alloc_context * palloc, size_t hoffset, const char * str);
 extern void   alloc_oefree(alloc_context * palloc, size_t hoffset, void * addr);
+extern void   alloc_osfree(alloc_context * palloc, size_t hoffset, void * addr);
 extern void   alloc_omfree(alloc_context * palloc, size_t hoffset, void * addr);
 
 extern void   alloc_runtest();

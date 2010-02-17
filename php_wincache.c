@@ -52,11 +52,25 @@ PHP_FUNCTION(wincache_fcache_fileinfo);
 PHP_FUNCTION(wincache_fcache_meminfo);
 PHP_FUNCTION(wincache_ocache_fileinfo);
 PHP_FUNCTION(wincache_ocache_meminfo);
+PHP_FUNCTION(wincache_ucache_meminfo);
 
 /* Utility functions exposed by this extension */
 PHP_FUNCTION(wincache_refresh_if_changed);
 
+/* ZVAL cache functions matching other caches */
+PHP_FUNCTION(wincache_ucache_get);
+PHP_FUNCTION(wincache_ucache_set);
+PHP_FUNCTION(wincache_ucache_add);
+PHP_FUNCTION(wincache_ucache_delete);
+PHP_FUNCTION(wincache_ucache_clear);
+PHP_FUNCTION(wincache_ucache_exists);
+PHP_FUNCTION(wincache_ucache_info);
+PHP_FUNCTION(wincache_ucache_inc);
+PHP_FUNCTION(wincache_ucache_dec);
+PHP_FUNCTION(wincache_ucache_cas);
+
 #ifdef WINCACHE_TEST
+PHP_FUNCTION(wincache_ucache_lasterror);
 PHP_FUNCTION(wincache_runtests);
 PHP_FUNCTION(wincache_fcache_find);
 PHP_FUNCTION(wincache_ocache_find);
@@ -82,11 +96,66 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ocache_meminfo, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_meminfo, 0, 0, 0)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_refresh_if_changed, 0, 0, 0)
     ZEND_ARG_INFO(0, file_list)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_get, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(1, success)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_set, 0, 0, 2)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, value)
+    ZEND_ARG_INFO(0, ttl)
+ZEND_END_ARG_INFO()
+        
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_add, 0, 0, 2)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, value)
+    ZEND_ARG_INFO(0, ttl)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_delete, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_clear, 0, 0, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_exists, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_info, 0, 0, 0)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_inc, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, delta)
+    ZEND_ARG_INFO(1, success)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_dec, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, delta)
+    ZEND_ARG_INFO(1, success)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_cas, 0, 0, 3)
+    ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, cvalue)
+    ZEND_ARG_INFO(0, nvalue)
+ZEND_END_ARG_INFO()
+
 #ifdef WINCACHE_TEST
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_lasterror, 0, 0, 0)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_runtests, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
@@ -109,8 +178,20 @@ function_entry wincache_functions[] = {
     PHP_FE(wincache_fcache_meminfo, arginfo_wincache_fcache_meminfo)
     PHP_FE(wincache_ocache_fileinfo, arginfo_wincache_ocache_fileinfo)
     PHP_FE(wincache_ocache_meminfo, arginfo_wincache_ocache_meminfo)
+    PHP_FE(wincache_ucache_meminfo, arginfo_wincache_ucache_meminfo)
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
+    PHP_FE(wincache_ucache_get, arginfo_wincache_ucache_get)
+    PHP_FE(wincache_ucache_set, arginfo_wincache_ucache_set)
+    PHP_FE(wincache_ucache_add, arginfo_wincache_ucache_add)
+    PHP_FE(wincache_ucache_delete, arginfo_wincache_ucache_delete)
+    PHP_FE(wincache_ucache_clear, arginfo_wincache_ucache_clear)
+    PHP_FE(wincache_ucache_exists, arginfo_wincache_ucache_exists)
+    PHP_FE(wincache_ucache_info, arginfo_wincache_ucache_info)
+    PHP_FE(wincache_ucache_inc, arginfo_wincache_ucache_inc)
+    PHP_FE(wincache_ucache_dec, arginfo_wincache_ucache_dec)
+    PHP_FE(wincache_ucache_cas, arginfo_wincache_ucache_cas)
 #ifdef WINCACHE_TEST
+    PHP_FE(wincache_ucache_lasterror, arginfo_wincache_ucache_lasterror)
     PHP_FE(wincache_runtests, arginfo_wincache_runtests)
     PHP_FE(wincache_fcache_find, arginfo_wincache_fcache_find)
     PHP_FE(wincache_ocache_find, arginfo_wincache_ocache_find)
@@ -157,8 +238,10 @@ PHP_INI_BEGIN()
 /* index 12 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
 /* index 13 */ STD_PHP_INI_ENTRY("wincache.namesalt", NULL, PHP_INI_SYSTEM, OnUpdateString, namesalt, zend_wincache_globals, wincache_globals)
 /* index 14 */ STD_PHP_INI_ENTRY("wincache.localheap", "0", PHP_INI_SYSTEM, OnUpdateBool, localheap, zend_wincache_globals, wincache_globals)
+/* index 15 */ STD_PHP_INI_BOOLEAN("wincache.ucenabled", "1", PHP_INI_ALL, OnUpdateBool, zvenabled, zend_wincache_globals, wincache_globals)
+/* index 16 */ STD_PHP_INI_ENTRY("wincache.ucachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, zvcachesize, zend_wincache_globals, wincache_globals)
 #ifdef WINCACHE_TEST
-/* index 15 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+/* index 17 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
 
@@ -177,9 +260,11 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
 
     WCG(fcenabled)   = 1;    /* File cache enabled by default */
     WCG(ocenabled)   = 1;    /* Opcode cache enabled by default */
+    WCG(zvenabled)   = 1;    /* ZVAL cache enabled by default */
     WCG(enablecli)   = 0;    /* WinCache not enabled by default for CLI */
     WCG(fcachesize)  = 24;   /* File cache size is 24 MB by default */
     WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
+    WCG(zvcachesize) = 8;    /* ZVAL cache size is 128 MB by default */
     WCG(maxfilesize) = 256;  /* Maximum file size to cache is 256 KB */
     WCG(numfiles)    = 4096; /* 4096 hashtable keys */
     WCG(fcchkfreq)   = 30;   /* File change check done every 30 secs */
@@ -190,13 +275,13 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(fcefilter)   = NULL; /* List of sites for which fcenabled is toggled */
     WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
-#ifdef WINCACHE_TEST
-    WCG(olocaltest)  = 0;    /* Local opcode test disabled by default */
-#endif
 
     WCG(lasterror)   = 0;    /* GetLastError() value set by wincache */
+    WCG(zvcopied)    = NULL; /* zvals copied from the user cache */
+    WCG(zvlasterror) = 0;    /* Last error returned by ucache */
     WCG(lfcache)     = NULL; /* Aplist to use for file/rpath cache */
     WCG(locache)     = NULL; /* Aplist to use for opcode cache */
+    WCG(zvcache)     = NULL; /* zvcache_context for user zvals */
     WCG(issame)      = 1;    /* Indicates if same aplist is used */
     WCG(oclisthead)  = NULL; /* Head of in-use ocache values list */
     WCG(oclisttail)  = NULL; /* Tail of in-use ocache values list */
@@ -206,7 +291,12 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(dooctoggle)  = 0;    /* If set to 1, toggle value of ocenabled */
     WCG(dofctoggle)  = 0;    /* If set to 1, toggle value of fcenabled */
 
+#ifdef WINCACHE_TEST
+    WCG(olocaltest)  = 0;    /* Local opcode test disabled by default */
+#endif
+
     dprintverbose("end globals_initialize");
+
     return;
 }
 
@@ -378,11 +468,12 @@ Finished:
 
 PHP_MINIT_FUNCTION(wincache)
 {
-    int              result    = NONFATAL;
-    aplist_context * plcache1  = NULL;
-    aplist_context * plcache2  = NULL;
-    int              resnumber = -1;
-    zend_extension   extension = {0};
+    int                result    = NONFATAL;
+    aplist_context *   plcache1  = NULL;
+    aplist_context *   plcache2  = NULL;
+    zvcache_context *  pzcache   = NULL;
+    int                resnumber = -1;
+    zend_extension     extension = {0};
 
     ZEND_INIT_MODULE_GLOBALS(wincache, globals_initialize, globals_terminate);
     REGISTER_INI_ENTRIES();
@@ -404,6 +495,8 @@ PHP_MINIT_FUNCTION(wincache)
     WCG(ocachesize)  = (WCG(ocachesize)  > OCACHE_SIZE_MAXIMUM) ? OCACHE_SIZE_MAXIMUM : WCG(ocachesize);
     WCG(fcachesize)  = (WCG(fcachesize)  < FCACHE_SIZE_MINIMUM) ? FCACHE_SIZE_MINIMUM : WCG(fcachesize);
     WCG(fcachesize)  = (WCG(fcachesize)  > FCACHE_SIZE_MAXIMUM) ? FCACHE_SIZE_MAXIMUM : WCG(fcachesize);
+    WCG(zvcachesize) = (WCG(zvcachesize) < ZCACHE_SIZE_MINIMUM) ? ZCACHE_SIZE_MINIMUM : WCG(zvcachesize);
+    WCG(zvcachesize) = (WCG(zvcachesize) > ZCACHE_SIZE_MAXIMUM) ? ZCACHE_SIZE_MAXIMUM : WCG(zvcachesize);
     WCG(maxfilesize) = (WCG(maxfilesize) < FILE_SIZE_MINIMUM)   ? FILE_SIZE_MINIMUM   : WCG(maxfilesize);
     WCG(maxfilesize) = (WCG(maxfilesize) > FILE_SIZE_MAXIMUM)   ? FILE_SIZE_MAXIMUM   : WCG(maxfilesize);
 
@@ -462,6 +555,7 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
+    /* Initialize file cache */
     result = aplist_fcache_initialize(plcache1, WCG(fcachesize), WCG(maxfilesize) TSRMLS_CC);
     if(FAILED(result))
     {
@@ -480,6 +574,7 @@ PHP_MINIT_FUNCTION(wincache)
 
     dprintverbose("Installed function hooks for stream_open");
 
+    /* Initialize opcode cache */
     resnumber = zend_get_resource_handle(&extension);
     if(resnumber == -1)
     {
@@ -543,8 +638,35 @@ PHP_MINIT_FUNCTION(wincache)
 
     /* Also keep zend_error_cb pointer for saving generating messages */
     original_error_cb = zend_error_cb;
-
     dprintverbose("Installed function hooks for compile_file");
+
+    /* Create zval cache*/
+    result = zvcache_create(&pzcache);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = zvcache_initialize(pzcache, 0, 256, WCG(zvcachesize) TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+    
+    WCG(zvcache) = pzcache;
+
+    /* Register wincache session handler */
+    php_session_register_module(ps_wincache_ptr);
+
+    /* Create zvcopied hashtable */
+    WCG(zvcopied) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+    if(WCG(zvcopied) == NULL)
+    {
+        result = FATAL_OUT_OF_LMEMORY;
+        goto Finished;
+    }
+
+    zend_hash_init(WCG(zvcopied), 0, NULL, NULL, 0);
 
     _ASSERT(SUCCEEDED(result));
 
@@ -569,6 +691,14 @@ Finished:
             aplist_destroy(plcache2);
 
             plcache2 = NULL;
+        }
+
+        if(pzcache != NULL)
+        {
+            zvcache_terminate(pzcache);
+            zvcache_destroy(pzcache);
+
+            pzcache = NULL;
         }
     }
 
@@ -610,6 +740,14 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         }
 
         WCG(locache) = NULL;
+    }
+
+    if(WCG(zvcache) != NULL)
+    {
+        zvcache_terminate(WCG(zvcache));
+        zvcache_destroy(WCG(zvcache));
+
+        WCG(zvcache) = NULL;
     }
 
     filemap_global_terminate(TSRMLS_C);
@@ -1394,6 +1532,41 @@ Finished:
     return;
 }
 
+PHP_FUNCTION(wincache_ucache_meminfo)
+{
+    int          result = NONFATAL;
+    alloc_info * pinfo  = NULL;
+
+    if(WCG(zvcache) == NULL)
+    {
+        goto Finished;
+    }
+
+    result = alloc_getinfo(WCG(zvcache)->zvalloc, &pinfo);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    array_init(return_value);
+
+    add_assoc_long(return_value, "memory_total", pinfo->total_size);
+    add_assoc_long(return_value, "memory_free", pinfo->free_size);
+    add_assoc_long(return_value, "num_used_blks", pinfo->usedcount);
+    add_assoc_long(return_value, "num_free_blks", pinfo->freecount);
+    add_assoc_long(return_value, "memory_overhead", pinfo->mem_overhead);
+
+Finished:
+
+    if(pinfo != NULL)
+    {
+        alloc_freeinfo(pinfo);
+        pinfo = NULL;
+    }
+
+    return;
+}
+
 PHP_FUNCTION(wincache_refresh_if_changed)
 {
     int    result   = NONFATAL;
@@ -1402,6 +1575,7 @@ PHP_FUNCTION(wincache_refresh_if_changed)
     /* If both file cache and opcode cache are not active, return false */
     if(WCG(lfcache) == NULL && WCG(locache) == NULL)
     {
+        result = FATAL_UNEXPECTED_FCALL;
         goto Finished;
     }
 
@@ -1441,7 +1615,686 @@ Finished:
     RETURN_TRUE;
 }
 
+PHP_FUNCTION(wincache_ucache_get)
+{
+    int          result  = NONFATAL;
+    char *       key     = NULL;
+    unsigned int keylen  = 0;
+    zval *       success = NULL;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    /* Add support for arrays */
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|z", &key, &keylen, &success) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 0);
+    }
+
+    result = zvcache_get(WCG(zvcache), key, 0, &return_value);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 1);
+    }
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_get", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+}
+
+PHP_FUNCTION(wincache_ucache_set)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+    char *            key    = NULL;
+    unsigned int      keylen = 0;
+    zval *            pzval  = NULL;
+    int               ttl    = 0;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|l", &key, &keylen, &pzval, &ttl) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Blank string as key is not allowed */
+    if(keylen == 0)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
+
+        result = WARNING_ZVCACHE_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Negative ttl is not allowed */
+    if(ttl < 0)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "ttl cannot be less than 0");
+
+        result = WARNING_ZVCACHE_ARGUMENT;
+        goto Finished;
+    }
+
+    if(Z_TYPE_P(pzval) == IS_RESOURCE)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "value cannot be a resource");
+
+        result = WARNING_ZVCACHE_RESCOPYIN;
+        goto Finished;
+    }
+
+    result = zvcache_set(WCG(zvcache), key, 0, pzval, ttl, 0);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_set", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_ucache_add)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+    char *            key    = NULL;
+    unsigned int      keylen = 0;
+    zval *            pzval  = NULL;
+    int               ttl    = 0;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|l", &key, &keylen, &pzval, &ttl) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Blank string as key is not allowed */
+    if(keylen == 0)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
+
+        result = WARNING_ZVCACHE_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Negative ttl is not allowed */
+    if(ttl < 0)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "ttl cannot be less than 0");
+
+        result = WARNING_ZVCACHE_ARGUMENT;
+        goto Finished;
+    }
+
+    if(Z_TYPE_P(pzval) == IS_RESOURCE)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_WARNING, "value cannot be a resource");
+
+        result = WARNING_ZVCACHE_RESCOPYIN;
+        goto Finished;
+    }
+
+    result = zvcache_set(WCG(zvcache), key, 0, pzval, ttl, 1);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_add", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(result == WARNING_ZVCACHE_EXISTS)
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "function called with a key which already exists");
+        }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_ucache_delete)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+    char *            key    = NULL;
+    unsigned int      keylen = 0;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    result = zvcache_delete(WCG(zvcache), key, 0);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_delete", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_ucache_clear)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(ZEND_NUM_ARGS())
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    result = zvcache_clear(WCG(zvcache));
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_clear", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_ucache_exists)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+    char *            key    = NULL;
+    unsigned int      keylen = 0;
+    unsigned char     exists = 0;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    result = zvcache_exists(WCG(zvcache), key, 0, &exists);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_exists", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    if(!exists)
+    {
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_ucache_info)
+{
+    int                  result    = NONFATAL;
+    zend_llist *         plist     = NULL;
+    zvcache_info_entry * peinfo    = NULL;
+    zval *               zfentries = NULL;
+    zval *               zfentry   = NULL;
+    unsigned int         index     = 1;
+    char *               valuetype = NULL;
+    zvcache_info         zvinfo    = {0};
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(ZEND_NUM_ARGS())
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    plist = (zend_llist *)alloc_emalloc(sizeof(zend_llist));
+    if(plist == NULL)
+    {
+        result = FATAL_OUT_OF_LMEMORY;
+        goto Finished;
+    }
+
+    result = zvcache_list(WCG(zvcache), &zvinfo, plist);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* Fill the array and then call zend_llist_destroy */
+    array_init(return_value);
+    add_assoc_long(return_value, "total_cache_uptime", zvinfo.initage);
+    add_assoc_bool(return_value, "is_local_cache", zvinfo.islocal);
+    add_assoc_long(return_value, "total_item_count", zvinfo.itemcount);
+    add_assoc_long(return_value, "total_hit_count", zvinfo.hitcount);
+    add_assoc_long(return_value, "total_miss_count", zvinfo.misscount);
+
+    MAKE_STD_ZVAL(zfentries);
+    array_init(zfentries);
+    
+    peinfo = (zvcache_info_entry *)zend_llist_get_first(plist);
+    while(peinfo != NULL)
+    {
+        MAKE_STD_ZVAL(zfentry);
+        array_init(zfentry);
+
+        switch(peinfo->type)
+        {
+            case IS_NULL:
+                valuetype = "null";
+                break;
+            case IS_BOOL:
+                valuetype = "bool";
+                break;
+            case IS_LONG:
+                valuetype = "long";
+                break;
+            case IS_DOUBLE:
+                valuetype = "double";
+                break;
+            case IS_STRING:
+            case IS_CONSTANT:
+                valuetype = "string";
+                break;
+            case IS_ARRAY:
+            case IS_CONSTANT_ARRAY:
+                valuetype = "array";
+                break;
+            case IS_OBJECT:
+                valuetype = "object";
+                break;
+            default:
+                valuetype = "unknown";
+                break;
+        }
+
+        add_assoc_string(zfentry, "key_name", peinfo->key, 1);
+        add_assoc_string(zfentry, "value_type", valuetype, 1);
+        add_assoc_long(zfentry, "ttl_seconds", peinfo->ttl);
+        add_assoc_long(zfentry, "age_seconds", peinfo->age);
+        add_assoc_long(zfentry, "hitcount", peinfo->hitcount);
+
+        add_index_zval(zfentries, index++, zfentry);
+        peinfo = (zvcache_info_entry *)zend_llist_get_next(plist);
+    }
+
+    add_assoc_zval(return_value, "ucache_entries", zfentries);
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(plist != NULL)
+    {
+        zend_llist_destroy(plist);
+        alloc_efree(plist);
+        plist = NULL;
+    }
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_info", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    return;
+}
+
+PHP_FUNCTION(wincache_ucache_inc)
+{
+    int               result  = NONFATAL;
+    zvcache_context * pcache  = NULL;
+    char *            key     = NULL;
+    unsigned int      keylen  = 0;
+    int               delta   = 1;
+    int               newval  = 0;
+    zval *            success = NULL;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lz", &key, &keylen, &delta, &success) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 0);
+    }
+
+    result = zvcache_change(WCG(zvcache), key, delta, &newval);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 1);
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_inc", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(result == WARNING_ZVCACHE_NOTLONG)
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "function can only be called for key whose value is long");
+        }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_LONG(newval);
+}
+
+PHP_FUNCTION(wincache_ucache_dec)
+{
+    int               result  = NONFATAL;
+    zvcache_context * pcache  = NULL;
+    char *            key     = NULL;
+    unsigned int      keylen  = 0;
+    int               delta   = 1;
+    int               newval  = 0;
+    zval *            success = NULL;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|lz", &key, &keylen, &delta, &success) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 0);
+    }
+
+    /* Convert to negative number */
+    delta = -delta;
+
+    result = zvcache_change(WCG(zvcache), key, delta, &newval);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    if(success != NULL)
+    {
+        ZVAL_BOOL(success, 1);
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_dec", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(result == WARNING_ZVCACHE_NOTLONG)
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "function can only be called for key whose value is long");
+        }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_LONG(newval);
+}
+
+PHP_FUNCTION(wincache_ucache_cas)
+{
+    int               result = NONFATAL;
+    zvcache_context * pcache = NULL;
+    char *            key    = NULL;
+    unsigned int      keylen = 0;
+    int               cvalue = 0;
+    int               nvalue = 0;
+
+    /* If user cache is enabled, return false */
+    if(!WCG(zvenabled))
+    {
+        RETURN_FALSE;
+    }
+
+    if(WCG(zvcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sll", &key, &keylen, &cvalue, &nvalue) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    result = zvcache_compswitch(WCG(zvcache), key, cvalue, nvalue);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        WCG(zvlasterror) = result;
+
+        dprintimportant("failure %d in wincache_ucache_cas", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(result == WARNING_ZVCACHE_NOTLONG)
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "function can only be called for key whose value is long");
+        }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
 #ifdef WINCACHE_TEST
+PHP_FUNCTION(wincache_ucache_lasterror)
+{
+    if(WCG(zvcache) == NULL)
+    {
+        RETURN_LONG(0);
+    }
+
+    RETURN_LONG(WCG(zvlasterror));
+}
+
 PHP_FUNCTION(wincache_runtests)
 {
     dprintverbose("start wincache_runtests");

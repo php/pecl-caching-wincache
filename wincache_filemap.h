@@ -57,6 +57,7 @@
 #define FILEMAP_TYPE_RESPATHS               2   /* Resolve path cache */
 #define FILEMAP_TYPE_FILECONTENT            3   /* File cache map */
 #define FILEMAP_TYPE_BYTECODES              4   /* Byte code map */
+#define FILEMAP_TYPE_USERZVALS              5   /* ZVAL cache map */
 #define FILEMAP_TYPE_UNUSED                 255 /* UNUSED SEGMENT MARKER */
 #define FILEMAP_TYPE_MAX                    255
 
@@ -84,6 +85,9 @@
 
 #define FILEMAP_BYTECODES_PREFIX            "WINCACHE_FILEMAP_BYTECODES"
 #define FILEMAP_BYTECODES_PREFIX_LENGTH     (sizeof(FILEMAP_BYTECODES_PREFIX))
+
+#define FILEMAP_USERZVALS_PREFIX            "WINCACHE_FILEMAP_USERZVALS"
+#define FILEMAP_USERZVALS_PREFIX_LENGTH     (sizeof(FILEMAP_USERZVALS_PREFIX))
 
 /* filemap_information_header - SHARED - 16 bytes */
 /* filemap_information_entry  - SHARED - 276 bytes */

@@ -34,12 +34,11 @@
 #ifndef _WINCACHE_UTILS_H_
 #define _WINCACHE_UTILS_H_
 
-extern unsigned int utils_crc32(const char * str, unsigned int strlen);
 extern unsigned int utils_hashcalc(const char * str, unsigned int strlen);
 extern unsigned int utils_getindex(const char * filename, unsigned int numfiles);
-extern char * utils_filepath(zend_file_handle * file_handle);
-extern char * utils_fullpath(const char * filename);
-extern int    utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
+extern char *       utils_filepath(zend_file_handle * file_handle);
+extern char *       utils_fullpath(const char * filename);
+extern int          utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);

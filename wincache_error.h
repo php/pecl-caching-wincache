@@ -48,6 +48,7 @@
 #define FATAL_INVALID_ARGUMENT              15
 #define FATAL_NEED_MORE_MEMORY              16
 #define FATAL_UNEXPECTED_DATA               17
+#define FATAL_UNEXPECTED_FCALL              18
 
 #define FATAL_ZEND_BAILOUT                  98
 #define FATAL_UNKNOWN_FATAL                 99
@@ -119,14 +120,25 @@
 #define FATAL_OPCOPY_ZEND_CLASS             FATAL_OPCOPY_BASE + 6
 #define FATAL_OPCOPY_ZEND_CLASS_ENTRY       FATAL_OPCOPY_BASE + 7
 
-/* Error codes used by optimizer */
-#define FATAL_OPTIMIZER_BASE                900
-#define FATAL_OPTIMIZER_CREATION            FATAL_OPTIMIZER_BASE + 1
+/* Error codes used by zvcache */
+#define FATAL_ZVCACHE_BASE                  900
+#define FATAL_ZVCACHE_INITIALIZE            FATAL_ZVCACHE_BASE + 1
+#define FATAL_ZVCACHE_INIT_EVENT            FATAL_ZVCACHE_BASE + 2
 
+/* Error codes used by session handler */
+#define FATAL_SESSION_BASE                  1000
+#define FATAL_SESSION_INITIALIZE            FATAL_SESSION_BASE + 1
+
+/* Warning codes */
 #define WARNING_COMMON_BASE                 5000
 #define WARNING_FCACHE_TOOBIG               WARNING_COMMON_BASE + 1
 #define WARNING_OPCOPY_MISSING_PARENT       WARNING_COMMON_BASE + 2
 #define WARNING_FILEMAP_MAPVIEW             WARNING_COMMON_BASE + 3
+#define WARNING_ZVCACHE_EMISSING            WARNING_COMMON_BASE + 4
+#define WARNING_ZVCACHE_EXISTS              WARNING_COMMON_BASE + 5
+#define WARNING_ZVCACHE_NOTLONG             WARNING_COMMON_BASE + 6
+#define WARNING_ZVCACHE_ARGUMENT            WARNING_COMMON_BASE + 7
+#define WARNING_ZVCACHE_RESCOPYIN           WARNING_COMMON_BASE + 8
 
 /* SUCCEEDED and FAILED macros */
 #ifdef SUCCEEDED

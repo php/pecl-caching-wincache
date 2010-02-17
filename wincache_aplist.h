@@ -66,8 +66,8 @@ struct aplist_header
 
     unsigned int       ttlmax;      /* Max time a file can stay w/o being used */
     unsigned int       scfreq;      /* How frequently should scavenger run */
-    unsigned int       lscavenge;   /* Ticks when was last time we ran scavenger */
-    unsigned int       scstart;     /* Entry starting which scavenger should run */
+    unsigned int       lscavenge;   /* Ticks when last scavenger run happened */
+    unsigned int       scstart;     /* Index from where scavenger should start */
 
     unsigned int       itemcount;   /* Number of valid items */
     unsigned int       valuecount;  /* Total values starting from last entry */

@@ -129,6 +129,7 @@ Finished:
     if(hSnapShot != INVALID_HANDLE_VALUE)
     {
         CloseHandle(hSnapShot);
+        hSnapShot = INVALID_HANDLE_VALUE;
     }
 
     if(FAILED(result))
@@ -774,6 +775,10 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
                 {
                     _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(fmapgdata)->ppid);
                 }
+                else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
+                {
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(fmapgdata)->ppid);
+                }
                 else
                 {
                     _ASSERT(FALSE);
@@ -796,6 +801,10 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
                 else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
                 {
                     _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                }
+                else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
+                {
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else
                 {
@@ -849,6 +858,10 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             {
                 _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(fmapgdata)->pid);
             }
+            else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
+            {
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(fmapgdata)->pid);
+            }
             else
             {
                 _ASSERT(FALSE);
@@ -871,6 +884,10 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
             {
                 _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+            }
+            else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
+            {
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else
             {

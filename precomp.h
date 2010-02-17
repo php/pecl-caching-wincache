@@ -35,10 +35,10 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.0.1325.0"
+#define PHP_WINCACHE_EXTVER    "1.1.0205.0"
 
 /* comment following line for release builds */
-//#define WINCACHE_DEBUG
+#define WINCACHE_DEBUG
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)
@@ -58,6 +58,8 @@
 #include "php_ini.h"
 #include "sapi.h"
 #include "ext/standard/info.h"
+#include "ext/standard/php_smart_str.h"
+#include "ext/session/php_session.h"
 #include "zend_extensions.h"
 
 #include <tlhelp32.h>
@@ -97,6 +99,7 @@
 #define CACHE_TYPE_RESPATHS        2
 #define CACHE_TYPE_FILECONTENT     3
 #define CACHE_TYPE_BYTECODES       4
+#define CACHE_TYPE_USERZVALS       5
 
 #define APLIST_TYPE_INVALID        255
 #define APLIST_TYPE_GLOBAL         0
@@ -108,6 +111,8 @@
 #define OCACHE_SIZE_MAXIMUM        255
 #define FCACHE_SIZE_MINIMUM        5
 #define FCACHE_SIZE_MAXIMUM        85
+#define ZCACHE_SIZE_MINIMUM        5
+#define ZCACHE_SIZE_MAXIMUM        85
 #define FILE_SIZE_MINIMUM          10
 #define FILE_SIZE_MAXIMUM          2048
 #define FCHECK_FREQ_MINIMUM        2
@@ -115,17 +120,19 @@
 #define TTL_VALUE_MINIMUM          60
 #define TTL_VALUE_MAXIMUM          7200
 
+#include "wincache_error.h"
 #include "wincache_debug.h"
 #include "wincache_utils.h"
-#include "wincache_error.h"
 #include "wincache_lock.h"
 #include "wincache_filemap.h"
 #include "wincache_alloc.h"
-#include "wincache_fcache.h"
 #include "wincache_ocache.h"
+#include "wincache_opcopy.h"
+#include "wincache_fcache.h"
 #include "wincache_rplist.h"
 #include "wincache_aplist.h"
-#include "wincache_opcopy.h"
+#include "wincache_zvcache.h"
+#include "wincache_session.h"
 #include "php_wincache.h"
 
 #endif /* _PRECOMP_H_ */

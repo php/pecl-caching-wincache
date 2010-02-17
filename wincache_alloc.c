@@ -882,6 +882,11 @@ void * alloc_get_cacheheader(alloc_context * palloc, unsigned int valuecount, un
             _ASSERT(valuecount == 0);
             msize = sizeof(ocache_header);
         }
+        else if(type == CACHE_TYPE_USERZVALS)
+        {
+            _ASSERT(valuecount > 0);
+            msize = sizeof(zvcache_header) + (valuecount - 1) * sizeof(size_t);
+        }
         else
         {
             _ASSERT(FALSE);
@@ -1008,80 +1013,99 @@ void alloc_freeinfo(alloc_info * pinfo)
     }
 }
 
+__inline
 void * alloc_emalloc(size_t size)
 {
     return alloc_malloc(NULL, ALLOC_TYPE_PROCESS, size);
 }
 
+__inline
 void * alloc_pemalloc(size_t size)
 {
     return alloc_malloc(NULL, ALLOC_TYPE_PROCESS_PERSISTENT, size);
 }
 
+__inline
 void * alloc_smalloc(alloc_context * palloc, size_t size)
 {
     _ASSERT(palloc != NULL);
     return alloc_malloc(palloc, ALLOC_TYPE_SHAREDMEM, size);
 }
 
+__inline
 void * alloc_erealloc(void * addr, size_t size)
 {
     return alloc_realloc(NULL, ALLOC_TYPE_PROCESS, addr, size);
 }
 
+__inline
 void * alloc_perealloc(void * addr, size_t size)
 {
     return alloc_realloc(NULL, ALLOC_TYPE_PROCESS_PERSISTENT, addr, size);
 }
 
+__inline
 void * alloc_srealloc(alloc_context * palloc, void * addr, size_t size)
 {
     _ASSERT(palloc != NULL);
     return alloc_realloc(palloc, ALLOC_TYPE_SHAREDMEM, addr, size);
 }
 
+__inline
 char * alloc_estrdup(const char * str)
 {
     return alloc_strdup(NULL, ALLOC_TYPE_PROCESS, str);
 }
 
+__inline
 char * alloc_pestrdup(const char * str)
 {
     return alloc_strdup(NULL, ALLOC_TYPE_PROCESS_PERSISTENT, str);
 }
 
+__inline
 char * alloc_sstrdup(alloc_context * palloc, const char * str)
 {
     _ASSERT(palloc != NULL);
     return alloc_strdup(palloc, ALLOC_TYPE_SHAREDMEM, str);
 }
 
+__inline
 void alloc_efree(void * addr)
 {
     alloc_free(NULL, ALLOC_TYPE_PROCESS, addr);
     return;
 }
 
+__inline
 void alloc_pefree(void * addr)
 {
     alloc_free(NULL, ALLOC_TYPE_PROCESS_PERSISTENT, addr);
     return;
 }
 
+__inline
 void alloc_sfree(alloc_context * palloc, void * addr)
 {
     _ASSERT(palloc != NULL);
     alloc_free(palloc, ALLOC_TYPE_SHAREDMEM, addr);
-
     return;
 }
 
 void * alloc_oemalloc(alloc_context * palloc, size_t hoffset, size_t size)
 {
-    _ASSERT(palloc == NULL);
+    _ASSERT(palloc  == NULL);
     _ASSERT(hoffset == 0);
 
-    return alloc_malloc(palloc, ALLOC_TYPE_PROCESS, size);
+    return alloc_emalloc(size);
+}
+
+void * alloc_osmalloc(alloc_context * palloc, size_t hoffset, size_t size)
+{
+    _ASSERT(palloc  != NULL);
+    _ASSERT(hoffset == 0);
+
+    return alloc_smalloc(palloc, size);
 }
 
 void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
@@ -1230,10 +1254,18 @@ Finished:
 
 void * alloc_oerealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size)
 {
-    _ASSERT(palloc != NULL);
+    _ASSERT(palloc  == NULL);
     _ASSERT(hoffset == 0);
 
-    return alloc_realloc(palloc, ALLOC_TYPE_PROCESS, addr, size);
+    return alloc_erealloc(addr, size);
+}
+
+void * alloc_osrealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size)
+{
+    _ASSERT(palloc  != NULL);
+    _ASSERT(hoffset == 0);
+
+    return alloc_srealloc(palloc, addr, size);
 }
 
 void * alloc_omrealloc(alloc_context * palloc, size_t hoffset, void * addr, size_t size)
@@ -1246,10 +1278,18 @@ void * alloc_omrealloc(alloc_context * palloc, size_t hoffset, void * addr, size
 
 char * alloc_oestrdup(alloc_context * palloc, size_t hoffset, const char * str)
 {
-    _ASSERT(palloc == NULL);
+    _ASSERT(palloc  == NULL);
     _ASSERT(hoffset == 0);
 
-    return alloc_strdup(palloc, ALLOC_TYPE_PROCESS, str);
+    return alloc_estrdup(str);
+}
+
+char * alloc_osstrdup(alloc_context * palloc, size_t hoffset, const char * str)
+{
+    _ASSERT(palloc  != NULL);
+    _ASSERT(hoffset == 0);
+
+    return alloc_sstrdup(palloc, str);
 }
 
 char * alloc_omstrdup(alloc_context * palloc, size_t hoffset, const char * str)
@@ -1277,7 +1317,16 @@ void alloc_oefree(alloc_context * palloc, size_t hoffset, void * addr)
     _ASSERT(palloc == NULL);
     _ASSERT(hoffset == 0);
 
-    alloc_free(palloc, ALLOC_TYPE_PROCESS, addr);
+    alloc_efree(addr);
+    return;
+}
+
+void alloc_osfree(alloc_context * palloc, size_t hoffset, void * addr)
+{
+    _ASSERT(palloc  != NULL);
+    _ASSERT(hoffset == 0);
+
+    alloc_sfree(palloc, addr);
     return;
 }
 

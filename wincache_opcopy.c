@@ -181,7 +181,7 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
         case IS_CONSTANT_ARRAY:
             /* Copy zval pointers in the hashtable */
             pnewz->value.ht = NULL;
-	    dprintverbose("copy_zval calling copy_hashtable");
+            dprintverbose("copy_zval calling copy_hashtable");
             result = copy_hashtable(popcopy, poldz->value.ht, copy_flag_zval_ref | copy_flag_pDataPtr, &pnewz->value.ht, NULL, NULL);
             if(FAILED(result))
             {

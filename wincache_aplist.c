@@ -48,7 +48,7 @@
 
 #define APLIST_VALUE(p, o)            ((aplist_value *)alloc_get_cachevalue(p, o))
 
-static int  findapath_in_cache(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete);
+static int  find_aplist_entry(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete);
 static int  is_file_changed(aplist_context * pcache, aplist_value * pvalue);
 static int  create_aplist_data(aplist_context * pcache, const char * filename, aplist_value ** ppvalue);
 static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue);
@@ -65,13 +65,13 @@ unsigned short glcacheid = 1;
 
 /* Call this method atleast under a read lock */
 /* If an entry for filename with is_deleted is found, return that in ppdelete */
-static int findapath_in_cache(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete)
+static int find_aplist_entry(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete)
 {
     int             result = NONFATAL;
     aplist_header * header = NULL;
     aplist_value *  pvalue = NULL;
 
-    dprintverbose("start findapath_in_cache");
+    dprintverbose("start find_aplist_entry");
 
     _ASSERT(pcache   != NULL);
     _ASSERT(filename != NULL);
@@ -118,7 +118,7 @@ static int findapath_in_cache(aplist_context * pcache, const char * filename, un
 
     *ppvalue = pvalue;
 
-    dprintverbose("end findapath_in_cache");
+    dprintverbose("end find_aplist_entry");
 
     return result;
 }
@@ -542,7 +542,7 @@ static void delete_aplist_fileentry(aplist_context * pcache, const char * filena
     _ASSERT(IS_ABSOLUTE_PATH(filename, strlen(filename)));
 
     findex = utils_getindex(filename, pcache->apheader->valuecount);
-    findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
+    find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
 
     /* If an entry is found for this file, remove it */
     if(pvalue != NULL)
@@ -595,7 +595,7 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
         }
     }
 
-    dprintimportant("scavenger run sindex = %d, eindex = %d", sindex, eindex);
+    dprintimportant("aplist scavenger sindex = %d, eindex = %d", sindex, eindex);
     for( ;sindex < eindex; sindex++)
     {
         if(apheader->values[sindex] == 0)
@@ -1222,7 +1222,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     lock_readlock(pcache->aprwlock);
 
     /* Find file in hashtable and also get any entry for the file if mark deleted */
-    result = findapath_in_cache(pcache, filename, findex, DO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
+    result = find_aplist_entry(pcache, filename, findex, DO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
     if(pvalue != NULL)
     {
         addtick = pvalue->add_ticks;
@@ -1267,7 +1267,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         flock = 1;
 
         /* Check again after getting write lock to see if something changed */
-        result = findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
+        result = find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
         if(FAILED(result))
         {
             goto Finished;
@@ -1321,7 +1321,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         flock = 1;
 
         /* Check again to see if anything changed before getting write lock */
-        result = findapath_in_cache(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pdummy, &pdelete);
+        result = find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pdummy, &pdelete);
         if(FAILED(result))
         {
             goto Finished;
@@ -1514,7 +1514,7 @@ static int set_lastcheck_time(aplist_context * pcache, const char * filename, un
     findex = utils_getindex(resolve_path, pcache->apheader->valuecount);
 
     /* failure to find the entry in cache should be ignored */
-    findapath_in_cache(pcache, resolve_path, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
+    find_aplist_entry(pcache, resolve_path, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
     if(pvalue != NULL)
     {
         pvalue->last_check = 0;
