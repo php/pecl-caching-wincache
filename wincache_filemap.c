@@ -55,6 +55,7 @@ static unsigned short getppid(TSRMLS_D)
     unsigned int   pid       = 0;
     HANDLE         hSnapShot = INVALID_HANDLE_VALUE;
     PROCESSENTRY32 pe        = {0};
+    int            poolpid   = -1;
 
     dprintverbose("start getppid");
 
@@ -71,6 +72,14 @@ static unsigned short getppid(TSRMLS_D)
     if(WCG(localheap) != 0)
     {
         WCG(parentpid) = pid;
+        goto Finished;
+    }
+
+    /* Use CRC of apppoolname as ppid if available */
+    poolpid = utils_apoolpid();
+    if(poolpid != -1)
+    {
+        WCG(parentpid) = poolpid;
         goto Finished;
     }
 

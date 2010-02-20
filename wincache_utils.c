@@ -282,8 +282,53 @@ Finished:
     return result;
 }
 
+int utils_apoolpid()
+{
+    int          retval = -1;
+    char *       buffer = NULL;
+    unsigned int buflen = 0;
+
+    dprintverbose("start utils_apoolpid");
+
+    buflen = GetEnvironmentVariable("APP_POOL_ID", NULL, 0);
+    if(buflen == 0)
+    {
+        goto Finished;
+    }
+
+    buffer = (char *)alloc_pemalloc(buflen);
+    if(buffer == NULL)
+    {
+        goto Finished;
+    }
+
+    buflen = GetEnvironmentVariable("APP_POOL_ID", buffer, buflen);
+    if(buflen == 0)
+    {
+        goto Finished;
+    }
+
+    /* Return a value which can be stored as unsigned short */
+    /* Keeping number larger than 32766 to not confuse with regular pids */
+    retval = utils_hashcalc(buffer, buflen);
+    retval %= 32766;
+    retval += 32766;
+
+Finished:
+
+    if(buffer != NULL)
+    {
+        alloc_pefree(buffer);
+        buffer = NULL;
+    }
+
+    dprintverbose("end utils_apoolpid");
+
+    return retval;
+}
+
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
-int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...) /* {{{ */
+int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...)
 {
     va_list arglist;
     int     retval = 0;
@@ -294,5 +339,4 @@ int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *form
     
     return retval;
 }
-/* }}} */
 #endif

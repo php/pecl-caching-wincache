@@ -277,7 +277,6 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
 
     WCG(lasterror)   = 0;    /* GetLastError() value set by wincache */
-    WCG(zvcopied)    = NULL; /* zvals copied from the user cache */
     WCG(zvlasterror) = 0;    /* Last error returned by ucache */
     WCG(lfcache)     = NULL; /* Aplist to use for file/rpath cache */
     WCG(locache)     = NULL; /* Aplist to use for opcode cache */
@@ -657,16 +656,6 @@ PHP_MINIT_FUNCTION(wincache)
 
     /* Register wincache session handler */
     php_session_register_module(ps_wincache_ptr);
-
-    /* Create zvcopied hashtable */
-    WCG(zvcopied) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
-    if(WCG(zvcopied) == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    zend_hash_init(WCG(zvcopied), 0, NULL, NULL, 0);
 
     _ASSERT(SUCCEEDED(result));
 
@@ -1617,10 +1606,13 @@ Finished:
 
 PHP_FUNCTION(wincache_ucache_get)
 {
-    int          result  = NONFATAL;
-    char *       key     = NULL;
-    unsigned int keylen  = 0;
-    zval *       success = NULL;
+    int          result    = NONFATAL;
+    zval *       pzkey     = NULL;
+    zval *       success   = NULL;
+    HashTable *  htable    = NULL;
+    zval **      hentry    = NULL;
+    HashPosition hposition;
+    zval *       nentry    = NULL;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -1634,8 +1626,7 @@ PHP_FUNCTION(wincache_ucache_get)
         goto Finished;
     }
 
-    /* Add support for arrays */
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|z", &key, &keylen, &success) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|z", &pzkey, &success) == FAILURE)
     {
         result = FATAL_INVALID_ARGUMENT;
         goto Finished;
@@ -1646,10 +1637,51 @@ PHP_FUNCTION(wincache_ucache_get)
         ZVAL_BOOL(success, 0);
     }
 
-    result = zvcache_get(WCG(zvcache), key, 0, &return_value);
-    if(FAILED(result))
+    /* Convert zval to string zval */
+    if(Z_TYPE_P(pzkey) != IS_STRING && Z_TYPE_P(pzkey) != IS_ARRAY)
     {
-        goto Finished;
+        convert_to_string(pzkey);
+    }
+
+    if(Z_TYPE_P(pzkey) == IS_STRING)
+    {
+        result = zvcache_get(WCG(zvcache), Z_STRVAL_P(pzkey), 0, &return_value TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+    else if(Z_TYPE_P(pzkey) == IS_ARRAY)
+    {
+        array_init(return_value);
+        htable = Z_ARRVAL_P(pzkey);
+        zend_hash_internal_pointer_reset_ex(htable, &hposition);
+        while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
+        {
+            if(Z_TYPE_PP(hentry) != IS_STRING)
+            {
+                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string");
+
+                result = WARNING_ZVCACHE_ARGUMENT;
+                goto Finished;
+            }
+
+            MAKE_STD_ZVAL(nentry);
+            result = zvcache_get(WCG(zvcache), Z_STRVAL_PP(hentry), 0, &nentry TSRMLS_CC);
+
+            /* Ignore failures and try getting values of other keys */
+            if(SUCCEEDED(result))
+            {
+                zend_hash_add(Z_ARRVAL_P(return_value), Z_STRVAL_PP(hentry), Z_STRLEN_PP(hentry) + 1, &nentry, sizeof(zval *), NULL);
+            }
+
+            nentry = NULL;
+            zend_hash_move_forward_ex(htable, &hposition);
+        }
+    }
+    else
+    {
+        _ASSERT(FALSE);
     }
 
     if(success != NULL)
@@ -1658,6 +1690,12 @@ PHP_FUNCTION(wincache_ucache_get)
     }
 
 Finished:
+
+    if(nentry != NULL)
+    {
+        FREE_ZVAL(nentry);
+        nentry = NULL;
+    }
 
     if(FAILED(result))
     {
@@ -1672,12 +1710,16 @@ Finished:
 
 PHP_FUNCTION(wincache_ucache_set)
 {
-    int               result = NONFATAL;
-    zvcache_context * pcache = NULL;
-    char *            key    = NULL;
-    unsigned int      keylen = 0;
-    zval *            pzval  = NULL;
-    int               ttl    = 0;
+    int           result   = NONFATAL;
+    zval *        pzkey    = NULL;
+    zval *        pzval    = NULL;
+    int           ttl      = 0;
+    HashTable *   htable   = NULL;
+    HashPosition  hposition;
+    zval **       hentry   = NULL;
+    char *        key      = NULL;
+    unsigned int  keylen   = 0;
+    unsigned int  longkey  = 0;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -1691,22 +1733,13 @@ PHP_FUNCTION(wincache_ucache_set)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|l", &key, &keylen, &pzval, &ttl) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|zl", &pzkey, &pzval, &ttl) == FAILURE)
     {
         result = FATAL_INVALID_ARGUMENT;
         goto Finished;
     }
 
-    /* Blank string as key is not allowed */
-    if(keylen == 0)
-    {
-        php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
-
-        result = WARNING_ZVCACHE_ARGUMENT;
-        goto Finished;
-    }
-
-    /* Negative ttl is not allowed */
+    /* Negative ttl and resource values are not allowed */
     if(ttl < 0)
     {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "ttl cannot be less than 0");
@@ -1715,7 +1748,7 @@ PHP_FUNCTION(wincache_ucache_set)
         goto Finished;
     }
 
-    if(Z_TYPE_P(pzval) == IS_RESOURCE)
+    if(pzval && Z_TYPE_P(pzval) == IS_RESOURCE)
     {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "value cannot be a resource");
 
@@ -1723,13 +1756,93 @@ PHP_FUNCTION(wincache_ucache_set)
         goto Finished;
     }
 
-    result = zvcache_set(WCG(zvcache), key, 0, pzval, ttl, 0);
-    if(FAILED(result))
+    if(Z_TYPE_P(pzkey) != IS_STRING && Z_TYPE_P(pzkey) != IS_ARRAY)
     {
-        goto Finished;
+        convert_to_string(pzkey);
     }
 
-    _ASSERT(SUCCEEDED(result));
+    if(Z_TYPE_P(pzkey) == IS_STRING)
+    {
+        /* Blank string as key is not allowed */
+        if(Z_STRLEN_P(pzkey) == 0 || *(Z_STRVAL_P(pzkey)) == '\0')
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
+
+            result = WARNING_ZVCACHE_ARGUMENT;
+            goto Finished;
+        }
+
+        /* When first argument is string, value is required */
+        if(pzval == NULL || Z_STRLEN_P(pzkey) > 4096)
+        {
+            result = WARNING_ZVCACHE_ARGUMENT;
+            goto Finished;
+        }
+
+        /* issession = 0, isadd = 0 */
+        result = zvcache_set(WCG(zvcache), Z_STRVAL_P(pzkey), 0, pzval, ttl, 0 TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        ZVAL_BOOL(return_value, 1);
+    }
+    else if(Z_TYPE_P(pzkey) == IS_ARRAY)
+    {
+        array_init(return_value);
+        htable = Z_ARRVAL_P(pzkey);
+        zend_hash_internal_pointer_reset_ex(htable, &hposition);
+        while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
+        {
+            zend_hash_get_current_key_ex(htable, &key, &keylen, &longkey, 0, &hposition);
+
+            /* We are taking care of long keys properly */
+            if(!key && longkey != 0)
+            {
+                /* Convert longkey to string and use that instead */
+                spprintf(&key, 0, "%ld", longkey);
+                keylen = strlen(key);
+            }
+
+            if(key)
+            {
+                if(keylen > 4096)
+                {
+                    result = WARNING_ZVCACHE_ARGUMENT;
+                }
+                else
+                {
+                    /* issession = 0, isadd = 0 */
+                    result = zvcache_set(WCG(zvcache), key, 0, *hentry, ttl, 0 TSRMLS_CC);
+                }
+
+                if(FAILED(result))
+                {
+                    add_assoc_long_ex(return_value, key, keylen, -1);
+                }
+
+                if(longkey)
+                {
+                    efree(key);
+                    key = NULL;
+                }
+            }
+            else
+            {
+                add_index_long(return_value, longkey, -1);
+            }
+
+            key     = NULL;
+            keylen  = 0;
+            longkey = 0;
+            zend_hash_move_forward_ex(htable, &hposition);
+        }
+    }
+    else
+    {
+        _ASSERT(FALSE);
+    }
 
 Finished:
 
@@ -1742,18 +1855,20 @@ Finished:
 
         RETURN_FALSE;
     }
-
-    RETURN_TRUE;
 }
 
 PHP_FUNCTION(wincache_ucache_add)
 {
-    int               result = NONFATAL;
-    zvcache_context * pcache = NULL;
-    char *            key    = NULL;
-    unsigned int      keylen = 0;
-    zval *            pzval  = NULL;
-    int               ttl    = 0;
+    int           result   = NONFATAL;
+    zval *        pzkey    = NULL;
+    zval *        pzval    = NULL;
+    int           ttl      = 0;
+    HashTable *   htable   = NULL;
+    HashPosition  hposition;
+    zval **       hentry   = NULL;
+    char *        key      = NULL;
+    unsigned int  keylen   = 0;
+    unsigned int  longkey  = 0;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -1767,22 +1882,13 @@ PHP_FUNCTION(wincache_ucache_add)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "sz|l", &key, &keylen, &pzval, &ttl) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z|zl", &pzkey, &pzval, &ttl) == FAILURE)
     {
         result = FATAL_INVALID_ARGUMENT;
         goto Finished;
     }
 
-    /* Blank string as key is not allowed */
-    if(keylen == 0)
-    {
-        php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
-
-        result = WARNING_ZVCACHE_ARGUMENT;
-        goto Finished;
-    }
-
-    /* Negative ttl is not allowed */
+    /* Negative ttl and resource values are not allowed */
     if(ttl < 0)
     {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "ttl cannot be less than 0");
@@ -1791,7 +1897,7 @@ PHP_FUNCTION(wincache_ucache_add)
         goto Finished;
     }
 
-    if(Z_TYPE_P(pzval) == IS_RESOURCE)
+    if(pzval && Z_TYPE_P(pzval) == IS_RESOURCE)
     {
         php_error_docref(NULL TSRMLS_CC, E_WARNING, "value cannot be a resource");
 
@@ -1799,13 +1905,91 @@ PHP_FUNCTION(wincache_ucache_add)
         goto Finished;
     }
 
-    result = zvcache_set(WCG(zvcache), key, 0, pzval, ttl, 1);
-    if(FAILED(result))
+    if(Z_TYPE_P(pzkey) != IS_STRING && Z_TYPE_P(pzkey) != IS_ARRAY)
     {
-        goto Finished;
+        convert_to_string(pzkey);
     }
 
-    _ASSERT(SUCCEEDED(result));
+    if(Z_TYPE_P(pzkey) == IS_STRING)
+    {
+        /* Blank string as key is not allowed */
+        if(Z_STRLEN_P(pzkey) == 0 || *(Z_STRVAL_P(pzkey)) == '\0')
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "key cannot be blank string");
+
+            result = WARNING_ZVCACHE_ARGUMENT;
+            goto Finished;
+        }
+
+        /* When first argument is string, value is required */
+        if(pzval == NULL || Z_STRLEN_P(pzkey) > 4096)
+        {
+            result = WARNING_ZVCACHE_ARGUMENT;
+            goto Finished;
+        }
+
+        /* issession = 0, isadd = 1 */
+        result = zvcache_set(WCG(zvcache), Z_STRVAL_P(pzkey), 0, pzval, ttl, 1 TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        ZVAL_BOOL(return_value, 1);
+    }
+    else if(Z_TYPE_P(pzkey) == IS_ARRAY)
+    {
+        array_init(return_value);
+        htable = Z_ARRVAL_P(pzkey);
+        zend_hash_internal_pointer_reset_ex(htable, &hposition);
+        while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
+        {
+            /* We are taking care of long keys properly */
+            if(!key && longkey != 0)
+            {
+                /* Convert longkey to string and use that instead */
+                spprintf(&key, 0, "%ld", longkey);
+                keylen = strlen(key);
+            }
+
+            if(key)
+            {
+                if(keylen > 4096)
+                {
+                    result = WARNING_ZVCACHE_ARGUMENT;
+                }
+                else
+                {
+                    /* issession = 0, isadd = 1 */
+                    result = zvcache_set(WCG(zvcache), key, 0, *hentry, ttl, 1 TSRMLS_CC);
+                }
+
+                if(FAILED(result))
+                {
+                    add_assoc_long_ex(return_value, key, keylen, -1);
+                }
+
+                if(longkey)
+                {
+                    efree(key);
+                    key = NULL;
+                }
+            }
+            else
+            {
+                add_index_long(return_value, longkey, -1);
+            }
+
+            key     = NULL;
+            keylen  = 0;
+            longkey = 0;
+            zend_hash_move_forward_ex(htable, &hposition);
+        }
+    }
+    else
+    {
+        _ASSERT(FALSE);
+    }
 
 Finished:
 
@@ -1823,16 +2007,15 @@ Finished:
 
         RETURN_FALSE;
     }
-
-    RETURN_TRUE;
 }
 
 PHP_FUNCTION(wincache_ucache_delete)
 {
-    int               result = NONFATAL;
-    zvcache_context * pcache = NULL;
-    char *            key    = NULL;
-    unsigned int      keylen = 0;
+    int           result   = NONFATAL;
+    zval *        pzkey    = NULL;
+    HashTable *   htable   = NULL;
+    HashPosition  hposition;
+    zval **       hentry   = NULL;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -1846,19 +2029,60 @@ PHP_FUNCTION(wincache_ucache_delete)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "z", &pzkey) == FAILURE)
     {
         result = FATAL_INVALID_ARGUMENT;
         goto Finished;
     }
 
-    result = zvcache_delete(WCG(zvcache), key, 0);
-    if(FAILED(result))
+    if(Z_TYPE_P(pzkey) != IS_STRING && Z_TYPE_P(pzkey) != IS_ARRAY)
     {
-        goto Finished;
+        convert_to_string(pzkey);
     }
 
-    _ASSERT(SUCCEEDED(result));
+    if(Z_TYPE_P(pzkey) == IS_STRING)
+    {
+        result = zvcache_delete(WCG(zvcache), Z_STRVAL_P(pzkey), 0);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        ZVAL_BOOL(return_value, 1);
+    }
+    else if(Z_TYPE_P(pzkey) == IS_ARRAY)
+    {
+        array_init(return_value);
+        htable = Z_ARRVAL_P(pzkey);
+        zend_hash_internal_pointer_reset_ex(htable, &hposition);
+        while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
+        {
+            if(Z_TYPE_PP(hentry) != IS_STRING)
+            {
+                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string");
+
+                result = WARNING_ZVCACHE_ARGUMENT;
+                goto Finished;
+            }
+
+            result = zvcache_delete(WCG(zvcache), Z_STRVAL_PP(hentry), 0);
+            if(SUCCEEDED(result))
+            {
+                add_next_index_zval(return_value, *hentry);
+#ifndef PHP_VERSION_52
+                (*hentry)->refcount__gc++;
+#else
+                (*hentry)->refcount++;
+#endif
+            }
+
+            zend_hash_move_forward_ex(htable, &hposition);
+        }
+    }
+    else
+    {
+        _ASSERT(FALSE);
+    }
 
 Finished:
 
@@ -1871,8 +2095,6 @@ Finished:
 
         RETURN_FALSE;
     }
-
-    RETURN_TRUE;
 }
 
 PHP_FUNCTION(wincache_ucache_clear)
@@ -2060,6 +2282,7 @@ PHP_FUNCTION(wincache_ucache_info)
 
         add_assoc_string(zfentry, "key_name", peinfo->key, 1);
         add_assoc_string(zfentry, "value_type", valuetype, 1);
+        add_assoc_long(zfentry, "is_session", peinfo->issession);
         add_assoc_long(zfentry, "ttl_seconds", peinfo->ttl);
         add_assoc_long(zfentry, "age_seconds", peinfo->age);
         add_assoc_long(zfentry, "hitcount", peinfo->hitcount);

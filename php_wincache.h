@@ -78,7 +78,6 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     ocacheval_list *         oclisthead;  /* List of ocache_value entries in use */
     ocacheval_list *         oclisttail;  /* Tail of ocache_value entries list */
     unsigned int             lasterror;   /* Last error value */
-    HashTable *              zvcopied;    /* Values which are already copied for the request */
     unsigned int             zvlasterror; /* Last error value encountered by zvcache */
     unsigned int             parentpid;   /* Parent process identifier */
     filemap_global_context * fmapgdata;   /* Global data for filemap */

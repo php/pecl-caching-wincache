@@ -37,6 +37,7 @@
 1.1.0 release:
 - Added wincache user cache which can be used to store php values in cache.
 - Added wincache session handler. Now wincache user cache can be used to store session data.
+- Made behavior of user cache functions handle arrays and other key types.
   </notes>
   <contents>
     <dir name="/">

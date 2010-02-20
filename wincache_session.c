@@ -76,7 +76,7 @@ PS_READ_FUNC(wincache)
     MAKE_STD_ZVAL(pzval);
     ZVAL_NULL(pzval);
 
-    result = zvcache_get(WCG(zvcache), key, 1, &pzval);
+    result = zvcache_get(WCG(zvcache), key, 1, &pzval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -120,8 +120,8 @@ PS_WRITE_FUNC(wincache)
     MAKE_STD_ZVAL(pzval);
     ZVAL_STRING(pzval, val, 1);
 
-    /* issession = 1, ttl = 0, isadd = 0 */
-    result = zvcache_set(WCG(zvcache), key, 1, pzval, 0, 0);
+    /* issession = 1, ttl = session.gc_maxlifetime, isadd = 0 */
+    result = zvcache_set(WCG(zvcache), key, 1, pzval, INI_INT("session.gc_maxlifetime"), 0 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

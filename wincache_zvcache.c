@@ -49,14 +49,14 @@
 #define ZVALUE(pcopy, offset)        ((offset == 0) ? NULL : ((pcopy)->pbaseadr + (offset)))
 #define ZVCACHE_VALUE(p, o)          ((zvcache_value *)alloc_get_cachevalue(p, o))
 
-static int  copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * poriginal, zv_zval ** pcopied);
-static int  copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zval * pcopied, zval ** poriginal);
-static int  copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * poriginal, zv_HashTable ** pcopied);
-static int  copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucket * poriginal, zv_Bucket ** pcopied);
-static int  copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, zv_HashTable * pcopied, HashTable ** poriginal);
-static int  copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_Bucket * pcopied, Bucket ** poriginal);
+static int  copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * poriginal, zv_zval ** pcopied TSRMLS_DC);
+static int  copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zval * pcopied, zval ** poriginal TSRMLS_DC);
+static int  copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * poriginal, zv_HashTable ** pcopied TSRMLS_DC);
+static int  copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucket * poriginal, zv_Bucket ** pcopied TSRMLS_DC);
+static int  copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, zv_HashTable * pcopied, HashTable ** poriginal TSRMLS_DC);
+static int  copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_Bucket * pcopied, Bucket ** poriginal TSRMLS_DC);
 static int  find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned char issession, unsigned int index, zvcache_value ** ppvalue);
-static int  create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue);
+static int  create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC);
 static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalue);
 static void add_zvcache_entry(zvcache_context * pcache, unsigned int index, zvcache_value * pvalue);
 static void remove_zvcache_entry(zvcache_context * pcache, unsigned int index, zvcache_value * pvalue);
@@ -66,7 +66,7 @@ static void run_zvcache_scavenger(zvcache_context * pcache);
 unsigned short gzvcacheid = 1;
 
 /* Private functions */
-static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * poriginal, zv_zval ** pcopied)
+static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * poriginal, zv_zval ** pcopied TSRMLS_DC)
 {
     /* TBD?? When zval is already copied only refcount need to be incremented */
     /* TBD?? If not already copied, copy to hashtable to keep track of copied ones */
@@ -186,11 +186,11 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * 
                 phashcopy->fnstrdup  = alloc_omstrdup;
                 phashcopy->fnfree    = alloc_omfree;
 
-                result = copyin_hashtable(pcache, phashcopy, poriginal->value.ht, &phashtable);
+                result = copyin_hashtable(pcache, phashcopy, poriginal->value.ht, &phashtable TSRMLS_CC);
             }
             else
             {
-                result = copyin_hashtable(pcache, pcopy, poriginal->value.ht, &phashtable);
+                result = copyin_hashtable(pcache, pcopy, poriginal->value.ht, &phashtable TSRMLS_CC);
             }
 
             if(FAILED(result))
@@ -205,8 +205,6 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * 
 
         case IS_OBJECT:
             /* Serialize object and store in string */
-            TSRMLS_FETCH();
-
             PHP_VAR_SERIALIZE_INIT(serdata);
             php_var_serialize(&smartstr, (zval **)&poriginal, &serdata TSRMLS_CC);
             PHP_VAR_SERIALIZE_DESTROY(serdata);
@@ -278,7 +276,7 @@ Finished:
     return result;
 }
 
-static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zval * pcopied, zval ** poriginal)
+static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zval * pcopied, zval ** poriginal TSRMLS_DC)
 {
     int                    result     = NONFATAL;
     zval *                 pnewzv     = NULL;
@@ -367,7 +365,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zva
 
         case IS_ARRAY:
         case IS_CONSTANT_ARRAY:
-            result = copyout_hashtable(pcache, pcopy, (zv_HashTable *)ZVALUE(pcopy, pcopied->value.ht.val), &phashtable);
+            result = copyout_hashtable(pcache, pcopy, (zv_HashTable *)ZVALUE(pcopy, pcopied->value.ht.val), &phashtable TSRMLS_CC);
             if(FAILED(result))
             {
                 goto Finished;
@@ -378,8 +376,6 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, zv_zva
 
         case IS_OBJECT:
             /* Deserialize stored data to produce object */
-            TSRMLS_FETCH();
-
             pnewzv->type = IS_NULL;
             pbuffer = ZVALUE(pcopy, pcopied->value.str.val);
 
@@ -430,7 +426,7 @@ Finished:
     return result;
 }
 
-static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * poriginal, zv_HashTable ** pcopied)
+static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * poriginal, zv_HashTable ** pcopied TSRMLS_DC)
 {
     int            result    = NONFATAL;
     int            allocated = 0;
@@ -511,7 +507,7 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
         ptemp = NULL;
 
         /* Copy bucket containing zval_ref */
-        result = copyin_bucket(pcache, pcopy, pbucket, &ptemp);
+        result = copyin_bucket(pcache, pcopy, pbucket, &ptemp TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
@@ -578,7 +574,7 @@ Finished:
     return result;
 }
 
-static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucket * poriginal, zv_Bucket ** pcopied)
+static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucket * poriginal, zv_Bucket ** pcopied TSRMLS_DC)
 {
     int         result    = NONFATAL;
     zv_Bucket * pnewb     = NULL;
@@ -635,7 +631,7 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucke
 
     *pbuffer = 0;
 
-    result = copyin_zval(pcache, pcopy, *((zval **)poriginal->pData), &pzval);
+    result = copyin_zval(pcache, pcopy, *((zval **)poriginal->pData), &pzval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -678,7 +674,7 @@ Finished:
     return result;
 }
 
-static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, zv_HashTable * pcopied, HashTable ** poriginal)
+static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, zv_HashTable * pcopied, HashTable ** poriginal TSRMLS_DC)
 {
     int           result    = NONFATAL;
     int           allocated = 0;
@@ -760,7 +756,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, z
         ptemp = NULL;
 
         /* Copy bucket containing zval_ref */
-        result = copyout_bucket(pcache, pcopy, pbucket, &ptemp);
+        result = copyout_bucket(pcache, pcopy, pbucket, &ptemp TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
@@ -822,7 +818,7 @@ Finished:
     return result;
 }
 
-static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_Bucket * pcopied, Bucket ** poriginal)
+static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_Bucket * pcopied, Bucket ** poriginal TSRMLS_DC)
 {
     int       result    = NONFATAL;
     Bucket *  pnewb     = NULL;
@@ -880,7 +876,7 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_B
 
     *pbuffer = NULL;
 
-    result = copyout_zval(pcache, pcopy, (zv_zval *)ZVALUE(pcopy, *((size_t *)ZVALUE(pcopy, pcopied->pData))), &pzval);
+    result = copyout_zval(pcache, pcopy, (zv_zval *)ZVALUE(pcopy, *((size_t *)ZVALUE(pcopy, pcopied->pData))), &pzval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -982,7 +978,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
     return result;
 }
 
-static int create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue)
+static int create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC)
 {
     int              result  = NONFATAL;
     zvcache_value *  pvalue  = NULL;
@@ -1002,7 +998,8 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, unsig
     pcopy = pcache->incopy;
 
     keylen = strlen(key) + 1;
-    
+    _ASSERT(keylen < 4098);
+
     pvalue = (zvcache_value *)ZMALLOC(pcopy, sizeof(zvcache_value) + keylen);
     if(FAILED(result))
     {
@@ -1012,14 +1009,14 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, unsig
     memset(pvalue, 0, sizeof(zvcache_value) + keylen);
     memcpy_s((char *)pvalue + sizeof(zvcache_value), keylen, key, keylen);
 
-    result = copyin_zval(pcache, pcopy, pzval, &pcopied);
+    result = copyin_zval(pcache, pcopy, pzval, &pcopied TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     pvalue->keystr     = ZOFFSET(pcopy, pvalue) + sizeof(zvcache_value);
-    pvalue->keylen     = keylen - 1;
+    pvalue->keylen     = (unsigned short)(keylen - 1);
     pvalue->zvalue     = ZOFFSET(pcopy, pcopied);
     pvalue->issession  = issession;
     pvalue->add_ticks  = GetTickCount();
@@ -1256,17 +1253,17 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
 
             /* Remove the entry from cache if its expired */
             ticks = GetTickCount();
-            if(ticks >= pvalue->add_ticks)
+            if(ticks >= ptemp->add_ticks)
             {
-                ticks -= pvalue->add_ticks;
+                ticks -= ptemp->add_ticks;
             }
             else
             {
-                ticks = (DWORD_MAX - pvalue->add_ticks) + ticks;
+                ticks = (DWORD_MAX - ptemp->add_ticks) + ticks;
             }
 
             ticks /= 1000;
-            if(ticks >= pvalue->ttlive)
+            if(ticks >= ptemp->ttlive)
             {
                 remove_zvcache_entry(pcache, sindex, ptemp);
                 ptemp = NULL;
@@ -1599,7 +1596,7 @@ void zvcache_terminate(zvcache_context * pcache)
     return;
 }
 
-int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issession, zval ** pvalue)
+int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issession, zval ** pvalue TSRMLS_DC)
 {
     int              result  = NONFATAL;
     unsigned int     index   = 0;
@@ -1654,7 +1651,7 @@ int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issess
     pentry->use_ticks = GetTickCount();
     pcopied = (zv_zval *)ZVALUE(pcache->incopy, pentry->zvalue);
 
-    result = copyout_zval(pcache, pcache->outcopy, pcopied, pvalue);
+    result = copyout_zval(pcache, pcache->outcopy, pcopied, pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1681,7 +1678,7 @@ Finished:
     return result;
 }
 
-int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, unsigned char isadd)
+int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC)
 {
     int             result  = NONFATAL;
     unsigned int    index   = 0;
@@ -1743,7 +1740,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issess
     }
 
     /* If entry wasn't found or set was called, create new data */
-    result = create_zvcache_data(pcache, key, issession, pzval, ttl, &pnewval);
+    result = create_zvcache_data(pcache, key, issession, pzval, ttl, &pnewval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2029,7 +2026,7 @@ int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * p
         }
 
         pvalue = ZVCACHE_VALUE(palloc, header->values[index]);
-        while(pvalue != NULL && pvalue->issession == 0)
+        while(pvalue != NULL)
         {
             pinfo.key = alloc_estrdup(ZVALUE(pcache->incopy, pvalue->keystr));
             if(pinfo.key == NULL)
@@ -2052,10 +2049,11 @@ int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * p
             /* Convert to seconds */
             ticks = ticks / 1000;
 
-            pinfo.ttl      = pvalue->ttlive;
-            pinfo.age      = ticks;
-            pinfo.type     = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
-            pinfo.hitcount = pvalue->hitcount;
+            pinfo.ttl       = pvalue->ttlive;
+            pinfo.age       = ticks;
+            pinfo.type      = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
+            pinfo.issession = pvalue->issession;
+            pinfo.hitcount  = pvalue->hitcount;
 
             zend_llist_add_element(plist, &pinfo);
             pvalue = ZVCACHE_VALUE(palloc, pvalue->next_value);
