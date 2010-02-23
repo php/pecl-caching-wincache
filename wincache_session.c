@@ -118,7 +118,7 @@ PS_WRITE_FUNC(wincache)
     _ASSERT(val != NULL);
 
     MAKE_STD_ZVAL(pzval);
-    ZVAL_STRING(pzval, val, 1);
+    ZVAL_STRINGL(pzval, val, vallen, 0);
 
     /* issession = 1, ttl = session.gc_maxlifetime, isadd = 0 */
     result = zvcache_set(WCG(zvcache), key, 1, pzval, INI_INT("session.gc_maxlifetime"), 0 TSRMLS_CC);
