@@ -1613,6 +1613,8 @@ PHP_FUNCTION(wincache_ucache_get)
     zval **      hentry    = NULL;
     HashPosition hposition;
     zval *       nentry    = NULL;
+    char *       key       = NULL;
+    unsigned int keylen    = 0;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -1658,24 +1660,46 @@ PHP_FUNCTION(wincache_ucache_get)
         zend_hash_internal_pointer_reset_ex(htable, &hposition);
         while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
         {
-            if(Z_TYPE_PP(hentry) != IS_STRING)
+            if(Z_TYPE_PP(hentry) != IS_STRING && Z_TYPE_PP(hentry) != IS_LONG)
             {
-                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string");
+                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string or long");
 
                 result = WARNING_ZVCACHE_ARGUMENT;
                 goto Finished;
             }
 
+            if(Z_TYPE_PP(hentry) == IS_LONG)
+            {
+                spprintf(&key, 0, "%ld", Z_LVAL_PP(hentry));
+                keylen = strlen(key);
+            }
+            else
+            {
+                _ASSERT(Z_TYPE_PP(hentry) == IS_STRING);
+
+                key = Z_STRVAL_PP(hentry);
+                keylen = Z_STRLEN_PP(hentry);
+            }
+
             MAKE_STD_ZVAL(nentry);
-            result = zvcache_get(WCG(zvcache), Z_STRVAL_PP(hentry), 0, &nentry TSRMLS_CC);
+            result = zvcache_get(WCG(zvcache), key, 0, &nentry TSRMLS_CC);
 
             /* Ignore failures and try getting values of other keys */
             if(SUCCEEDED(result))
             {
-                zend_hash_add(Z_ARRVAL_P(return_value), Z_STRVAL_PP(hentry), Z_STRLEN_PP(hentry) + 1, &nentry, sizeof(zval *), NULL);
+                zend_hash_add(Z_ARRVAL_P(return_value), key, keylen + 1, &nentry, sizeof(zval *), NULL);
             }
 
+            if(Z_TYPE_PP(hentry) == IS_LONG && key != NULL)
+            {
+                efree(key);
+                key = NULL;
+            }
+
+            result = NONFATAL;
             nentry = NULL;
+            key    = NULL;
+            keylen = 0;
             zend_hash_move_forward_ex(htable, &hposition);
         }
     }
@@ -1805,9 +1829,9 @@ PHP_FUNCTION(wincache_ucache_set)
                 keylen = strlen(key);
             }
 
-            if(key)
+            if(key && *key != '\0')
             {
-                if(keylen > 4096)
+                if(keylen > 4096 || Z_TYPE_PP(hentry) == IS_RESOURCE)
                 {
                     result = WARNING_ZVCACHE_ARGUMENT;
                 }
@@ -1833,6 +1857,7 @@ PHP_FUNCTION(wincache_ucache_set)
                 add_index_long(return_value, longkey, -1);
             }
 
+            result  = NONFATAL;
             key     = NULL;
             keylen  = 0;
             longkey = 0;
@@ -1944,6 +1969,8 @@ PHP_FUNCTION(wincache_ucache_add)
         zend_hash_internal_pointer_reset_ex(htable, &hposition);
         while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
         {
+            zend_hash_get_current_key_ex(htable, &key, &keylen, &longkey, 0, &hposition);
+
             /* We are taking care of long keys properly */
             if(!key && longkey != 0)
             {
@@ -1952,9 +1979,9 @@ PHP_FUNCTION(wincache_ucache_add)
                 keylen = strlen(key);
             }
 
-            if(key)
+            if(key && *key != '\0')
             {
-                if(keylen > 4096)
+                if(keylen > 4096 || Z_TYPE_PP(hentry) == IS_RESOURCE)
                 {
                     result = WARNING_ZVCACHE_ARGUMENT;
                 }
@@ -1980,6 +2007,7 @@ PHP_FUNCTION(wincache_ucache_add)
                 add_index_long(return_value, longkey, -1);
             }
 
+            result  = NONFATAL;
             key     = NULL;
             keylen  = 0;
             longkey = 0;
@@ -2016,6 +2044,8 @@ PHP_FUNCTION(wincache_ucache_delete)
     HashTable *   htable   = NULL;
     HashPosition  hposition;
     zval **       hentry   = NULL;
+    char *        key      = NULL;
+    unsigned int  keylen   = 0;
 
     /* If user cache is enabled, return false */
     if(!WCG(zvenabled))
@@ -2057,15 +2087,28 @@ PHP_FUNCTION(wincache_ucache_delete)
         zend_hash_internal_pointer_reset_ex(htable, &hposition);
         while(zend_hash_get_current_data_ex(htable, (void **)&hentry, &hposition) == SUCCESS)
         {
-            if(Z_TYPE_PP(hentry) != IS_STRING)
+            if(Z_TYPE_PP(hentry) != IS_STRING && Z_TYPE_PP(hentry) != IS_LONG)
             {
-                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string");
+                php_error_docref(NULL TSRMLS_CC, E_WARNING, "key array elements can only be string or long");
 
                 result = WARNING_ZVCACHE_ARGUMENT;
                 goto Finished;
             }
 
-            result = zvcache_delete(WCG(zvcache), Z_STRVAL_PP(hentry), 0);
+            if(Z_TYPE_PP(hentry) == IS_LONG)
+            {
+                spprintf(&key, 0, "%ld", Z_LVAL_PP(hentry));
+                keylen = strlen(key);
+            }
+            else
+            {
+                _ASSERT(Z_TYPE_PP(hentry) == IS_STRING);
+
+                key = Z_STRVAL_PP(hentry);
+                keylen = Z_STRLEN_PP(hentry);
+            }
+
+            result = zvcache_delete(WCG(zvcache), key, 0);
             if(SUCCEEDED(result))
             {
                 add_next_index_zval(return_value, *hentry);
@@ -2076,6 +2119,14 @@ PHP_FUNCTION(wincache_ucache_delete)
 #endif
             }
 
+            if(Z_TYPE_PP(hentry) == IS_LONG && key != NULL)
+            {
+                efree(key);
+                key = NULL;
+            }
+
+            key    = NULL;
+            keylen = 0;
             zend_hash_move_forward_ex(htable, &hposition);
         }
     }
@@ -2491,6 +2542,11 @@ Finished:
 
     if(FAILED(result))
     {
+        if(result == WARNING_ZVCACHE_CASNEQ)
+        {
+            RETURN_FALSE;
+        }
+
         WCG(zvlasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_cas", result);

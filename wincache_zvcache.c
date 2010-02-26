@@ -68,8 +68,6 @@ unsigned short gzvcacheid = 1;
 /* Private functions */
 static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, zval * poriginal, zv_zval ** pcopied TSRMLS_DC)
 {
-    /* TBD?? When zval is already copied only refcount need to be incremented */
-    /* TBD?? If not already copied, copy to hashtable to keep track of copied ones */
     int                  result     = NONFATAL;
     zv_zval *            pnewzv     = NULL;
     int                  allocated  = 0;
@@ -1131,10 +1129,7 @@ static void add_zvcache_entry(zvcache_context * pcache, unsigned int index, zvca
         pvalue->prev_value = 0;
     }
 
-    if(!pvalue->issession)
-    {
-        header->itemcount++;
-    }
+    header->itemcount++;
 
     dprintverbose("end add_zvcache_entry");
 
@@ -1158,10 +1153,7 @@ static void remove_zvcache_entry(zvcache_context * pcache, unsigned int index, z
     header  = pcache->zvheader;
 
     /* Decrement itemcount and remove entry from hashtable */
-    if(!pvalue->issession)
-    {
-        header->itemcount--;
-    }
+    header->itemcount--;
 
     if(pvalue->prev_value == 0)
     {
@@ -1623,25 +1615,18 @@ int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issess
         goto Finished;
     }
 
-    /* Adjust overall cache hitcount/misscount and entry */
-    /* hitcount for non-session lookups */
+    /* Adjust overall cache hitcount/misscount and entry hitcount */
     if(pentry == NULL)
     {
-        if(!issession)
-        {
-            InterlockedIncrement(&header->misscount);
-        }
+        InterlockedIncrement(&header->misscount);
 
         result = WARNING_ZVCACHE_EMISSING;
         goto Finished;
     }
     else
     {
-        if(!issession)
-        {
-            InterlockedIncrement(&pentry->hitcount);
-            InterlockedIncrement(&header->hitcount);
-        }
+        InterlockedIncrement(&pentry->hitcount);
+        InterlockedIncrement(&header->hitcount);
     }
 
     /* Entry found. copyout to local memory */
@@ -2190,6 +2175,11 @@ int zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue,
     if(pzval->value.lval == oldvalue)
     {
         pzval->value.lval = newvalue;
+    }
+    else
+    {
+	result = WARNING_ZVCACHE_CASNEQ;
+	goto Finished;
     }
 
     _ASSERT(SUCCEEDED(result));

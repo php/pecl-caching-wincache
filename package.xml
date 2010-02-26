@@ -39,6 +39,7 @@
 - Added wincache session handler. Now wincache user cache can be used to store session data.
 - Made behavior of user cache functions handle arrays and other key types.\
 - Fixed a bug in session handler to make it work for SugarCRM.
+- Fixed inconsistencies in wincache_ucache APIs. Included session entries lookups in hit/miss counts.
   </notes>
   <contents>
     <dir name="/">
