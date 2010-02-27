@@ -40,6 +40,7 @@
 - Made behavior of user cache functions handle arrays and other key types.\
 - Fixed a bug in session handler to make it work for SugarCRM.
 - Fixed inconsistencies in wincache_ucache APIs. Included session entries lookups in hit/miss counts.
+- Updated the wincache.php page to show the informaiton about user and session cache.
   </notes>
   <contents>
     <dir name="/">

@@ -91,17 +91,21 @@ if ( USE_AUTHENTICATION == 1 ) {
 define('IMG_WIDTH', 320);
 define('IMG_HEIGHT', 220);
 define('SUMMARY_DATA', 1);
-define('OCACHE_DATA', 2);
-define('FCACHE_DATA', 3);
-define('RCACHE_DATA', 4);
+define('OCACHE_DATA', 2); // Opcode cache
+define('FCACHE_DATA', 3); // File cache
+define('UCACHE_DATA', 4); // User cache
+define('RCACHE_DATA', 5); // Resolve file cache
 define('BAR_CHART', 1);
 define('PIE_CHART', 2);
 define('PATH_MAX_LENGTH', 45);
 define('INI_MAX_LENGTH', 45);
 define('SUBKEY_MAX_LENGTH', 90);
 
+// Check if the current version of WinCache supports user cache
+$ucache_available = function_exists('wincache_ucache_info');
+
 // WinCache settings that are used for debugging purposes
-$settings_to_hide = array( 'wincache.localheap', 'wincache.debuglevel' );
+$settings_to_hide = array( 'wincache.localheap', 'wincache.debuglevel', 'wincache.olocaltest' );
 
 // Input parameters check
 $PHP_SELF = isset( $_SERVER['PHP_SELF'] ) ? htmlentities( strip_tags( $_SERVER['PHP_SELF'],'' ), ENT_QUOTES, 'UTF-8' ) : '';
@@ -112,7 +116,7 @@ if ( !is_numeric( $page ) || $page < SUMMARY_DATA || $page > RCACHE_DATA )
 $img = 0;
 if ( isset( $_GET['img'] ) && is_numeric( $_GET['img'] ) ) {
     $img = $_GET['img'];
-    if ( $img < OCACHE_DATA || $img > FCACHE_DATA)
+    if ( $img < OCACHE_DATA || $img > UCACHE_DATA)
         $img = 0;
 }
 $chart_type = BAR_CHART;
@@ -147,6 +151,8 @@ $fcache_file_info = null;
 $fcache_summary_info = null;
 $rpcache_mem_info = null;
 $rpcache_file_info = null;
+$ucache_mem_info = null;
+$ucache_info = null;
 $sort_key = null;
 
 function cmp($a, $b)
@@ -493,7 +499,17 @@ if ( $img > 0 ) {
             else{
                 $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'File Cache Hits & Misses (in %)' );
            }
+           break;
         }
+        case UCACHE_DATA: {
+            if ( $chart_type == PIE_CHART ){
+                $image = create_used_free_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'Memory Usage by User Cache (in %)' );
+            }
+            else{
+                $image = create_hit_miss_chart( IMG_WIDTH, IMG_HEIGHT,  $chart_param1, $chart_param2, 'User Cache Hits & Misses (in %)' );
+           }
+        }
+        
     }
 
     if ( $image !== null ) {
@@ -516,6 +532,8 @@ function get_chart_markup( $data_type, $chart_type, $chart_param1, $chart_param2
             $alt_title = 'Opcode cache ';
         elseif ( $data_type == FCACHE_DATA )
             $alt_title = "File cache ";
+        elseif ( $data_type == UCACHE_DATA )
+            $atl_title = "User and Session cache";
         else 
             return '';
 
@@ -552,7 +570,10 @@ function init_cache_info( $cache_type = SUMMARY_DATA )
             $fcache_file_info,
             $fcache_summary_info,
             $rpcache_mem_info,
-            $rpcache_file_info;
+            $rpcache_file_info,
+            $ucache_mem_info,
+            $ucache_info,
+            $ucache_available;
 
     if ( $cache_type == SUMMARY_DATA || $cache_type == OCACHE_DATA ) {
         $ocache_mem_info = wincache_ocache_meminfo();
@@ -567,6 +588,10 @@ function init_cache_info( $cache_type = SUMMARY_DATA )
     if ( $cache_type == SUMMARY_DATA || $cache_type == RCACHE_DATA ){
         $rpcache_mem_info = wincache_rplist_meminfo();
         $rpcache_file_info = wincache_rplist_fileinfo();
+    }
+    if ( $ucache_available && ( $cache_type == SUMMARY_DATA || $cache_type == UCACHE_DATA ) ){
+        $ucache_mem_info = wincache_ucache_meminfo();
+        $ucache_info = wincache_ucache_info();
     }
 }
 
@@ -720,6 +745,7 @@ th {
             <li <?php echo ($page == SUMMARY_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', SUMMARY_DATA; ?>">Summary</a></li>
             <li <?php echo ($page == OCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', OCACHE_DATA; ?>">Opcode Cache</a></li>
             <li <?php echo ($page == FCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', FCACHE_DATA; ?>">File System Cache</a></li>
+            <li <?php echo ($page == UCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', UCACHE_DATA; ?>">User and Session Cache</a></li>
             <li <?php echo ($page == RCACHE_DATA)? 'class="selected"' : ''; ?>><a href="<?php echo $PHP_SELF, '?page=', RCACHE_DATA; ?>">Resolve Path Cache</a></li>
         </ul>
     </div>
@@ -754,7 +780,7 @@ th {
                 </tr>
                 <tr>
                     <td class="e">Operating System</td>
-                    <td class="v"><?php echo php_uname( 's' ), ' ', php_uname( 'r' ), ' ', php_uname( 'v' ); ?></td>
+                    <td class="v"><?php echo php_uname( 's' ), ' ', php_uname( 'r' ); ?></td>
                 </tr>
                   <tr>
                     <td class="e">Processor information</td>
@@ -772,6 +798,22 @@ th {
                     <td class="e">Host name</td>
                     <td class="v"><?php echo isset( $_SERVER['HTTP_HOST'] ) ? $_SERVER['HTTP_HOST'] : 'Not set'; ?></td>
                 </tr>
+                <tr>
+                    <td class="e">PHP session handler</td>
+                    <td class="v"><?php echo ini_get( 'session.save_handler' ); ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Application Pool ID</td>
+                    <td class="v"><?php echo (getenv( 'APP_POOL_ID' ) != FALSE) ? getenv( 'APP_POOL_ID') : 'Not available'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Site ID</td>
+                    <td class="v"><?php echo isset( $_SERVER['INSTANCE_ID'] ) ? $_SERVER['INSTANCE_ID'] : 'Not available'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">FastCGI impersonation</td>
+                    <td class="v"><?php echo (ini_get( 'fastcgi.impersonate' ) === '1') ? 'enabled' : 'disabled'; ?></td>
+                </tr>
             </table>
         </div>
         <div class="widerightpanel">
@@ -782,7 +824,7 @@ th {
 <?php 
 foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     // Do not show the settings used for debugging
-    if ( in_array( $ini_name, $settings_to_hide ) ) 
+    if ( in_array( $ini_name, $settings_to_hide ) )
         continue;
     echo '<tr title="', $ini_value['local_value'], '"><td class="e">', $ini_name, '</td><td class="v">';
     if ( !is_numeric( $ini_value['local_value'] ) )
@@ -811,7 +853,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>          
                 <tr>
                     <td class="e">Cached files</td>
-                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=2#filelist'; ?>"><?php echo $ocache_file_info['total_file_count']; ?></a></td>
+                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', OCACHE_DATA, '#filelist'; ?>"><?php echo $ocache_file_info['total_file_count']; ?></a></td>
                 </tr>
                 <tr>
                     <td class="e">Hits</td>
@@ -862,7 +904,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>                
                 <tr>
                     <td class="e">Cached files</td>
-                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=3#filelist'; ?>"><?php echo $fcache_file_info['total_file_count']; ?></a></td>
+                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', FCACHE_DATA, '#filelist'; ?>"><?php echo $fcache_file_info['total_file_count']; ?></a></td>
                 </tr>
                 <tr>
                     <td class="e">Total files size</td>
@@ -898,6 +940,55 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         </div>
     </div>
     <div class="overview">
+        <?php if ( $ucache_available ) {?>
+        <div class="leftpanel extra_margin">
+            <table style="width: 100%">
+                <tr>
+                    <th colspan="2">User and Session Cache Overview</th>
+                </tr>
+                <tr>
+                    <td class="e">Cache scope</td>
+                    <td class="v"><?php echo ( isset( $ucache_info['is_local_cache'] ) ) ? cache_scope_text( $ucache_info['is_local_cache'] ) : 'Unknown'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $ucache_info['total_cache_uptime'] ) ) ? seconds_to_words( $ucache_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>                
+                <tr>
+                    <td class="e">Cached entries</td>
+                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', UCACHE_DATA, '#filelist'; ?>"><?php echo $ucache_info['total_item_count']; ?></a></td>
+                </tr>
+                <tr>
+                    <td class="e">Hits</td>
+                    <td class="v"><?php echo $ucache_info['total_hit_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Misses</td>
+                    <td class="v"><?php echo $ucache_info['total_miss_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_total'] ); ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Available memory</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_free'] ); ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Memory overhead</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_overhead'] ); ?></td>
+                </tr>
+            </table> 
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( UCACHE_DATA, BAR_CHART, $ucache_info['total_hit_count'], $ucache_info['total_miss_count'] ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( UCACHE_DATA, PIE_CHART, $ucache_mem_info['memory_total'] - $ucache_mem_info['memory_free'], $ucache_mem_info['memory_free'] ); ?>
+        </div>
+        <?php } ?>
+    </div>
+    <div class="overview">
         <div class="leftpanel">
             <table style="width: 100%">
                 <tr>
@@ -905,7 +996,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>
                 <tr>
                     <td class="e">Cached entries</td>
-                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=4#filelist'; ?>"><?php echo $rpcache_file_info['total_file_count'] ?></a></td>
+                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', RCACHE_DATA, '#filelist'; ?>"><?php echo $rpcache_file_info['total_file_count']; ?></a></td>
                 </tr>
                 <tr>
                     <td class="e">Total memory</td>
@@ -1090,7 +1181,116 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
 ?>
         </table>
     </div>
-
+<?php } else if ( $page == UCACHE_DATA ) {
+    if ( $ucache_available ) { 
+        init_cache_info( UCACHE_DATA );
+?>
+    <div class="overview">
+        <div class="leftpanel extra_margin">
+            <table style="width: 100%">
+                <tr>
+                    <th colspan="2">User and Session Cache Overview</th>
+                </tr>
+                <tr>
+                    <td class="e">Cache scope</td>
+                    <td class="v"><?php echo ( isset( $ucache_info['is_local_cache'] ) ) ? cache_scope_text( $ucache_info['is_local_cache'] ) : 'Unknown'; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Cache uptime</td>
+                    <td class="v"><?php echo ( isset( $ucache_info['total_cache_uptime'] ) ) ? seconds_to_words( $ucache_info['total_cache_uptime'] ) : 'Unknown'; ?></td>
+                </tr>                
+                <tr>
+                    <td class="e">Cached entries</td>
+                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', UCACHE_DATA, '#filelist'; ?>"><?php echo $ucache_info['total_item_count']; ?></a></td>
+                </tr>
+                <tr>
+                    <td class="e">Hits</td>
+                    <td class="v"><?php echo $ucache_info['total_hit_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Misses</td>
+                    <td class="v"><?php echo $ucache_info['total_miss_count']; ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Total memory</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_total'] ); ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Available memory</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_free'] ); ?></td>
+                </tr>
+                <tr>
+                    <td class="e">Memory overhead</td>
+                    <td class="v"><?php echo convert_bytes_to_string( $ucache_mem_info['memory_overhead'] ); ?></td>
+                </tr>
+            </table> 
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( UCACHE_DATA, BAR_CHART, $ucache_info['total_hit_count'], $ucache_info['total_miss_count'] ); ?>
+        </div>
+        <div class="rightpanel">
+            <?php echo get_chart_markup( UCACHE_DATA, PIE_CHART, $ucache_mem_info['memory_total'] - $ucache_mem_info['memory_free'], $ucache_mem_info['memory_free'] ); ?>
+        </div>
+    </div>
+    <div class="list" id="filelist">
+        <table style="width:100%">
+            <tr>
+                <th colspan="5">User cache entries</th>
+            </tr>
+            <tr>
+                <th title="Object Key Name">Key name</th>
+                <th title="Type of the object stored">Value type</th>
+                <th title="Total amount of time in seconds which remains until the object is removed from the cache">Total TTL</th>
+                <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
+                <th title="Number of times the object has been served from the cache">Hit Count</th>
+        </tr>
+<?php 
+    foreach ( $ucache_info['ucache_entries'] as $entry ) {
+        // Skip all the entries that are session objects
+        if ( $entry['is_session'] == '1') continue;
+        echo '<tr title="', $entry['key_name'] ,'">', "\n";
+        echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
+        echo '<td class="v">', $entry['value_type'], '</td>', "\n";
+        echo '<td class="v">', $entry['ttl_seconds'],'</td>', "\n";
+        echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
+        echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
+        echo "</tr>\n";
+    }
+?>
+        </table>
+    </div>
+    <div class="list" id="sessionlist">
+        <table style="width:100%">
+            <tr>
+                <th colspan="5">Session cache entries</th>
+            </tr>
+            <tr>
+                <th title="Object Key Name">Key name</th>
+                <th title="Type of the object stored">Value type</th>
+                <th title="Total amount of time in seconds which remains until the object is removed from the cache">Total TTL</th>
+                <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
+                <th title="Number of times the object has been served from the cache">Hit Count</th>
+        </tr>
+<?php 
+    foreach ( $ucache_info['ucache_entries'] as $entry ) {
+        // Skip all the entries that are session objects
+        if ( $entry['is_session'] == '0') continue;
+        echo '<tr title="', $entry['key_name'] ,'">', "\n";
+        echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
+        echo '<td class="v">', $entry['value_type'], '</td>', "\n";
+        echo '<td class="v">', $entry['ttl_seconds'],'</td>', "\n";
+        echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
+        echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
+        echo "</tr>\n";
+    }
+?>
+        </table>
+    </div>
+<?php } else { ?>
+    <div class="overview">
+        <p class="notice">This build of WinCache extension does not support User and Session Cache functionality. Upgrade to the latest stable build of WinCache.</p>
+    </div>
+<?php }?>
 <?php } else if ( $page == RCACHE_DATA ) {
     init_cache_info( RCACHE_DATA );
 ?>
