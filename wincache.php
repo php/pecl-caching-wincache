@@ -100,6 +100,7 @@ define('PIE_CHART', 2);
 define('PATH_MAX_LENGTH', 45);
 define('INI_MAX_LENGTH', 45);
 define('SUBKEY_MAX_LENGTH', 90);
+define('UCACHE_MAX_ENTRY', 500);
 
 // Check if the current version of WinCache supports user cache
 $ucache_available = function_exists('wincache_ucache_info');
@@ -1244,10 +1245,14 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
                 <th title="Number of times the object has been served from the cache">Hit Count</th>
         </tr>
-<?php 
+<?php
+    $count = 0;
     foreach ( $ucache_info['ucache_entries'] as $entry ) {
         // Skip all the entries that are session objects
         if ( $entry['is_session'] == '1') continue;
+        $count++;
+        if ($count == UCACHE_MAX_ENTRY)
+            break;
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
@@ -1272,9 +1277,13 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 <th title="Number of times the object has been served from the cache">Hit Count</th>
         </tr>
 <?php 
+    $count = 0;
     foreach ( $ucache_info['ucache_entries'] as $entry ) {
         // Skip all the entries that are session objects
         if ( $entry['is_session'] == '0') continue;
+        $count++;
+        if ($count == UCACHE_MAX_ENTRY)
+            break;
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
