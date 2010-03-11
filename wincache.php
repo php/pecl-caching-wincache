@@ -100,7 +100,7 @@ define('PIE_CHART', 2);
 define('PATH_MAX_LENGTH', 45);
 define('INI_MAX_LENGTH', 45);
 define('SUBKEY_MAX_LENGTH', 90);
-define('UCACHE_MAX_ENTRY', 500);
+define('UCACHE_MAX_ENTRY', 250);
 
 // Check if the current version of WinCache supports user cache
 $ucache_available = function_exists('wincache_ucache_info');
@@ -141,6 +141,13 @@ if ( isset( $_GET['p2'] ) && is_numeric( $_GET['p2'] ) ) {
         $chart_param2 = 0;
     else if ( $chart_param2 > PHP_INT_MAX )
         $chart_param2 = PHP_INT_MAX;
+}
+
+$show_all_ucache_entries = 0;
+if ( isset( $_GET['all'] ) && is_numeric( $_GET['all'] ) ) {
+    $show_all_ucache_entries = $_GET['all'];
+    if ( $show_all_ucache_entries < 0 || $show_all_ucache_entries > 1)
+        $show_all_ucache_entries = 0;
 }
 // End of input parameters check
 
@@ -1250,9 +1257,6 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     foreach ( $ucache_info['ucache_entries'] as $entry ) {
         // Skip all the entries that are session objects
         if ( $entry['is_session'] == '1') continue;
-        $count++;
-        if ($count == UCACHE_MAX_ENTRY)
-            break;
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
@@ -1260,6 +1264,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
         echo "</tr>\n";
+        if ($count++ > UCACHE_MAX_ENTRY && !$show_all_ucache_entries){
+            echo '<tr><td colspan="5"><a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
+            break;
+        }
     }
 ?>
         </table>
@@ -1279,11 +1287,8 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
 <?php 
     $count = 0;
     foreach ( $ucache_info['ucache_entries'] as $entry ) {
-        // Skip all the entries that are session objects
+        // Skip all the entries that are NOT session objects
         if ( $entry['is_session'] == '0') continue;
-        $count++;
-        if ($count == UCACHE_MAX_ENTRY)
-            break;
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
@@ -1291,6 +1296,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
         echo "</tr>\n";
+        if ($count++ > UCACHE_MAX_ENTRY && !$show_all_ucache_entries){
+            echo '<tr><td colspan="5"><a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
+            break;
+        }
     }
 ?>
         </table>

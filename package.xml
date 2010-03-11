@@ -34,13 +34,8 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-1.1.0 release:
-- Added wincache user cache which can be used to store php values in cache.
-- Added wincache session handler. Now wincache user cache can be used to store session data.
-- Made behavior of user cache functions handle arrays and other key types.\
-- Fixed a bug in session handler to make it work for SugarCRM.
-- Fixed inconsistencies in wincache_ucache APIs. Included session entries lookups in hit/miss counts.
-- Updated the wincache.php page to show the informaiton about user and session cache.
+1.1.0 RC release:
+- updated wincache.php to not show all user cache entries if the total number of entries exceeds 250
   </notes>
   <contents>
     <dir name="/">
@@ -104,14 +99,12 @@
     </version>
     <date>2010-03-04</date>
     <notes>
-- Fixed require_once on PHP5.3. If the files were absolute and similar files were included in different case, require_once was including it twice.
-- Changed relative path cache to act as resolve path cache. Incremented refcounts under aplist lock. Did comparison using InterlockedCompareExchange.
-- Fixed crashes which were happening because aplist refcount and opcode cache refcount can get out of sync due to local cache.
-- Exposed is_local_cache property from ocache_fileinfo and fcache_fileinfo. Stats page will use this to indicate when local opcode data is shown.
-- Updated the wincache.php to pass chart data on query string to ensure that the charts show the same data that is displayed in tables
-- Updated the wincache.php to show whether information about a global or local cache instance is being displayed
-- Changed variable names and comments to indicate rplist is resolve path cache and not just relative path cache
-- Changed wincache.php to use resolve_path instead of relative_path
+- Added wincache user cache which can be used to store php values in cache.
+- Added wincache session handler. Now wincache user cache can be used to store session data.
+- Made behavior of user cache functions handle arrays and other key types.
+- Fixed a bug in session handler to make it work for SugarCRM.
+- Fixed inconsistencies in wincache_ucache APIs. Included session entries lookups in hit/miss counts.
+- Updated the wincache.php page to show the informaiton about user and session cache.    
     </notes>
    </release>
    <release>
