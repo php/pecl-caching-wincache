@@ -97,7 +97,6 @@ struct zvcache_value
     size_t            zvalue;            /* Offset of zval value stored */
     size_t            keystr;            /* Offset of key string */
     unsigned short    keylen;            /* Length of key string */
-    unsigned short    issession;         /* If 1, this value is session data */
 
     unsigned int      add_ticks;         /* Tick count when entry was created */
     unsigned int      use_ticks;         /* Tick count when entry was last used */
@@ -143,7 +142,7 @@ struct zvcache_context
     unsigned short    id;                /* unique identifier for cache */
     unsigned short    islocal;           /* is the cache local or shared */
     HANDLE            hinitdone;         /* event indicating if memory is initialized */
-    unsigned int      maxsize;           /* maximum size of zval allowed in cache */
+    unsigned int      issession;         /* session cache or user cache */
 
     zvcopy_context *  incopy;            /* zvcopy context to use for non-array copyin */
     zvcopy_context *  outcopy;           /* zvcopy context to use for all copyout */
@@ -172,21 +171,20 @@ struct zvcache_info_entry
     unsigned int      ttl;               /* ttl of this entry */
     unsigned int      age;               /* Age in seconds */
     unsigned short    type;              /* type of zval which is stored as value */
-    unsigned short    issession;         /* Is the entry for session cache or not */
     unsigned int      hitcount;          /* hitcount for this entry */
 };
 
 extern int  zvcache_create(zvcache_context ** ppcache);
 extern void zvcache_destroy(zvcache_context * pcache);
-extern int  zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigned int zvcount, unsigned int cachesize TSRMLS_DC);
+extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
 extern void zvcache_terminate(zvcache_context * pcache);
 
-extern int  zvcache_get(zvcache_context * pcache, const char * key, unsigned char issession, zval ** pvalue TSRMLS_DC);
-extern int  zvcache_set(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC);
-extern int  zvcache_delete(zvcache_context * pcache, const char * key, unsigned char issession);
+extern int  zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRMLS_DC);
+extern int  zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC);
+extern int  zvcache_delete(zvcache_context * pcache, const char * key);
 extern int  zvcache_clear(zvcache_context * pcache);
-extern int  zvcache_exists(zvcache_context * pcache, const char * key, unsigned char issession, unsigned char * pexists);
-extern int  zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * plist);
+extern int  zvcache_exists(zvcache_context * pcache, const char * key, unsigned char * pexists);
+extern int  zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info * pcinfo, zend_llist * plist);
 extern int  zvcache_change(zvcache_context * pcache, const char * key, int delta, int * newvalue);
 extern int  zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue, int newvalue);
 

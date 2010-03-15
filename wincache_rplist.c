@@ -394,7 +394,8 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
         locktype = LOCK_TYPE_LOCAL;
     }
 
-    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, mapclass, mapsize TSRMLS_CC);
+    /* shmfilepath = NULL to create filemap on page file */
+    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, mapclass, mapsize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -410,7 +411,8 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->rpalloc, islocal, "RESPATHS_SEGMENT", pcache->rpfilemap->mapaddr, segsize TSRMLS_CC);
+    /* initmemory = 1 for all page file backed shared memory allocators */
+    result = alloc_initialize(pcache->rpalloc, islocal, "RESPATHS_SEGMENT", pcache->rpfilemap->mapaddr, segsize, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -719,7 +721,7 @@ void rplist_markdeleted(rplist_context * pcache, size_t valoffset)
     return;
 }
 
-int rplist_getinfo(rplist_context * pcache, rplist_info ** ppinfo)
+int rplist_getinfo(rplist_context * pcache, zend_bool summaryonly, rplist_info ** ppinfo)
 {
     int                  result  = NONFATAL;
     rplist_info *        pcinfo  = NULL;
@@ -751,7 +753,12 @@ int rplist_getinfo(rplist_context * pcache, rplist_info ** ppinfo)
     pcinfo->itemcount = pcache->rpheader->itemcount;
     pcinfo->entries   = NULL;
 
-    count = pcache->rpheader->valuecount;
+    /* Leave count to 0 if only summary is needed */
+    if(!summaryonly)
+    {
+        count = pcache->rpheader->valuecount;
+    }
+
     for(index = 0; index < count; index++)
     {
         offset = pcache->rpheader->values[index];

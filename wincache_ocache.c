@@ -126,7 +126,8 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
         pcache->islocal = islocal;
     }
 
-    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, mapclass, cachesize TSRMLS_CC);
+    /* shmfilepath = NULL */
+    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, mapclass, cachesize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -142,7 +143,8 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->palloc, islocal, "BYTECODE_SEGMENT", pcache->memaddr, size TSRMLS_CC);
+    /* initmemory = 1 for all page file backed shared memory allocators */
+    result = alloc_initialize(pcache->palloc, islocal, "BYTECODE_SEGMENT", pcache->memaddr, size, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

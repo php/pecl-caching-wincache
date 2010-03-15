@@ -55,8 +55,8 @@ static int  copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
 static int  copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Bucket * poriginal, zv_Bucket ** pcopied TSRMLS_DC);
 static int  copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, zv_HashTable * pcopied, HashTable ** poriginal TSRMLS_DC);
 static int  copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, zv_Bucket * pcopied, Bucket ** poriginal TSRMLS_DC);
-static int  find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned char issession, unsigned int index, zvcache_value ** ppvalue);
-static int  create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC);
+static int  find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned int index, zvcache_value ** ppvalue);
+static int  create_zvcache_data(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC);
 static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalue);
 static void add_zvcache_entry(zvcache_context * pcache, unsigned int index, zvcache_value * pvalue);
 static void remove_zvcache_entry(zvcache_context * pcache, unsigned int index, zvcache_value * pvalue);
@@ -916,7 +916,7 @@ Finished:
 }
 
 /* Call this method atleast under a read lock */
-static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned char issession, unsigned int index, zvcache_value ** ppvalue)
+static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned int index, zvcache_value ** ppvalue)
 {
     int              result = NONFATAL;
     zvcache_header * header = NULL;
@@ -936,7 +936,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
 
     while(pvalue != NULL)
     {
-        if(strcmp(pcache->zvmemaddr + pvalue->keystr, key) == 0 && pvalue->issession == issession)
+        if(strcmp(pcache->zvmemaddr + pvalue->keystr, key) == 0)
         {
             if(pvalue->ttlive > 0)
             {
@@ -976,7 +976,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
     return result;
 }
 
-static int create_zvcache_data(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC)
+static int create_zvcache_data(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue TSRMLS_DC)
 {
     int              result  = NONFATAL;
     zvcache_value *  pvalue  = NULL;
@@ -1016,7 +1016,6 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, unsig
     pvalue->keystr     = ZOFFSET(pcopy, pvalue) + sizeof(zvcache_value);
     pvalue->keylen     = (unsigned short)(keylen - 1);
     pvalue->zvalue     = ZOFFSET(pcopy, pcopied);
-    pvalue->issession  = issession;
     pvalue->add_ticks  = GetTickCount();
     pvalue->use_ticks  = GetTickCount();
 
@@ -1290,7 +1289,7 @@ int zvcache_create(zvcache_context ** ppcache)
     pcache->id          = gzvcacheid++;
     pcache->islocal     = 0;
     pcache->hinitdone   = NULL;
-    pcache->maxsize     = 0;
+    pcache->issession   = 0;
 
     pcache->incopy      = NULL;
     pcache->outcopy     = NULL;
@@ -1331,16 +1330,17 @@ void zvcache_destroy(zvcache_context * pcache)
     return;
 }
 
-int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigned int zvcount, unsigned int cachesize TSRMLS_DC)
+int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC)
 {
-    int              result   = NONFATAL;
-    size_t           segsize  = 0;
-    zvcache_header * header   = NULL;
+    int              result    = NONFATAL;
+    size_t           segsize   = 0;
+    zvcache_header * header    = NULL;
 
-    unsigned int    cticks   = 0;
-    unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
-    unsigned short  locktype = LOCK_TYPE_SHARED;
-    unsigned char   isfirst  = 1;
+    unsigned int    cticks     = 0;
+    unsigned short  mapclass   = FILEMAP_MAP_SRANDOM;
+    unsigned short  locktype   = LOCK_TYPE_SHARED;
+    unsigned char   isfirst    = 1;
+    unsigned int    initmemory = 0;
     char            evtname[   MAX_PATH];
 
     dprintverbose("start zvcache_initialize");
@@ -1348,6 +1348,8 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
     _ASSERT(pcache    != NULL);
     _ASSERT(zvcount   >= 128 && zvcount   <= 1024);
     _ASSERT(cachesize >= 2   && cachesize <= 64);
+
+    pcache->issession = issession;
 
     /* Initialize memory map to store file list */
     result = filemap_create(&pcache->zvfilemap);
@@ -1364,7 +1366,8 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
         pcache->islocal = islocal;
     }
 
-    result = filemap_initialize(pcache->zvfilemap, FILEMAP_TYPE_USERZVALS, mapclass, cachesize TSRMLS_CC);
+    /* If a shmfilepath is passed, use that to create filemap */
+    result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), mapclass, cachesize, shmfilepath TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1372,6 +1375,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
 
     pcache->zvmemaddr = (char *)pcache->zvfilemap->mapaddr;
     segsize = filemap_getsize(pcache->zvfilemap TSRMLS_CC);
+    initmemory = (pcache->zvfilemap->existing == 0);
 
     /* Create allocator for file list segment */
     result = alloc_create(&pcache->zvalloc);
@@ -1380,14 +1384,14 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->zvalloc, islocal, "USERZVALS_SEGMENT", pcache->zvfilemap->mapaddr, segsize TSRMLS_CC);
+    result = alloc_initialize(pcache->zvalloc, islocal, ((issession) ? "SESSZVALS_SEGMENT" : "USERZVALS_SEGMENT"), pcache->zvfilemap->mapaddr, segsize, initmemory TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     /* Get memory for cache header */
-    pcache->zvheader = (zvcache_header *)alloc_get_cacheheader(pcache->zvalloc, zvcount, CACHE_TYPE_USERZVALS);
+    pcache->zvheader = (zvcache_header *)alloc_get_cacheheader(pcache->zvalloc, zvcount, ((issession) ? CACHE_TYPE_SESSZVALS : CACHE_TYPE_USERZVALS));
     if(pcache->zvheader == NULL)
     {
         result = FATAL_ZVCACHE_INITIALIZE;
@@ -1403,7 +1407,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
         goto Finished;
     }
 
-    result = lock_initialize(pcache->zvrwlock, "USERZVALS_CACHE", 0, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->zvrwlock, ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE"), 0, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1435,25 +1439,28 @@ int zvcache_initialize(zvcache_context * pcache, unsigned short islocal, unsigne
     /* Initialize the zvcache_header if this is the first process */
     if(islocal || isfirst)
     {
-        /* No need to get a write lock as other processes */
-        /* are blocked waiting for hinitdone event */
+        if(initmemory)
+        {
+            /* No need to get a write lock as other processes */
+            /* are blocked waiting for hinitdone event */
 
-        cticks = GetTickCount();
+            cticks = GetTickCount();
 
-        /* We can set rdcount to 0 safely as other processes are */
-        /* blocked and this process is right now not using lock */
-        header->mapcount     = 1;
-        header->hitcount     = 0;
-        header->misscount    = 0;
-        header->init_ticks   = cticks;
-        header->rdcount      = 0;
+            /* We can set rdcount to 0 safely as other processes are */
+            /* blocked and this process is right now not using lock */
+            header->hitcount     = 0;
+            header->misscount    = 0;
+            header->init_ticks   = cticks;
+            header->rdcount      = 0;
 
-        header->lscavenge    = cticks;
-        header->scstart      = 0;
-        header->itemcount    = 0;
-        header->valuecount   = zvcount;
-        memset((void *)header->values, 0, sizeof(size_t) * zvcount);
+            header->lscavenge    = cticks;
+            header->scstart      = 0;
+            header->itemcount    = 0;
+            header->valuecount   = zvcount;
+            memset((void *)header->values, 0, sizeof(size_t) * zvcount);
+        }
 
+        header->mapcount = 1;
         SetEvent(pcache->hinitdone);
     }
     else
@@ -1588,7 +1595,7 @@ void zvcache_terminate(zvcache_context * pcache)
     return;
 }
 
-int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issession, zval ** pvalue TSRMLS_DC)
+int zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRMLS_DC)
 {
     int              result  = NONFATAL;
     unsigned int     index   = 0;
@@ -1609,7 +1616,7 @@ int zvcache_get(zvcache_context * pcache, const char * key, unsigned char issess
     lock_readlock(pcache->zvrwlock);
     flock = 1;
 
-    result = find_zvcache_entry(pcache, key, issession, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -1663,7 +1670,7 @@ Finished:
     return result;
 }
 
-int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issession, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC)
+int zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC)
 {
     int             result  = NONFATAL;
     unsigned int    index   = 0;
@@ -1683,7 +1690,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issess
 
     lock_readlock(pcache->zvrwlock);
 
-    result = find_zvcache_entry(pcache, key, issession, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(pentry != NULL && SUCCEEDED(result))
     {
         pentry->use_ticks = GetTickCount();
@@ -1706,7 +1713,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issess
     }
 
     /* Only update the session entry if the value changed */
-    if(issession)
+    if(pcache->issession)
     {
         _ASSERT((Z_TYPE_P(pzval) & IS_CONSTANT_TYPE_MASK) == IS_STRING);
 
@@ -1725,7 +1732,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issess
     }
 
     /* If entry wasn't found or set was called, create new data */
-    result = create_zvcache_data(pcache, key, issession, pzval, ttl, &pnewval TSRMLS_CC);
+    result = create_zvcache_data(pcache, key, pzval, ttl, &pnewval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1737,7 +1744,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, unsigned char issess
     run_zvcache_scavenger(pcache);
 
     /* Check again after getting the write lock */
-    result = find_zvcache_entry(pcache, key, issession, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -1793,7 +1800,7 @@ Finished:
     return result;
 }
 
-int zvcache_delete(zvcache_context * pcache, const char * key, unsigned char issession)
+int zvcache_delete(zvcache_context * pcache, const char * key)
 {
     int             result = NONFATAL;
     unsigned int    index     = 0;
@@ -1812,7 +1819,7 @@ int zvcache_delete(zvcache_context * pcache, const char * key, unsigned char iss
 
     run_zvcache_scavenger(pcache);
 
-    result = find_zvcache_entry(pcache, key, issession, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -1879,13 +1886,7 @@ int zvcache_clear(zvcache_context * pcache)
         while(pvalue != NULL)
         {
             ptemp = ZVCACHE_VALUE(palloc, pvalue->next_value);
-
-            /* Delete entries which are not storing session data */
-            if(!pvalue->issession)
-            {
-                remove_zvcache_entry(pcache, index, pvalue);
-            }
-
+            remove_zvcache_entry(pcache, index, pvalue);
             pvalue = ptemp;
         }
 
@@ -1901,7 +1902,7 @@ int zvcache_clear(zvcache_context * pcache)
     return result;
 }
 
-int zvcache_exists(zvcache_context * pcache, const char * key, unsigned char issession, unsigned char * pexists)
+int zvcache_exists(zvcache_context * pcache, const char * key, unsigned char * pexists)
 {
     int             result = NONFATAL;
     unsigned int    index  = 0;
@@ -1920,7 +1921,7 @@ int zvcache_exists(zvcache_context * pcache, const char * key, unsigned char iss
     lock_readlock(pcache->zvrwlock);
     flock = 1;
 
-    result = find_zvcache_entry(pcache, key, issession, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -1972,7 +1973,7 @@ static void zvcache_info_entry_dtor(void * pvoid)
     return;
 }
 
-int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * plist)
+int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info * pcinfo, zend_llist * plist)
 {
     int                  result = NONFATAL;
     unsigned char        flock  = 0;
@@ -1982,6 +1983,7 @@ int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * p
     unsigned int         index  = 0;
     zvcache_info_entry   pinfo  = {0};
     unsigned int         ticks  = 0;
+    unsigned int         count  = 0;
 
     dprintverbose("start zvcache_list");
 
@@ -2003,7 +2005,13 @@ int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * p
 
     zend_llist_init(plist, sizeof(zvcache_info_entry), zvcache_info_entry_dtor, 0);
 
-    for(index = 0; index < header->valuecount; index++)
+    /* Leave count to 0 if only summary is needed */
+    if(!summaryonly)
+    {
+        count = header->valuecount;
+    }
+
+    for(index = 0; index < count; index++)
     {
         if(header->values[index] == 0)
         {
@@ -2037,7 +2045,6 @@ int zvcache_list(zvcache_context * pcache, zvcache_info * pcinfo, zend_llist * p
             pinfo.ttl       = pvalue->ttlive;
             pinfo.age       = ticks;
             pinfo.type      = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
-            pinfo.issession = pvalue->issession;
             pinfo.hitcount  = pvalue->hitcount;
 
             zend_llist_add_element(plist, &pinfo);
@@ -2086,8 +2093,7 @@ int zvcache_change(zvcache_context * pcache, const char * key, int delta, int * 
 
     run_zvcache_scavenger(pcache);
 
-    /* issession = 0 because session handler cannot store long in cache */
-    result = find_zvcache_entry(pcache, key, 0, index, &pvalue);
+    result = find_zvcache_entry(pcache, key, index, &pvalue);
     if(FAILED(result))
     {
         goto Finished;
@@ -2150,8 +2156,7 @@ int zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue,
 
     run_zvcache_scavenger(pcache);
 
-    /* issession = 0 because session handler cannot store long in cache */
-    result = find_zvcache_entry(pcache, key, 0, index, &pentry);
+    result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
         goto Finished;

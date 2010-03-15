@@ -36,6 +36,9 @@
   <notes>
 1.1.0 RC release:
 - updated wincache.php to not show all user cache entries if the total number of entries exceeds 250
+- Added summaryonly to all the info functions.
+- Separated session cache from user cache. Added wincache_scache_info and wincache_scache_meminfo.
+- Made session cache use file backed shared memory so that sessions survive process recycle.
   </notes>
   <contents>
     <dir name="/">

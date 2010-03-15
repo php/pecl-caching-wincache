@@ -47,6 +47,7 @@
 #define FILE_IS_CHANGED               1
 
 #define APLIST_VALUE(p, o)            ((aplist_value *)alloc_get_cachevalue(p, o))
+#define DWORD_MAX                     0xFFFFFFFF
 
 static int  find_aplist_entry(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete);
 static int  is_file_changed(aplist_context * pcache, aplist_value * pvalue);
@@ -126,10 +127,10 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
 /* Call this method atleast under a read lock */
 static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
 {
-    HRESULT       hr        = S_OK;
-    int           retvalue  = 0;
-    unsigned int  tickcount = 0;
-    unsigned int  difftime  = 0;
+    HRESULT                   hr        = S_OK;
+    int                       retvalue  = 0;
+    unsigned int              tickcount = 0;
+    unsigned int              difftime  = 0;
     WIN32_FILE_ATTRIBUTE_DATA fileData;
 
     dprintverbose("start is_file_changed");
@@ -144,11 +145,18 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
         goto Finished;
     }
 
+    /* Calculate difftime while taking care of rollover */
     tickcount = GetTickCount();
-    difftime  = tickcount - pvalue->last_check;
+    if(tickcount >= pvalue->last_check)
+    {
+        difftime  = tickcount - pvalue->last_check;
+    }
+    else
+    {
+        difftime = tickcount + (DWORD_MAX - pvalue->last_check);
+    }
 
-    if(pvalue->last_check != 0 &&
-       difftime > 0 && difftime < pcache->fchangefreq)
+    if(pvalue->last_check != 0 && difftime < pcache->fchangefreq)
     {
         goto Finished;
     }
@@ -174,8 +182,11 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
         goto Finished;
     }
 
+    _ASSERT(fileData.nFileSizeHigh == 0);
+
     /* If the attributes, WriteTime, and if it is a file, size are same */
-    /* then the file has not changed */
+    /* then the file has not changed. File sizes greater than 4GB won't */
+    /* get added to cache. So comparing only nFileSizeLow is sufficient */
     if (fileData.dwFileAttributes == pvalue->attributes &&
         *(__int64 *)&fileData.ftLastWriteTime / 10000000 ==
          *(__int64 *)&pvalue->modified_time / 10000000 &&
@@ -208,9 +219,10 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     char *                     filepath  = NULL;
 
     HANDLE                     hFile     = INVALID_HANDLE_VALUE;
-    unsigned int               filesize  = 0;
+    unsigned int               filesizel = 0;
+    unsigned int               filesizeh = 0;
     unsigned int               openflags = 0;
-    BY_HANDLE_FILE_INFORMATION finfo     = {0};
+    BY_HANDLE_FILE_INFORMATION finfo;
     aplist_value *             pvalue    = NULL;
 
     unsigned int               flength   = 0;
@@ -281,14 +293,17 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         goto Finished;
     }
 
-    filesize = GetFileSize(hFile, NULL);
-    if(filesize == INVALID_FILE_SIZE)
+    filesizel = GetFileSize(hFile, &filesizeh);
+    if(filesizel == INVALID_FILE_SIZE)
     {
         error_setlasterror();
         result = FATAL_FCACHE_GETFILESIZE;
 
         goto Finished;
     }
+
+    /* File sizes greater than 4096MB not allowed */
+    _ASSERT(filesizeh == 0);
 
     if(!GetFileInformationByHandle(hFile, &finfo))
     {
@@ -303,11 +318,12 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pbaseadr += sizeof(aplist_value);
 
     /* Fill the details in aplist_value */
+    /* memcpy_s error code ignored as buffer is of right size */
     memcpy_s(pbaseadr, flength, filename, flength);
     *(pbaseadr + flength) = 0;
     pvalue->file_path     = pbaseadr - pcache->apmemaddr;
         
-    pvalue->file_size     = filesize;
+    pvalue->file_size     = filesizel;
     pvalue->modified_time = finfo.ftLastWriteTime;
     pvalue->attributes    = finfo.dwFileAttributes;
     
@@ -729,6 +745,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
+    /* Desired cache size 2MB for 1024 entries. Expression below gives that */
     mapsize = ((filecount + 1023) * 2) / 1024;
     if(pcache->islocal)
     {
@@ -736,7 +753,8 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         locktype = LOCK_TYPE_LOCAL;
     }
 
-    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, mapclass, mapsize TSRMLS_CC);
+    /* shmfilepath = NULL to make it use page file */
+    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, mapclass, mapsize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -752,7 +770,8 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", pcache->apfilemap->mapaddr, segsize TSRMLS_CC);
+    /* initmemory = 1 for all page file backed shared memory allocators */
+    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", pcache->apfilemap->mapaddr, segsize, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -804,6 +823,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         }
     }
 
+    /* Even with manual reset and initial state not set */
     pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pcache->hinitdone == NULL)
     {
@@ -994,6 +1014,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         }
 
         /* First process reaching here will set all ocacheval to 0 if required */
+        /* Even with manual reset and initial state not set */
         hfirst = CreateEvent(NULL, TRUE, FALSE, evtname);
         if(hfirst == NULL)
         {
@@ -2029,7 +2050,7 @@ void aplist_ocache_close(aplist_context * pcache, ocache_value * povalue)
     return;
 }
 
-int aplist_getinfo(aplist_context * pcache, unsigned char type, cache_info ** ppinfo)
+int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summaryonly, cache_info ** ppinfo)
 {
     int                  result  = NONFATAL;
     cache_info *         pcinfo  = NULL;
@@ -2081,9 +2102,14 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, cache_info ** pp
         pcinfo->misscount = pcache->pocache->header->misscount;
     }
 
-    pcinfo->entries   = NULL;
+    pcinfo->entries = NULL;
 
-    count = pcache->apheader->valuecount;
+    /* Leave count to 0 when only summary is required */
+    if(!summaryonly)
+    {
+        count = pcache->apheader->valuecount;
+    }
+
     for(index = 0; index < count; index++)
     {
         offset = pcache->apheader->values[index];

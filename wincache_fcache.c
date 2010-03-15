@@ -267,7 +267,8 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         pfcache->islocal = islocal;
     }
 
-    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, mapclass, cachesize TSRMLS_CC);
+    /* shmfilepath = NULL to use page file for shared memory */
+    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, mapclass, cachesize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -283,7 +284,8 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
-    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", pfcache->memaddr, size TSRMLS_CC);
+    /* initmemory = 1 for all page file backed shared memory allocators */
+    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", pfcache->memaddr, size, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

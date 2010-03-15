@@ -35,10 +35,10 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.1.0225.0"
+#define PHP_WINCACHE_EXTVER    "1.1.0305.0"
 
 /* comment following line for release builds */
-#define WINCACHE_DEBUG
+/*#define WINCACHE_DEBUG*/
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)
@@ -61,6 +61,7 @@
 #include "ext/standard/php_smart_str.h"
 #include "ext/session/php_session.h"
 #include "zend_extensions.h"
+#include "php_open_temporary_file.h"
 
 #include <tlhelp32.h>
 
@@ -100,6 +101,7 @@
 #define CACHE_TYPE_FILECONTENT     3
 #define CACHE_TYPE_BYTECODES       4
 #define CACHE_TYPE_USERZVALS       5
+#define CACHE_TYPE_SESSZVALS       6
 
 #define APLIST_TYPE_INVALID        255
 #define APLIST_TYPE_GLOBAL         0

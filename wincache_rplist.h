@@ -97,7 +97,7 @@ extern int  rplist_getentry(rplist_context * pcache, const char * filename, rpli
 extern void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t absentry, size_t prevsame);
 extern void rplist_deleteval(rplist_context * pcache, size_t valoffset);
 extern void rplist_markdeleted(rplist_context * pcache, size_t valoffset);
-extern int  rplist_getinfo(rplist_context * pcache, rplist_info ** ppinfo);
+extern int  rplist_getinfo(rplist_context * pcache, zend_bool summaryonly, rplist_info ** ppinfo);
 extern void rplist_freeinfo(rplist_info * pinfo);
 
 extern void rplist_runtest();

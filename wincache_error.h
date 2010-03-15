@@ -71,6 +71,10 @@
 #define FATAL_FILEMAP_NOFREE                FATAL_FILEMAP_BASE + 6
 #define FATAL_FILEMAP_INIT_EVENT            FATAL_FILEMAP_BASE + 7
 #define FATAL_FILEMAP_MAPVIEW               FATAL_FILEMAP_BASE + 8
+#define FATAL_FILEMAP_CREATEFILE            FATAL_FILEMAP_BASE + 9
+#define FATAL_FILEMAP_GETFILETIME           FATAL_FILEMAP_BASE + 10
+#define FATAL_FILEMAP_SYSTOFILE             FATAL_FILEMAP_BASE + 11
+#define FATAL_FILEMAP_CREATEFILEMAP         FATAL_FILEMAP_BASE + 12
 
 /* Error codes used by shared memory allocator */
 #define FATAL_ALLOC_BASE                    300

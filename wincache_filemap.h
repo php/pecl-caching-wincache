@@ -49,45 +49,49 @@
 /* won't work for per site php.ini configuration. We will end up sharing the */
 /* cache with all processes which won't be too bad either */
 
-#define PID_MAX_LENGTH                      5   /* 65535 is the max value */
-#define READWRITE_LOCK_MAX_COUNT            20  /* NOT USED */
+#define PID_MAX_LENGTH                          5   /* 65535 is the max value */
+#define READWRITE_LOCK_MAX_COUNT                20  /* NOT USED */
 
-#define FILEMAP_TYPE_INVALID                0   /* Invalid value */
-#define FILEMAP_TYPE_FILELIST               1   /* File list map */
-#define FILEMAP_TYPE_RESPATHS               2   /* Resolve path cache */
-#define FILEMAP_TYPE_FILECONTENT            3   /* File cache map */
-#define FILEMAP_TYPE_BYTECODES              4   /* Byte code map */
-#define FILEMAP_TYPE_USERZVALS              5   /* ZVAL cache map */
-#define FILEMAP_TYPE_UNUSED                 255 /* UNUSED SEGMENT MARKER */
-#define FILEMAP_TYPE_MAX                    255
+#define FILEMAP_TYPE_INVALID                    0   /* Invalid value */
+#define FILEMAP_TYPE_FILELIST                   1   /* File list map */
+#define FILEMAP_TYPE_RESPATHS                   2   /* Resolve path cache */
+#define FILEMAP_TYPE_FILECONTENT                3   /* File cache map */
+#define FILEMAP_TYPE_BYTECODES                  4   /* Byte code map */
+#define FILEMAP_TYPE_USERZVALS                  5   /* User cache map */
+#define FILEMAP_TYPE_SESSZVALS                  6   /* Session cache map */
+#define FILEMAP_TYPE_UNUSED                     255 /* UNUSED SEGMENT MARKER */
+#define FILEMAP_TYPE_MAX                        255
 
-#define FILEMAP_MAP_INVALID                 0   /* Invalid value */
-#define FILEMAP_MAP_SRANDOM                 1   /* Map at any random address  */
-#define FILEMAP_MAP_SFIXED                  2   /* Try mapping at a particular address */
-#define FILEMAP_MAP_LRANDOM                 3   /* Create a local only filemap */
+#define FILEMAP_MAP_INVALID                     0   /* Invalid value */
+#define FILEMAP_MAP_SRANDOM                     1   /* Map at any random address  */
+#define FILEMAP_MAP_SFIXED                      2   /* Try mapping at a particular address */
+#define FILEMAP_MAP_LRANDOM                     3   /* Create a local only filemap */
 
-#define FILEMAP_MAX_COUNT                   30
-#define FILEMAP_MIN_SIZE                    1048576    /* 1   MB */
-#define FILEMAP_MAX_SIZE                    268435456  /* 256 MB */
+#define FILEMAP_MAX_COUNT                       30
+#define FILEMAP_MIN_SIZE                        1048576    /* 1   MB */
+#define FILEMAP_MAX_SIZE                        268435456  /* 256 MB */
 
 /* Following prefixes should be less than 254 characters */
-#define FILEMAP_INFORMATION_PREFIX          "WINCACHE_FILEMAP_INFORMATION"
-#define FILEMAP_INFORMATION_PREFIX_LENGTH   (sizeof(FILEMAP_INFORMATION_PREFIX))
+#define FILEMAP_INFORMATION_PREFIX              "WINCACHE_FILEMAP_INFORMATION"
+#define FILEMAP_INFORMATION_PREFIX_LENGTH       (sizeof(FILEMAP_INFORMATION_PREFIX))
 
-#define FILEMAP_FILELIST_PREFIX             "WINCACHE_FILEMAP_FILELIST"
-#define FILEMAP_FILELIST_PREFIX_LENGTH      (sizeof(FILEMAP_FILELIST_PREFIX))
+#define FILEMAP_FILELIST_PREFIX                 "WINCACHE_FILEMAP_FILELIST"
+#define FILEMAP_FILELIST_PREFIX_LENGTH          (sizeof(FILEMAP_FILELIST_PREFIX))
 
-#define FILEMAP_RESPATHS_PREFIX             "WINCACHE_FILEMAP_RESPATHS"
-#define FILEMAP_RESPATHS_PREFIX_LENGTH      (sizeof(FILEMAP_RESPATHS_PREFIX))
+#define FILEMAP_RESPATHS_PREFIX                 "WINCACHE_FILEMAP_RESPATHS"
+#define FILEMAP_RESPATHS_PREFIX_LENGTH          (sizeof(FILEMAP_RESPATHS_PREFIX))
 
-#define FILEMAP_FILECONTENT_PREFIX          "WINCACHE_FILEMAP_FILECONTENT"
-#define FILEMAP_FILECONTENT_PREFIX_LENGTH   (sizeof(FILEMAP_FILECONTENT_PREFIX))
+#define FILEMAP_FILECONTENT_PREFIX              "WINCACHE_FILEMAP_FILECONTENT"
+#define FILEMAP_FILECONTENT_PREFIX_LENGTH       (sizeof(FILEMAP_FILECONTENT_PREFIX))
 
-#define FILEMAP_BYTECODES_PREFIX            "WINCACHE_FILEMAP_BYTECODES"
-#define FILEMAP_BYTECODES_PREFIX_LENGTH     (sizeof(FILEMAP_BYTECODES_PREFIX))
+#define FILEMAP_BYTECODES_PREFIX                "WINCACHE_FILEMAP_BYTECODES"
+#define FILEMAP_BYTECODES_PREFIX_LENGTH         (sizeof(FILEMAP_BYTECODES_PREFIX))
 
-#define FILEMAP_USERZVALS_PREFIX            "WINCACHE_FILEMAP_USERZVALS"
-#define FILEMAP_USERZVALS_PREFIX_LENGTH     (sizeof(FILEMAP_USERZVALS_PREFIX))
+#define FILEMAP_USERZVALS_PREFIX                "WINCACHE_FILEMAP_USERZVALS"
+#define FILEMAP_USERZVALS_PREFIX_LENGTH         (sizeof(FILEMAP_USERZVALS_PREFIX))
+
+#define FILEMAP_SESSZVALS_PREFIX                "WINCACHE_FILEMAP_SESSZVALS"
+#define FILEMAP_SESSZVALS_PREFIX_LENGTH         (sizeof(FILEMAP_SESSZVALS_PREFIX))
 
 /* filemap_information_header - SHARED - 16 bytes */
 /* filemap_information_entry  - SHARED - 276 bytes */
@@ -98,51 +102,53 @@
 typedef struct filemap_information_header filemap_information_header;
 struct filemap_information_header
 {
-    size_t         size;          /* Total size of the memory map */
-    unsigned int   mapcount;      /* Total times this shared area got mapped */
-    unsigned short entry_count;   /* How many other filemap objects are present */
-    unsigned short maxcount;      /* Maximum number of filemaps which can be created */
+    size_t                       size;          /* Total size of the memory map */
+    unsigned int                 mapcount;      /* Total times this shared area got mapped */
+    unsigned short               entry_count;   /* How many other filemap objects are present */
+    unsigned short               maxcount;      /* Maximum number of filemaps which can be created */
 };
 
 typedef struct filemap_information_entry filemap_information_entry;
 struct filemap_information_entry
 {
-    unsigned short fmaptype;      /* Type which tells what is the purpose of this filemap */
-    char           name[MAX_PATH];/* name of filemap */
-    size_t         size;          /* Size of this filemap */
-    unsigned int   mapcount;      /* How many processes mapped this filemap */
-    unsigned short cpid;          /* ProcessID of process which initially created this map */
-    unsigned short opid;          /* Current ProcessID which is the owner */
-    void *         mapaddr;       /* Map address where owner has this memory mapped */
+    unsigned short               fmaptype;      /* Type which tells what is the purpose of this filemap */
+    char                         name[MAX_PATH];/* name of filemap */
+    size_t                       size;          /* Size of this filemap */
+    unsigned int                 mapcount;      /* How many processes mapped this filemap */
+    unsigned short               cpid;          /* ProcessID of process which initially created this map */
+    unsigned short               opid;          /* Current ProcessID which is the owner */
+    void *                       mapaddr;       /* Map address where owner has this memory mapped */
 };
 
 typedef struct filemap_context filemap_context;
 struct filemap_context
 {
-    unsigned short              id;        /* unique id of this filemap context */
-    unsigned short              islocal;   /* tells if specified address couldn't be used */
-    filemap_information_entry * infoentry; /* pointer to filemap information entry */
-    HANDLE                      hfilemap;  /* handle to memory map object */
-    void *                      mapaddr;   /* local adddress mapped for this process */
+    unsigned short               id;            /* unique id of this filemap context */
+    unsigned short               islocal;       /* tells if specified address couldn't be used */
+    filemap_information_entry *  infoentry;     /* pointer to filemap information entry */
+    HANDLE                       hshmfile;      /* file handle for file backed shared memory */
+    unsigned int                 existing;      /* If value is 1, skip initialization for this */
+    HANDLE                       hfilemap;      /* handle to memory map object */
+    void *                       mapaddr;       /* local adddress mapped for this process */
 };
 
 typedef struct filemap_information filemap_information;
 struct filemap_information
 {
-    HANDLE                       hinfomap; /* Handle to filemap object */
-    char *                       infoname; /* Name of memory map to store filemap info */
-    unsigned int                 infonlen; /* Length of name buffer */
-    filemap_information_header * header;   /* Mapped memory address to information segment */
-    HANDLE                       hinitdone;/* event inidicating if memory is initialized */
-    lock_context *               hrwlock;  /* Lock object for read/write to info filemap */
+    HANDLE                       hinfomap;      /* Handle to filemap object */
+    char *                       infoname;      /* Name of memory map to store filemap info */
+    unsigned int                 infonlen;      /* Length of name buffer */
+    filemap_information_header * header;        /* Mapped memory address to information segment */
+    HANDLE                       hinitdone;     /* event inidicating if memory is initialized */
+    lock_context *               hrwlock;       /* Lock object for read/write to info filemap */
 };
 
 typedef struct filemap_global_context filemap_global_context;
 struct filemap_global_context
 {
-    unsigned short        pid;    /* PID of this process */
-    unsigned short        ppid;   /* Parent process id */
-    filemap_information * info;   /* pointer to filemap_information */
+    unsigned short               pid;           /* PID of this process */
+    unsigned short               ppid;          /* Parent process id */
+    filemap_information *        info;          /* pointer to filemap_information */
 };
 
 extern int  filemap_global_initialize(TSRMLS_D);
@@ -152,17 +158,12 @@ extern unsigned short filemap_getppid(TSRMLS_D);
 
 extern int    filemap_create(filemap_context ** ppfilemap);
 extern void   filemap_destroy(filemap_context * pfilemap);
-extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short fmclass, unsigned int size_mb TSRMLS_DC);
+extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC);
 extern void   filemap_terminate(filemap_context * pfilemap);
 
 extern size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC);
 extern unsigned short filemap_getcpid(filemap_context * pfilemap TSRMLS_DC);
 
 extern void   filemap_runtest();
-
-/* TBD?? Give options to save the shared memory data to */
-/* file which can be loaded next time a process comes up */
-/* extern int filemap_save(); */
-/* extern int filemap_reload(); */
 
 #endif /* _WINCACHE_FILEMAP_H_ */

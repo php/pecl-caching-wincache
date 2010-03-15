@@ -125,7 +125,7 @@ extern int  aplist_initialize(aplist_context * pcache, unsigned short apctype, u
 extern void aplist_terminate(aplist_context * pcache);
 
 extern void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal);
-extern int  aplist_getinfo(aplist_context * pcache, unsigned char type, cache_info ** ppinfo);
+extern int  aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summaryonly, cache_info ** ppinfo);
 extern void aplist_freeinfo(unsigned char type, cache_info * pinfo);
 extern int  aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue);
 extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC);

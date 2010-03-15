@@ -580,7 +580,9 @@ void alloc_destroy(alloc_context * palloc)
     return;
 }
 
-int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, void * staddr, size_t size TSRMLS_DC)
+/* initmemory should be 1 for all non file backed shared memory allocators and 0 */
+/* for file backed shared memory allocators when filemap->existing is set to 1 */
+int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC)
 {
     int                    result   = NONFATAL;
     unsigned short         locktype = LOCK_TYPE_SHARED;
@@ -651,42 +653,45 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     {
         lock_writelock(palloc->rwlock);
 
-        /* Put the start header of size 0 */
-        /* followed by the first free block of size free_size */
-        frestart = (alloc_free_header *)(header + 1);
-        fremid   = (alloc_free_header *)((char *)frestart + ALLOC_FREE_BLOCK_OVERHEAD);
+        if(initmemory)
+        {
+            /* Put the start header of size 0 */
+            /* followed by the first free block of size free_size */
+            frestart = (alloc_free_header *)(header + 1);
+            fremid   = (alloc_free_header *)((char *)frestart + ALLOC_FREE_BLOCK_OVERHEAD);
 
-        /* Set start of doubly circular linked list */
-        frestart->size      = 0;
-        frestart->is_free   = BLOCK_ISFREE_FIRST;
-        frestart->prev_free = 0;
-        frestart->next_free = POINTER_OFFSET(staddr, fremid);
-        *((size_t *)((char *)(frestart + 1))) = frestart->size;
+            /* Set start of doubly circular linked list */
+            frestart->size      = 0;
+            frestart->is_free   = BLOCK_ISFREE_FIRST;
+            frestart->prev_free = 0;
+            frestart->next_free = POINTER_OFFSET(staddr, fremid);
+            *((size_t *)((char *)(frestart + 1))) = frestart->size;
 
-        /* Set mid of doubly linked list */
-        fremid->size      = size - ALLOC_SEGMENT_HEADER_SIZE - ALLOC_FREE_BLOCK_OVERHEAD - ALLOC_FREE_BLOCK_OVERHEAD - ALLOC_FREE_BLOCK_OVERHEAD;
-        freend   = (alloc_free_header *)((char *)fremid + ALLOC_FREE_BLOCK_OVERHEAD + fremid->size);
+            /* Set mid of doubly linked list */
+            fremid->size      = size - ALLOC_SEGMENT_HEADER_SIZE - ALLOC_FREE_BLOCK_OVERHEAD - ALLOC_FREE_BLOCK_OVERHEAD - ALLOC_FREE_BLOCK_OVERHEAD;
+            freend   = (alloc_free_header *)((char *)fremid + ALLOC_FREE_BLOCK_OVERHEAD + fremid->size);
 
-        fremid->is_free   = BLOCK_ISFREE_FREE;
-        fremid->prev_free = POINTER_OFFSET(staddr, frestart);
-        fremid->next_free = POINTER_OFFSET(staddr, freend);
-        *((size_t *)(((char *)(fremid + 1)) + fremid->size)) = fremid->size;
+            fremid->is_free   = BLOCK_ISFREE_FREE;
+            fremid->prev_free = POINTER_OFFSET(staddr, frestart);
+            fremid->next_free = POINTER_OFFSET(staddr, freend);
+            *((size_t *)(((char *)(fremid + 1)) + fremid->size)) = fremid->size;
 
-        freend->size      = 0;
-        freend->is_free   = BLOCK_ISFREE_LAST;
-        freend->next_free = 0;
-        freend->prev_free = POINTER_OFFSET(staddr, fremid);
-        *((size_t *)((char *)(freend + 1))) = freend->size;
+            freend->size      = 0;
+            freend->is_free   = BLOCK_ISFREE_LAST;
+            freend->next_free = 0;
+            freend->prev_free = POINTER_OFFSET(staddr, fremid);
+            *((size_t *)((char *)(freend + 1))) = freend->size;
 
-        /* Set segment header */
-        header->mapcount   = 1;
-        header->total_size = size;
-        header->free_size  = fremid->size;
+            /* Set segment header */
+            header->total_size = size;
+            header->free_size  = fremid->size;
 
-        header->cacheheader = 0;
-        header->usedcount   = 0;
-        header->freecount   = 1;
+            header->cacheheader = 0;
+            header->usedcount   = 0;
+            header->freecount   = 1;
+        }
 
+        header->mapcount = 1;
         SetEvent(palloc->hinitdone);
 
         lock_writeunlock(palloc->rwlock);
@@ -883,6 +888,11 @@ void * alloc_get_cacheheader(alloc_context * palloc, unsigned int valuecount, un
             msize = sizeof(ocache_header);
         }
         else if(type == CACHE_TYPE_USERZVALS)
+        {
+            _ASSERT(valuecount > 0);
+            msize = sizeof(zvcache_header) + (valuecount - 1) * sizeof(size_t);
+        }
+        else if(type == CACHE_TYPE_SESSZVALS)
         {
             _ASSERT(valuecount > 0);
             msize = sizeof(zvcache_header) + (valuecount - 1) * sizeof(size_t);
@@ -1370,7 +1380,7 @@ void alloc_runtest()
         goto Finished;
     }
 
-    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", memaddr, 4096 TSRMLS_CC);
+    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", memaddr, 4096, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
