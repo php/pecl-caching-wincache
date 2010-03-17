@@ -39,6 +39,7 @@
 - Added summaryonly to all the info functions.
 - Separated session cache from user cache. Added wincache_scache_info and wincache_scache_meminfo.
 - Made session cache use file backed shared memory so that sessions survive process recycle.
+- updated wincache.php to show user cache and session cache informaiton on different pages.
   </notes>
   <contents>
     <dir name="/">
