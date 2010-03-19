@@ -613,6 +613,7 @@ function init_cache_info( $cache_data = SUMMARY_DATA )
         $ucache_info = wincache_ucache_info();
     }
     if ( $session_cache_available && ( $cache_data == SUMMARY_DATA || $cache_data == SCACHE_DATA ) ){
+        @session_name('WINCACHE_SESSION');
         session_start();
         $scache_mem_info = wincache_scache_meminfo();
         $scache_info = wincache_scache_info();
