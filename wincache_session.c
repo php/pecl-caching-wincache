@@ -49,20 +49,10 @@ PS_OPEN_FUNC(wincache)
     dprintverbose("start ps_open_func");
 
     /* If session cache is not created yet create now */
+    /* Handling save_path as is done in ext\session\mod_files.c */
     if(WCG(zvscache) == NULL)
     {
-        if(*save_path == '\0')
-        {
-            /* Use temporary folder as save_path */
-            save_path = php_get_temporary_directory();
-
-            /* Check if path is accessible as per open_basedir */
-            if((PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) || php_check_open_basedir(save_path TSRMLS_CC))
-            {
-                return FAILURE;
-            }
-        }
-        else
+        if(*save_path != '\0')
         {
             /* Get last portion from [dirdepth;[filemode;]]dirpath */
             scolon = strchr(save_path, ';');
@@ -73,10 +63,22 @@ PS_OPEN_FUNC(wincache)
             }
         }
 
+        /* Use temporary folder as save_path if its blank */
+        if(*save_path == '\0')
+        {
+            save_path = php_get_temporary_directory();
+
+            /* Check if path is accessible as per open_basedir */
+            if((PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) || php_check_open_basedir(save_path TSRMLS_CC))
+            {
+                return FAILURE;
+            }
+        }
+
         _ASSERT(save_path != NULL);
 
         /* Create path as save_path\wincache_session_[<namesalt>_]ppid */
-        fpathlen = strlen(save_path) + 1 + sizeof("wincache_session_.tmp") + ((WCG(namesalt) == NULL) ? 0 : strlen(WCG(namesalt)) + 1) + 5;
+        fpathlen = strlen(save_path) + 1 + sizeof("wincache_session_.tmp") + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
         if(fpathlen > MAX_PATH)
         {
             return FAILURE;
@@ -91,14 +93,12 @@ PS_OPEN_FUNC(wincache)
         ZeroMemory(filepath, fpathlen);
         if(WCG(namesalt) == NULL)
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%s.tmp", save_path, WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%d.tmp", save_path, WCG(parentpid));
         }
         else
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%s_%s.tmp", save_path, WCG(namesalt), WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%s_%d.tmp", save_path, WCG(namesalt), WCG(parentpid));
         }
-
-        dprintalways("wincache session file = %s", filepath);
 
         /* Create session cache on call to session_start */
         result = zvcache_create(&pzcache);

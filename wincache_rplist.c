@@ -374,6 +374,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     size_t          segsize  = 0;
     unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype = LOCK_TYPE_SHARED;
+    unsigned int    msize    = 0;
 
     dprintverbose("start rplist_initialize");
 
@@ -419,7 +420,8 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* Get memory for cache header */
-    pcache->rpheader = (rplist_header *)alloc_get_cacheheader(pcache->rpalloc, filecount, CACHE_TYPE_RESPATHS);
+    msize = sizeof(rplist_header) + ((filecount - 1) * sizeof(size_t));
+    pcache->rpheader = (rplist_header *)alloc_get_cacheheader(pcache->rpalloc, msize, CACHE_TYPE_RESPATHS);
     if(pcache->rpheader == NULL)
     {
         result = FATAL_RPLIST_INITIALIZE;

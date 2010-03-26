@@ -35,11 +35,12 @@ ARG_ENABLE("wincache", "Windows PHP Cache", "no");
 
 if (PHP_WINCACHE != "no") {
 
-    EXTENSION('wincache', "php_wincache.c wincache_utils.c wincache_error.c      \
-                           wincache_debug.c wincache_lock.c wincache_filemap.c   \
-                           wincache_alloc.c wincache_ocache.c wincache_opcopy.c  \
-                           wincache_fcache.c wincache_rplist.c wincache_aplist.c \
-                           wincache_zvcache.c wincache_session.c");
+    EXTENSION('wincache', "php_wincache.c wincache_utils.c wincache_error.c         \
+                           wincache_debug.c wincache_lock.c wincache_filemap.c      \
+                           wincache_alloc.c wincache_ocache.c wincache_opcopy.c     \
+                           wincache_fcache.c wincache_rplist.c wincache_aplist.c    \
+                           wincache_zvcache.c wincache_session.c wincache_detours.c \
+                           wincache_fcnotify.c");
 
     AC_DEFINE('HAVE_WINCACHE', 1);
 

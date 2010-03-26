@@ -292,7 +292,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     }
 
     /* Get memory for cache header */
-    pfcache->header = (fcache_header *)alloc_get_cacheheader(pfcache->palloc, 0, CACHE_TYPE_FILECONTENT);
+    pfcache->header = (fcache_header *)alloc_get_cacheheader(pfcache->palloc, sizeof(fcache_header), CACHE_TYPE_FILECONTENT);
     if(pfcache->header == NULL)
     {
         result = FATAL_FCACHE_INITIALIZE;

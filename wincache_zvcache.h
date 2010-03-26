@@ -97,6 +97,7 @@ struct zvcache_value
     size_t            zvalue;            /* Offset of zval value stored */
     size_t            keystr;            /* Offset of key string */
     unsigned short    keylen;            /* Length of key string */
+    unsigned int      sizeb;             /* Memory allocated for zvalue in bytes */
 
     unsigned int      add_ticks;         /* Tick count when entry was created */
     unsigned int      use_ticks;         /* Tick count when entry was last used */
@@ -130,6 +131,8 @@ struct zvcopy_context
     void *            palloc;            /* Allocator for alloc_a* functions */
     char *            pbaseadr;          /* Base address of the segment */
     size_t            hoffset;           /* Offset of mpool_header */
+    unsigned int      allocsize;         /* Amount of memory allocated */
+
     fn_malloc         fnmalloc;          /* Function to use for malloc */
     fn_realloc        fnrealloc;         /* Function to use for realloc */
     fn_strdup         fnstrdup;          /* Function to use for strdup */
@@ -171,6 +174,7 @@ struct zvcache_info_entry
     unsigned int      ttl;               /* ttl of this entry */
     unsigned int      age;               /* Age in seconds */
     unsigned short    type;              /* type of zval which is stored as value */
+    unsigned int      sizeb;             /* memory allocated for zval in bytes */
     unsigned int      hitcount;          /* hitcount for this entry */
 };
 

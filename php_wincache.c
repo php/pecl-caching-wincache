@@ -57,6 +57,8 @@ PHP_FUNCTION(wincache_scache_meminfo);
 
 /* Utility functions exposed by this extension */
 PHP_FUNCTION(wincache_refresh_if_changed);
+PHP_FUNCTION(wincache_function_exists);
+PHP_FUNCTION(wincache_class_exists);
 
 /* ZVAL cache functions matching other caches */
 PHP_FUNCTION(wincache_ucache_get);
@@ -109,6 +111,15 @@ ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_refresh_if_changed, 0, 0, 0)
     ZEND_ARG_INFO(0, file_list)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_function_exists, 0, 0, 1)
+    ZEND_ARG_INFO(0, function_name)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_class_exists, 0, 0, 1)
+    ZEND_ARG_INFO(0, class_name)
+    ZEND_ARG_INFO(0, autoload)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_get, 0, 0, 1)
@@ -194,6 +205,8 @@ function_entry wincache_functions[] = {
     PHP_FE(wincache_ucache_meminfo, arginfo_wincache_ucache_meminfo)
     PHP_FE(wincache_scache_meminfo, arginfo_wincache_scache_meminfo)
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
+    PHP_FE(wincache_function_exists, arginfo_wincache_function_exists)
+    PHP_FE(wincache_class_exists, arginfo_wincache_class_exists)
     PHP_FE(wincache_ucache_get, arginfo_wincache_ucache_get)
     PHP_FE(wincache_ucache_set, arginfo_wincache_ucache_set)
     PHP_FE(wincache_ucache_add, arginfo_wincache_ucache_add)
@@ -256,8 +269,9 @@ PHP_INI_BEGIN()
 /* index 15 */ STD_PHP_INI_BOOLEAN("wincache.ucenabled", "1", PHP_INI_ALL, OnUpdateBool, ucenabled, zend_wincache_globals, wincache_globals)
 /* index 16 */ STD_PHP_INI_ENTRY("wincache.ucachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, ucachesize, zend_wincache_globals, wincache_globals)
 /* index 17 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
+/* index 18 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
 #ifdef WINCACHE_TEST
-/* index 18 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+/* index 19 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
 
@@ -291,6 +305,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(ocefilter)   = NULL; /* List of sites for which ocenabled is toggled */
     WCG(fcefilter)   = NULL; /* List of sites for which fcenabled is toggled */
     WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
+    WCG(rerouteini)  = NULL; /* Ini file containing function and class reroutes */
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
 
     WCG(lasterror)   = 0;    /* GetLastError() value set by wincache */
@@ -298,8 +313,10 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(lfcache)     = NULL; /* Aplist to use for file/rpath cache */
     WCG(locache)     = NULL; /* Aplist to use for opcode cache */
     WCG(zvucache)    = NULL; /* zvcache_context for user zvals */
+    WCG(detours)     = NULL; /* detours_context containing reroutes */
     WCG(zvscache)    = NULL; /* zvcache_context for session data */
     WCG(issame)      = 1;    /* Indicates if same aplist is used */
+    WCG(zvcopied)    = NULL; /* HashTable which helps with refcounting */
     WCG(oclisthead)  = NULL; /* Head of in-use ocache values list */
     WCG(oclisttail)  = NULL; /* Tail of in-use ocache values list */
     WCG(parentpid)   = 0;    /* Parent process identifier to use */
@@ -491,6 +508,8 @@ PHP_MINIT_FUNCTION(wincache)
     zvcache_context *  pzcache   = NULL;
     int                resnumber = -1;
     zend_extension     extension = {0};
+    detours_context *  pdetours  = NULL;
+    detours_info *     pdinfo    = NULL;
 
     ZEND_INIT_MODULE_GLOBALS(wincache, globals_initialize, globals_terminate);
     REGISTER_INI_ENTRIES();
@@ -559,6 +578,24 @@ PHP_MINIT_FUNCTION(wincache)
     if(FAILED(result))
     {
         goto Finished;
+    }
+
+    if(WCG(rerouteini) != NULL)
+    {
+        result = detours_create(&pdetours);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        result = detours_initialize(pdetours, WCG(rerouteini));
+        if(FAILED(result))
+        {
+            php_error_docref(NULL TSRMLS_CC, E_WARNING, "failure initializing function reroute as per wincache.rerouteini");
+            goto Finished;
+        }
+
+        WCG(detours) = pdetours;
     }
 
     /* Create filelist cache */
@@ -672,7 +709,15 @@ PHP_MINIT_FUNCTION(wincache)
     {
         goto Finished;
     }
-    
+
+    /* Create hashtable zvcopied */
+    WCG(zvcopied) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+    if(WCG(zvcopied) == NULL)
+    {
+        result = FATAL_OUT_OF_LMEMORY;
+        goto Finished;
+    }
+
     WCG(zvucache) = pzcache;
 
     /* Register wincache session handler */
@@ -687,12 +732,24 @@ Finished:
         dprintimportant("failure %d in php_minit", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
+        if(pdetours != NULL)
+        {
+            detours_terminate(pdetours);
+            detours_destroy(pdetours);
+
+            pdetours = NULL;
+            WCG(detours) = NULL;
+        }
+
         if(plcache1 != NULL)
         {
             aplist_terminate(plcache1);
             aplist_destroy(plcache1);
 
             plcache1 = NULL;
+
+            WCG(lfcache) = NULL;
+            WCG(locache) = NULL;
         }
 
         if(plcache2 != NULL)
@@ -701,6 +758,13 @@ Finished:
             aplist_destroy(plcache2);
 
             plcache2 = NULL;
+            WCG(locache) = NULL;
+        }
+
+        if(WCG(zvcopied) != NULL)
+        {
+            alloc_pefree(WCG(zvcopied));
+            WCG(zvcopied) = NULL;
         }
 
         if(pzcache != NULL)
@@ -709,6 +773,7 @@ Finished:
             zvcache_destroy(pzcache);
 
             pzcache = NULL;
+            WCG(zvucache) = NULL;
         }
     }
 
@@ -733,6 +798,20 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
     zend_stream_open_function = original_stream_open_function;
     zend_compile_file = original_compile_file;
     
+    if(WCG(detours) != NULL)
+    {
+        detours_terminate(WCG(detours));
+        detours_destroy(WCG(detours));
+
+        WCG(detours) = NULL;
+    }
+
+    if(WCG(zvcopied) != NULL)
+    {
+        alloc_pefree(WCG(zvcopied));
+        WCG(zvcopied) = NULL;
+    }
+
     if(WCG(lfcache) != NULL)
     {
         aplist_terminate(WCG(lfcache));
@@ -1608,27 +1687,37 @@ Finished:
 
 PHP_FUNCTION(wincache_scache_meminfo)
 {
-    int          result = NONFATAL;
-    alloc_info * pinfo  = NULL;
+    int           result = NONFATAL;
+    alloc_info *  pinfo  = NULL;
 
-    if(WCG(zvscache) == NULL)
+    if(WCG(zvscache) != NULL)
     {
-        goto Finished;
-    }
-
-    result = alloc_getinfo(WCG(zvscache)->zvalloc, &pinfo);
-    if(FAILED(result))
-    {
-        goto Finished;
+        result = alloc_getinfo(WCG(zvscache)->zvalloc, &pinfo);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
     }
 
     array_init(return_value);
 
-    add_assoc_long(return_value, "memory_total", pinfo->total_size);
-    add_assoc_long(return_value, "memory_free", pinfo->free_size);
-    add_assoc_long(return_value, "num_used_blks", pinfo->usedcount);
-    add_assoc_long(return_value, "num_free_blks", pinfo->freecount);
-    add_assoc_long(return_value, "memory_overhead", pinfo->mem_overhead);
+    /* If cache is not initialized, set everything to 0 */
+    if(pinfo == NULL)
+    {
+        add_assoc_long(return_value, "memory_total", 0);
+        add_assoc_long(return_value, "memory_free", 0);
+        add_assoc_long(return_value, "num_used_blks", 0);
+        add_assoc_long(return_value, "num_free_blks", 0);
+        add_assoc_long(return_value, "memory_overhead", 0);
+    }
+    else
+    {
+        add_assoc_long(return_value, "memory_total", pinfo->total_size);
+        add_assoc_long(return_value, "memory_free", pinfo->free_size);
+        add_assoc_long(return_value, "num_used_blks", pinfo->usedcount);
+        add_assoc_long(return_value, "num_free_blks", pinfo->freecount);
+        add_assoc_long(return_value, "memory_overhead", pinfo->mem_overhead);
+    }
 
 Finished:
 
@@ -1687,6 +1776,151 @@ Finished:
     }
 
     RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_function_exists)
+{
+    char *             oname     = NULL;
+    int                oname_len = 0;
+    char *             name      = NULL;
+    int                name_len  = 0;
+    zend_function *    func      = NULL;
+    char *             lcname    = NULL;
+    unsigned int       retval    = 0;
+    unsigned int *     pdata     = NULL;
+    static HashTable * fe_table  = NULL;
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &oname, &oname_len) == FAILURE)
+    {
+        return;
+    }
+
+    /* Initialize static hashtable if not already initialized */
+    if(fe_table == NULL)
+    {
+        fe_table = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+        if(fe_table == NULL)
+        {
+            return;
+        }
+
+        zend_hash_init(fe_table, 0, NULL, NULL, 1);
+    }
+
+    /* Try to find the function name in local hashtable first */
+    if(zend_hash_find(fe_table, oname, oname_len + 1, (void **)&pdata) == SUCCESS)
+    {
+        RETURN_BOOL(*pdata);
+    }
+
+    /* If not found, do what original function_exists does */
+    lcname = zend_str_tolower_dup(oname, oname_len);
+    name = lcname;
+    name_len = oname_len;
+
+    /* Ignore leading "\" */
+    if (lcname[0] == '\\')
+    {
+        name = &lcname[1];
+        name_len--;
+    }
+
+    retval = (zend_hash_find(EG(function_table), name, name_len+1, (void **)&func) == SUCCESS);
+    efree(lcname);
+
+    if(retval && func->type == ZEND_INTERNAL_FUNCTION && func->internal_function.handler == zif_display_disabled_function)
+    {
+        retval = 0;
+    }
+
+    /* Keep this entry in hashtable with original name */
+    zend_hash_add(fe_table, oname, oname_len + 1, &retval, sizeof(void *), NULL);
+
+    RETURN_BOOL(retval);
+}
+
+PHP_FUNCTION(wincache_class_exists)
+{
+    char *              class_name      = NULL;
+    int                 class_name_len  = 0;
+    char *              lc_name         = NULL;
+    zend_class_entry ** ce              = NULL;
+    int                 found           = 0;
+    zend_bool           autoload        = 1;
+    unsigned int        retval          = 0;
+    unsigned int *      pdata           = NULL;
+    static HashTable *  ce_table        = NULL;
+    ALLOCA_FLAG(use_heap)
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &class_name, &class_name_len, &autoload) == FAILURE)
+    {
+        return;
+    }
+
+    /* Initialize static hashtable if not already initialized */
+    if(ce_table == NULL)
+    {
+        ce_table = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+        if(ce_table == NULL)
+        {
+            return;
+        }
+
+        zend_hash_init(ce_table, 0, NULL, NULL, 1);
+    }
+
+    /* Try to find the function name in local hashtable first */
+    if(zend_hash_find(ce_table, class_name, class_name_len + 1, (void **)&pdata) == SUCCESS)
+    {
+        RETURN_BOOL(*pdata);
+    }
+
+    if(!autoload)
+    {
+        char * name = NULL;
+        int    len  = 0;
+
+#ifndef PHP_VERSION_52
+        lc_name = do_alloca(class_name_len + 1, use_heap);
+#else
+        lc_name = do_alloca_with_limit(class_name_len + 1, use_heap);
+#endif
+        zend_str_tolower_copy(lc_name, class_name, class_name_len);
+
+        /* Ignore leading "\" */
+        name = lc_name;
+        len = class_name_len;
+        if (lc_name[0] == '\\')
+        {
+            name = &lc_name[1];
+            len--;
+        }
+    
+        found = zend_hash_find(EG(class_table), name, len + 1, (void **)&ce);
+#ifndef PHP_VERSION_52
+        free_alloca(lc_name, use_heap);
+#else
+        free_alloca_with_limit(lc_name, use_heap);
+#endif
+        retval = (found == SUCCESS && !((*ce)->ce_flags & ZEND_ACC_INTERFACE));
+        goto Finished;
+    }
+
+    if(zend_lookup_class(class_name, class_name_len, &ce TSRMLS_CC) == SUCCESS)
+    {
+        retval = (((*ce)->ce_flags & ZEND_ACC_INTERFACE) == 0);
+    }
+    else
+    {
+       retval = 0;
+    }
+
+Finished:
+
+    /* Keep this entry in hashtable with original name */
+    zend_hash_add(ce_table, class_name, class_name_len + 1, &retval, sizeof(void *), NULL);
+
+    RETURN_BOOL(retval);
 }
 
 PHP_FUNCTION(wincache_ucache_get)
@@ -2417,6 +2651,7 @@ PHP_FUNCTION(wincache_ucache_info)
 
         add_assoc_string(zfentry, "key_name", peinfo->key, 1);
         add_assoc_string(zfentry, "value_type", valuetype, 1);
+        add_assoc_long(zfentry, "value_size", peinfo->sizeb);
         add_assoc_long(zfentry, "ttl_seconds", peinfo->ttl);
         add_assoc_long(zfentry, "age_seconds", peinfo->age);
         add_assoc_long(zfentry, "hitcount", peinfo->hitcount);
@@ -2463,86 +2698,100 @@ PHP_FUNCTION(wincache_scache_info)
     zvcache_info         zvinfo      = {0};
     zend_bool            summaryonly = 0;
 
-    if(WCG(zvscache) == NULL)
+    if(WCG(zvscache) != NULL)
     {
-        result = FATAL_UNEXPECTED_FCALL;
-        goto Finished;
-    }
+        if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &summaryonly) == FAILURE)
+        {
+            result = FATAL_INVALID_ARGUMENT;
+            goto Finished;
+        }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &summaryonly) == FAILURE)
-    {
-        result = FATAL_INVALID_ARGUMENT;
-        goto Finished;
-    }
+        plist = (zend_llist *)alloc_emalloc(sizeof(zend_llist));
+        if(plist == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
 
-    plist = (zend_llist *)alloc_emalloc(sizeof(zend_llist));
-    if(plist == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    result = zvcache_list(WCG(zvscache), summaryonly, &zvinfo, plist);
-    if(FAILED(result))
-    {
-        goto Finished;
+        result = zvcache_list(WCG(zvscache), summaryonly, &zvinfo, plist);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
     }
 
     /* Fill the array and then call zend_llist_destroy */
     array_init(return_value);
-    add_assoc_long(return_value, "total_cache_uptime", zvinfo.initage);
-    add_assoc_bool(return_value, "is_local_cache", zvinfo.islocal);
-    add_assoc_long(return_value, "total_item_count", zvinfo.itemcount);
-    add_assoc_long(return_value, "total_hit_count", zvinfo.hitcount);
-    add_assoc_long(return_value, "total_miss_count", zvinfo.misscount);
+
+    /* If cache is not initialized, set properties to 0 */
+    if(plist == NULL)
+    {
+        add_assoc_long(return_value, "total_cache_uptime", 0);
+        add_assoc_bool(return_value, "is_local_cache", 0);
+        add_assoc_long(return_value, "total_item_count", 0);
+        add_assoc_long(return_value, "total_hit_count", 0);
+        add_assoc_long(return_value, "total_miss_count", 0);
+    }
+    else
+    {
+        add_assoc_long(return_value, "total_cache_uptime", zvinfo.initage);
+        add_assoc_bool(return_value, "is_local_cache", zvinfo.islocal);
+        add_assoc_long(return_value, "total_item_count", zvinfo.itemcount);
+        add_assoc_long(return_value, "total_hit_count", zvinfo.hitcount);
+        add_assoc_long(return_value, "total_miss_count", zvinfo.misscount);
+    }
 
     MAKE_STD_ZVAL(zfentries);
     array_init(zfentries);
     
-    peinfo = (zvcache_info_entry *)zend_llist_get_first(plist);
-    while(peinfo != NULL)
+    if(plist != NULL)
     {
-        MAKE_STD_ZVAL(zfentry);
-        array_init(zfentry);
-
-        switch(peinfo->type)
+        peinfo = (zvcache_info_entry *)zend_llist_get_first(plist);
+        while(peinfo != NULL)
         {
-            case IS_NULL:
-                valuetype = "null";
-                break;
-            case IS_BOOL:
-                valuetype = "bool";
-                break;
-            case IS_LONG:
-                valuetype = "long";
-                break;
-            case IS_DOUBLE:
-                valuetype = "double";
-                break;
-            case IS_STRING:
-            case IS_CONSTANT:
-                valuetype = "string";
-                break;
-            case IS_ARRAY:
-            case IS_CONSTANT_ARRAY:
-                valuetype = "array";
-                break;
-            case IS_OBJECT:
-                valuetype = "object";
-                break;
-            default:
-                valuetype = "unknown";
-                break;
+            MAKE_STD_ZVAL(zfentry);
+            array_init(zfentry);
+
+            switch(peinfo->type)
+            {
+                case IS_NULL:
+                    valuetype = "null";
+                    break;
+                case IS_BOOL:
+                    valuetype = "bool";
+                    break;
+                case IS_LONG:
+                    valuetype = "long";
+                    break;
+                case IS_DOUBLE:
+                    valuetype = "double";
+                    break;
+                case IS_STRING:
+                case IS_CONSTANT:
+                    valuetype = "string";
+                    break;
+                case IS_ARRAY:
+                case IS_CONSTANT_ARRAY:
+                    valuetype = "array";
+                    break;
+                case IS_OBJECT:
+                    valuetype = "object";
+                    break;
+                default:
+                    valuetype = "unknown";
+                    break;
+            }
+
+            add_assoc_string(zfentry, "key_name", peinfo->key, 1);
+            add_assoc_string(zfentry, "value_type", valuetype, 1);
+            add_assoc_long(zfentry, "value_size", peinfo->sizeb);
+            add_assoc_long(zfentry, "ttl_seconds", peinfo->ttl);
+            add_assoc_long(zfentry, "age_seconds", peinfo->age);
+            add_assoc_long(zfentry, "hitcount", peinfo->hitcount);
+
+            add_index_zval(zfentries, index++, zfentry);
+            peinfo = (zvcache_info_entry *)zend_llist_get_next(plist);
         }
-
-        add_assoc_string(zfentry, "key_name", peinfo->key, 1);
-        add_assoc_string(zfentry, "value_type", valuetype, 1);
-        add_assoc_long(zfentry, "ttl_seconds", peinfo->ttl);
-        add_assoc_long(zfentry, "age_seconds", peinfo->age);
-        add_assoc_long(zfentry, "hitcount", peinfo->hitcount);
-
-        add_index_zval(zfentries, index++, zfentry);
-        peinfo = (zvcache_info_entry *)zend_llist_get_next(plist);
     }
 
     add_assoc_zval(return_value, "scache_entries", zfentries);

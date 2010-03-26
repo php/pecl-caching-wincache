@@ -686,9 +686,10 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
             header->total_size = size;
             header->free_size  = fremid->size;
 
-            header->cacheheader = 0;
-            header->usedcount   = 0;
-            header->freecount   = 1;
+            header->cacheheader1 = 0;
+            header->cacheheader2 = 0;
+            header->usedcount    = 0;
+            header->freecount    = 1;
         }
 
         header->mapcount = 1;
@@ -853,78 +854,63 @@ void alloc_free_mpool(alloc_context * palloc, size_t hoffset)
     return;
 }
 
-void * alloc_get_cacheheader(alloc_context * palloc, unsigned int valuecount, unsigned int type)
+void * alloc_get_cacheheader(alloc_context * palloc, unsigned int msize, unsigned int type)
 {
-    void *                 pvoid  = NULL;
-    alloc_segment_header * header = NULL;
-    unsigned int           msize  = 0;
+    void *                 pvoid   = NULL;
+    alloc_segment_header * header  = NULL;
+    size_t *               pcvalue = NULL;
 
     dprintverbose("start alloc_get_cacheheader");
 
     _ASSERT(palloc != NULL);
+    _ASSERT(msize  >  0);
+
     header = palloc->header;
 
-    if(header->cacheheader == 0)
+    switch(type)
     {
-        /* Memory for cache header is not allocated yet */
-        if(type == CACHE_TYPE_FILELIST)
-        {
-            _ASSERT(valuecount >  0);
-            msize = sizeof(aplist_header) + (valuecount - 1) * sizeof(size_t);
-        }
-        else if(type == CACHE_TYPE_RESPATHS)
-        {
-            _ASSERT(valuecount > 0);
-            msize = sizeof(rplist_header) + (valuecount - 1) * sizeof(size_t);
-        }
-        else if(type == CACHE_TYPE_FILECONTENT)
-        {
-            _ASSERT(valuecount == 0);
-            msize = sizeof(fcache_header);
-        }
-        else if(type == CACHE_TYPE_BYTECODES)
-        {
-            _ASSERT(valuecount == 0);
-            msize = sizeof(ocache_header);
-        }
-        else if(type == CACHE_TYPE_USERZVALS)
-        {
-            _ASSERT(valuecount > 0);
-            msize = sizeof(zvcache_header) + (valuecount - 1) * sizeof(size_t);
-        }
-        else if(type == CACHE_TYPE_SESSZVALS)
-        {
-            _ASSERT(valuecount > 0);
-            msize = sizeof(zvcache_header) + (valuecount - 1) * sizeof(size_t);
-        }
-        else
-        {
+        case CACHE_TYPE_FILELIST:
+        case CACHE_TYPE_RESPATHS:
+        case CACHE_TYPE_FILECONTENT:
+        case CACHE_TYPE_BYTECODES:
+        case CACHE_TYPE_USERZVALS:
+        case CACHE_TYPE_SESSZVALS:
+            pcvalue = &header->cacheheader1;
+            break;
+
+        case CACHE_TYPE_FCNOTIFY:
+            pcvalue = &header->cacheheader2;
+            break;
+
+        default:
             _ASSERT(FALSE);
-        }
+            break;
+    }
 
-        if(FAILED(allocate_memory(palloc, msize, &pvoid)))
-        {
-            pvoid = NULL;
-            goto Finished;
-        }
+    if(*pcvalue != 0)
+    {
+        pvoid = (void *)((char *)palloc->memaddr + (*pcvalue));
+        goto Finished;
+    }
 
-        lock_writelock(palloc->rwlock);
-        if(header->cacheheader != 0)
-        {
-            /* Some other process allocated before this process could do */
-            lock_writeunlock(palloc->rwlock);
-            free_memory(palloc, pvoid);
-            pvoid = (void *)((char *)palloc->memaddr + header->cacheheader);
-        }
-        else
-        {
-            header->cacheheader = POINTER_OFFSET(palloc->memaddr, pvoid);
-            lock_writeunlock(palloc->rwlock);
-        }
+    if(FAILED(allocate_memory(palloc, msize, &pvoid)))
+    {
+        pvoid = NULL;
+        goto Finished;
+    }
+
+    lock_writelock(palloc->rwlock);
+    if(*pcvalue != 0)
+    {
+        /* Some other process allocated before this process could do */
+        lock_writeunlock(palloc->rwlock);
+        free_memory(palloc, pvoid);
+        pvoid = (void *)((char *)palloc->memaddr + (*pcvalue));
     }
     else
     {
-        pvoid = (void *)((char *)palloc->memaddr + header->cacheheader);
+        *pcvalue = POINTER_OFFSET(palloc->memaddr, pvoid);
+        lock_writeunlock(palloc->rwlock);
     }
 
 Finished:

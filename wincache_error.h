@@ -133,6 +133,15 @@
 #define FATAL_SESSION_BASE                  1000
 #define FATAL_SESSION_INITIALIZE            FATAL_SESSION_BASE + 1
 
+/* Error codes used by file change notification */
+#define FATAL_FCNOTIFY_BASE                 1100
+#define FATAL_FCNOTIFY_INITIALIZE           FATAL_FCNOTIFY_BASE + 1
+
+/* Error codes used by detours */
+#define FATAL_DETOURS_BASE                  1200
+#define FATAL_DETOURS_INITIALIZE            FATAL_DETOURS_BASE + 1
+#define FATAL_DETOURS_TOOBIG                FATAL_DETOURS_BASE + 2
+
 /* Warning codes */
 #define WARNING_COMMON_BASE                 5000
 #define WARNING_FCACHE_TOOBIG               WARNING_COMMON_BASE + 1

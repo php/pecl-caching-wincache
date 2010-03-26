@@ -40,6 +40,11 @@
 - Separated session cache from user cache. Added wincache_scache_info and wincache_scache_meminfo.
 - Made session cache use file backed shared memory so that sessions survive process recycle.
 - updated wincache.php to show user cache and session cache informaiton on different pages.
+- Calculated memory allocated for storing zval in user cache and exposed it from wincache_ucache_info.
+- Distributed file change notification infrastructure to be used with file cache.
+- Using pagefile backed shared memory if APP_POOL_ID environment variable is not available.
+- Fixed a bug in hashtable copyout. Missed setting hashtable global list tail.
+- Added ability to reroute functions in opcode copy code.
   </notes>
   <contents>
     <dir name="/">

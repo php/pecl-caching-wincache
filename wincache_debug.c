@@ -57,14 +57,9 @@ void dprintsetlevel(unsigned int level)
     return;
 }
 
-void dprintmessage(unsigned int type, char * format, va_list args)
+void dprintmessage(char * format, va_list args)
 {
     char debug_message[255];
-
-    if(type > gdebuglevel)
-    {
-        return;
-    }
 
     sprintf_s(debug_message, 255, "WINCACHE: ");
     vsprintf_s(debug_message + 10, 245, format, args);
@@ -81,39 +76,54 @@ void dprintmessage(unsigned int type, char * format, va_list args)
 void dprintalways(char * format, ...)
 {
     va_list args;
-    va_start(args, format);
-    dprintmessage(WINCACHE_DEBUG_MTYPE_ALWAYS, format, args);
-    va_end(args);
+    if(gdebuglevel >= WINCACHE_DEBUG_MTYPE_ALWAYS)
+    {
+        va_start(args, format);
+        dprintmessage(format, args);
+        va_end(args);
+    }
 }
 
 void dprintcritical(char * format, ...)
 {
     va_list args;
-    va_start(args, format);
-    dprintmessage(WINCACHE_DEBUG_MTYPE_CRITICAL, format, args);
-    va_end(args);
+    if(gdebuglevel >= WINCACHE_DEBUG_MTYPE_CRITICAL)
+    {
+        va_start(args, format);
+        dprintmessage(format, args);
+        va_end(args);
+    }
 }
 
 void dprintimportant(char * format, ...)
 {
     va_list args;
-    va_start(args, format);
-    dprintmessage(WINCACHE_DEBUG_MTYPE_IMPORTANT, format, args);
-    va_end(args);
+    if(gdebuglevel >= WINCACHE_DEBUG_MTYPE_IMPORTANT)
+    {
+        va_start(args, format);
+        dprintmessage(format, args);
+        va_end(args);
+    }
 }
 
 void dprintverbose(char * format, ...)
 {
     va_list args;
-    va_start(args, format);
-    dprintmessage(WINCACHE_DEBUG_MTYPE_VERBOSE, format, args);
-    va_end(args);
+    if(gdebuglevel >= WINCACHE_DEBUG_MTYPE_VERBOSE)
+    {
+        va_start(args, format);
+        dprintmessage(format, args);
+        va_end(args);
+    }
 }
 
 void dprintdecorate(char * format, ...)
 {
     va_list args;
-    va_start(args, format);
-    dprintmessage(WINCACHE_DEBUG_MTYPE_DECORATE, format, args);
-    va_end(args);
+    if(gdebuglevel >= WINCACHE_DEBUG_MTYPE_DECORATE)
+    {
+        va_start(args, format);
+        dprintmessage(format, args);
+        va_end(args);
+    }
 }

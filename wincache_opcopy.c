@@ -824,7 +824,10 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
     zend_op *       pnewop    = NULL;
     zend_op *       pnextop   = NULL;
     znode *         pznode    = NULL;
+    char *          frname    = NULL;
+    unsigned int    frnlen    = 0;
 
+    TSRMLS_FETCH();
     dprintverbose("start copy_zend_op");
 
     _ASSERT(popcopy != NULL);
@@ -850,8 +853,29 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
 
     memcpy_s(pnewop, sizeof(zend_op), poldop, sizeof(zend_op));
 
-    /* TBD?? Opcode handler pointer can be different for */
-    /* different processes. Do I need a wrapper and redirection table */
+    /* Detour function call if one is configured */
+    if(popcopy->optype == OPCOPY_OPERATION_COPYIN && WCG(detours) != NULL && poldop->opcode == ZEND_DO_FCALL)
+    {
+        result = detours_fcheck(WCG(detours), Z_STRVAL_P(&poldop->op1.u.constant), &frname);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        if(frname != NULL)
+        {
+            /* TBD?? Free memory allocated by existing string */
+
+            /* Change the function call to replacement function */
+            frnlen = strlen(frname);
+
+            Z_STRVAL(poldop->op1.u.constant) = estrndup(frname, frnlen);
+            Z_STRLEN(poldop->op1.u.constant) = frnlen;
+
+            ZVAL_LONG(&poldop->op2.u.constant, zend_hash_func(frname, frnlen + 1));
+        }
+    }
+
     pznode = &pnewop->result;
     result = copy_znode(popcopy, &poldop->result, &pznode);
     if(FAILED(result))

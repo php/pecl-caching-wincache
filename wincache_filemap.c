@@ -36,7 +36,7 @@
 #define FILEMAP_INFO_HEADER_SIZE ALIGNQWORD(sizeof(filemap_information_header))
 #define FILEMAP_INFO_ENTRY_SIZE  ALIGNQWORD(sizeof(filemap_information_entry))
 
-static unsigned short getppid(TSRMLS_D);
+static unsigned int getppid(TSRMLS_D);
 static int create_rwlock(char * lockname, lock_context ** pplock TSRMLS_DC);
 static void destroy_rwlock(lock_context * plock);
 static int create_file_mapping(char * name, char * shmfilepath, size_t size, HANDLE * pshmfile, unsigned int * pexisting, HANDLE * pmap);
@@ -49,7 +49,7 @@ static void destroy_information_filemap(filemap_information * pinfo);
 unsigned short gfilemapid = 1;
 
 /* private method to get parent process id */
-static unsigned short getppid(TSRMLS_D)
+static unsigned int getppid(TSRMLS_D)
 {
     int            result    = NONFATAL;
     unsigned int   pid       = 0;
@@ -252,7 +252,10 @@ static int create_file_mapping(char * name, char * shmfilepath, size_t size, HAN
         if(GetLastError() == ERROR_ALREADY_EXISTS)
         {
             isexisting = 1;
+
             /* TBD?? Check file size and error out if its greater than size */
+            /* TBD?? If file never got initialized properly, mark isexisting = 0 */
+            /* TBD?? Detect memory corruption. Mark isexisting = 0 */
         }
     }
 
@@ -606,7 +609,7 @@ int filemap_global_initialize(TSRMLS_D)
     }
 
     /* Set default values of structure members */
-    fgcontext->pid  = (unsigned short)GetCurrentProcessId();
+    fgcontext->pid  = GetCurrentProcessId();
     fgcontext->ppid = getppid(TSRMLS_C);
     fgcontext->info = NULL;
 
@@ -669,7 +672,7 @@ void filemap_global_terminate(TSRMLS_D)
 }
 
 /* API to get current process ID */
-unsigned short filemap_getpid(TSRMLS_D)
+unsigned int filemap_getpid(TSRMLS_D)
 {
     _ASSERT(WCG(fmapgdata) != NULL);
     return WCG(fmapgdata)->pid;
@@ -678,7 +681,7 @@ unsigned short filemap_getpid(TSRMLS_D)
 /* API tp get the parent process ID */
 /* Use parent process identifier to create */
 /* separate caches for processes under a process */
-unsigned short filemap_getppid(TSRMLS_D)
+unsigned int filemap_getppid(TSRMLS_D)
 {
     _ASSERT(WCG(fmapgdata) != NULL);
     return WCG(fmapgdata)->ppid;
@@ -761,6 +764,13 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
     _ASSERT(size_mb        >  0);
 
     size = size_mb * 1024 * 1024;
+
+    /* If parentpid is greater than 65536, use shmfilepath */
+    /* Else don't create file backed shared memory */
+    if(WCG(fmapgdata)->ppid <= 65536)
+    {
+        shmfilepath = NULL;
+    }
 
     /* See if this is already there in the list of filemaps */
     /* If not create a new filemap and add to the list */
@@ -1142,9 +1152,9 @@ size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC)
     return size;
 }
 
-unsigned short filemap_getcpid(filemap_context * pfilemap TSRMLS_DC)
+unsigned int filemap_getcpid(filemap_context * pfilemap TSRMLS_DC)
 {
-    unsigned short cpid = 0;
+    unsigned int cpid = 0;
 
     dprintverbose("start filemap_getcpid");
 

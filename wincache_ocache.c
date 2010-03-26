@@ -151,7 +151,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
     }
 
     /* Get memory for cache header */
-    pcache->header = (ocache_header *)alloc_get_cacheheader(pcache->palloc, 0, CACHE_TYPE_BYTECODES);
+    pcache->header = (ocache_header *)alloc_get_cacheheader(pcache->palloc, sizeof(ocache_header), CACHE_TYPE_BYTECODES);
     if(pcache->header == NULL)
     {
         result = FATAL_OCACHE_INITIALIZE;

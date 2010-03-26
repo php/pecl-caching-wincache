@@ -102,6 +102,7 @@
 #define CACHE_TYPE_BYTECODES       4
 #define CACHE_TYPE_USERZVALS       5
 #define CACHE_TYPE_SESSZVALS       6
+#define CACHE_TYPE_FCNOTIFY        7
 
 #define APLIST_TYPE_INVALID        255
 #define APLIST_TYPE_GLOBAL         0
@@ -128,8 +129,10 @@
 #include "wincache_lock.h"
 #include "wincache_filemap.h"
 #include "wincache_alloc.h"
+#include "wincache_detours.h"
 #include "wincache_ocache.h"
 #include "wincache_opcopy.h"
+#include "wincache_fcnotify.h"
 #include "wincache_fcache.h"
 #include "wincache_rplist.h"
 #include "wincache_aplist.h"

@@ -711,6 +711,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     size_t          mapsize  = 0;
     size_t          segsize  = 0;
     aplist_header * header   = NULL;
+    unsigned int    msize    = 0;
 
     unsigned int    cticks   = 0;
     unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
@@ -778,7 +779,8 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     }
 
     /* Get memory for cache header */
-    pcache->apheader = (aplist_header *)alloc_get_cacheheader(pcache->apalloc, filecount, CACHE_TYPE_FILELIST);
+    msize = sizeof(aplist_header) + ((filecount - 1) * sizeof(size_t));
+    pcache->apheader = (aplist_header *)alloc_get_cacheheader(pcache->apalloc, msize, CACHE_TYPE_FILELIST);
     if(pcache->apheader == NULL)
     {
         result = FATAL_FCACHE_INITIALIZE;

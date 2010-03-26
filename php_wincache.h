@@ -60,6 +60,7 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned int             numfiles;    /* Configured number of files to handle */
     unsigned int             fcchkfreq;   /* File change check frequency in seconds */
     unsigned int             ttlmax;      /* Seconds a cache entry can stay dormant */
+    detours_context *        detours;     /* Function and class detours set */
 
     zend_bool                enablecli;   /* Enable wincache for command line sapi */
     zend_bool                fcenabled;   /* File cache enabled or disabled */
@@ -75,8 +76,10 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     char *                   ocefilter;   /* Comma-separated sitelist having ocenabled toggled */
     char *                   fcefilter;   /* Comma-separated sitelist having fcenabled toggled */
     char *                   namesalt;    /* Salt to use in all the names */
+    char *                   rerouteini;  /* Ini file containing function/class reroutes */
     zend_bool                localheap;   /* Local heap is enabled or disabled */
 
+    HashTable *              zvcopied;    /* Copied zvals to make refcounting work */
     ocacheval_list *         oclisthead;  /* List of ocache_value entries in use */
     ocacheval_list *         oclisttail;  /* Tail of ocache_value entries list */
     unsigned int             lasterror;   /* Last error value */

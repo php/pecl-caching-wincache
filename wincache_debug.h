@@ -35,7 +35,7 @@
 #define _WINCACHE_DEBUG_H_
 
 extern void dprintsetlevel(unsigned int level);
-extern void dprintmessage(unsigned int type, char * format, va_list args);
+extern void dprintmessage(char * format, va_list args);
 extern void dprintalways(char * format, ...);
 extern void dprintcritical(char * format, ...);
 extern void dprintimportant(char * format, ...);

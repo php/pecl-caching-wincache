@@ -115,8 +115,8 @@ struct filemap_information_entry
     char                         name[MAX_PATH];/* name of filemap */
     size_t                       size;          /* Size of this filemap */
     unsigned int                 mapcount;      /* How many processes mapped this filemap */
-    unsigned short               cpid;          /* ProcessID of process which initially created this map */
-    unsigned short               opid;          /* Current ProcessID which is the owner */
+    unsigned int                 cpid;          /* ProcessID of process which initially created this map */
+    unsigned int                 opid;          /* Current ProcessID which is the owner */
     void *                       mapaddr;       /* Map address where owner has this memory mapped */
 };
 
@@ -146,15 +146,15 @@ struct filemap_information
 typedef struct filemap_global_context filemap_global_context;
 struct filemap_global_context
 {
-    unsigned short               pid;           /* PID of this process */
-    unsigned short               ppid;          /* Parent process id */
+    unsigned int                 pid;           /* PID of this process */
+    unsigned int                 ppid;          /* Parent process id */
     filemap_information *        info;          /* pointer to filemap_information */
 };
 
 extern int  filemap_global_initialize(TSRMLS_D);
 extern void filemap_global_terminate(TSRMLS_D);
-extern unsigned short filemap_getpid(TSRMLS_D);
-extern unsigned short filemap_getppid(TSRMLS_D);
+extern unsigned int filemap_getpid(TSRMLS_D);
+extern unsigned int filemap_getppid(TSRMLS_D);
 
 extern int    filemap_create(filemap_context ** ppfilemap);
 extern void   filemap_destroy(filemap_context * pfilemap);
@@ -162,7 +162,7 @@ extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmap
 extern void   filemap_terminate(filemap_context * pfilemap);
 
 extern size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC);
-extern unsigned short filemap_getcpid(filemap_context * pfilemap TSRMLS_DC);
+extern unsigned int filemap_getcpid(filemap_context * pfilemap TSRMLS_DC);
 
 extern void   filemap_runtest();
 

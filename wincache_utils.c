@@ -308,11 +308,11 @@ int utils_apoolpid()
         goto Finished;
     }
 
-    /* Return a value which can be stored as unsigned short */
-    /* Keeping number larger than 32766 to not confuse with regular pids */
+    /* Keeping number between 65536 and 99999 to not confuse with regular pids */
+    /* 99999 - 65537 = 34462. Code dependent on assumption that apoolpid > 65536 */
     retval = utils_hashcalc(buffer, buflen);
-    retval %= 32766;
-    retval += 32766;
+    retval %= 34462;
+    retval += 65537;
 
 Finished:
 
