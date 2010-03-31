@@ -195,7 +195,7 @@ ZEND_END_ARG_INFO()
 #endif
         
 /* Put all user defined functions here */
-function_entry wincache_functions[] = {
+zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_rplist_fileinfo, arginfo_wincache_rplist_fileinfo)
     PHP_FE(wincache_rplist_meminfo, arginfo_wincache_rplist_meminfo)
     PHP_FE(wincache_fcache_fileinfo, arginfo_wincache_fcache_fileinfo)
