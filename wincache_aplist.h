@@ -48,11 +48,13 @@ struct aplist_value
     unsigned int    add_ticks;      /* Ticks when this entry was created */
     unsigned int    use_ticks;      /* Ticks when this entry was last used */
     unsigned int    last_check;     /* Ticks when last file change check was made */
-    unsigned int    is_deleted;     /* If set to 1, value is marked for deletion */
+    unsigned short  is_deleted;     /* If set to 1, value is marked for deletion */
+    unsigned short  is_changed;     /* If set to 1, value is marked changed */
 
     size_t          fcacheval;      /* File cache value offset */
     size_t          ocacheval;      /* Opcode cache value offset */
     size_t          resentry;       /* Offset of first entry in rplist */
+    size_t          fcnotify;       /* Offset of file change notification entry */
     size_t          prev_value;     /* previous aplist_value offset */
     size_t          next_value;     /* next aplist_value offset */
 };
@@ -94,6 +96,7 @@ struct aplist_context
     rplist_context *   prplist;     /* Resolve path cache to resolve all paths */
     fcache_context *   pfcache;     /* File cache containing file content */
     ocache_context *   pocache;     /* Opcode cache containing opcodes */
+    fcnotify_context * pnotify;     /* File change notification context */
     int                resnumber;   /* Resource number for this extension */
 };
 
@@ -129,6 +132,7 @@ extern int  aplist_getinfo(aplist_context * pcache, unsigned char type, zend_boo
 extern void aplist_freeinfo(unsigned char type, cache_info * pinfo);
 extern int  aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue);
 extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC);
+extern void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename);
 
 extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC);
 extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);

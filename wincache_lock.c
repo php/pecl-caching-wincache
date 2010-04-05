@@ -112,7 +112,7 @@ void lock_destroy(lock_context * plock)
 
 /* Initialize the lock context with valid information */
 /* lock is not ready to use unless initialize is called */
-int lock_initialize(lock_context * plock, char * name, unsigned int lnumber, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC)
+int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC)
 {
     int    result  = NONFATAL;
     char * objname = 0;
@@ -122,13 +122,14 @@ int lock_initialize(lock_context * plock, char * name, unsigned int lnumber, uns
 
     dprintverbose("start lock_initialize");
 
-    _ASSERT(plock   != NULL);
-    _ASSERT(name    != NULL);
-    _ASSERT(lnumber <= LOCK_NUMBER_MAXIMUM);
-    _ASSERT(type    <= LOCK_TYPE_MAXIMUM);
-    _ASSERT(usetype <= LOCK_USET_MAXIMUM);
+    _ASSERT(plock    != NULL);
+    _ASSERT(name     != NULL);
+    _ASSERT(cachekey != 0);
+    _ASSERT(cachekey <= LOCK_NUMBER_MAXIMUM);
+    _ASSERT(type     <= LOCK_TYPE_MAXIMUM);
+    _ASSERT(usetype  <= LOCK_USET_MAXIMUM);
 
-    if(lnumber > LOCK_NUMBER_MAXIMUM)
+    if(cachekey > LOCK_NUMBER_MAXIMUM)
     {
         result = FATAL_LOCK_NUMBER_LARGE;
         goto Finished;
@@ -166,7 +167,7 @@ int lock_initialize(lock_context * plock, char * name, unsigned int lnumber, uns
     }
 
     /* Add 4 for underscores, 1 for null termination, */
-    /* LOCK_NUMBER_MAX_STRLEN for adding lnumber, 2 for 0 (for global) */
+    /* LOCK_NUMBER_MAX_STRLEN for adding cachekey, 2 for 0 (for global) */
     namelen = namelen + LOCK_NUMBER_MAX_STRLEN + 7;
 
     /* Most synchronization object names are limited to MAX_PATH characters */
@@ -197,11 +198,11 @@ int lock_initialize(lock_context * plock, char * name, unsigned int lnumber, uns
     /* Create nameprefix as name_pid_ppid_ */
     if(WCG(namesalt) == NULL)
     {
-        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%u_%u_%u_", name, lnumber, pid, ppid);
+        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%u_%u_%u_", name, cachekey, pid, ppid);
     }
     else
     {
-        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%s_%u_%u_%u_", name, WCG(namesalt), lnumber, pid, ppid);
+        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%u_%s_%u_%u_", name, cachekey, WCG(namesalt), pid, ppid);
     }
 
     plock->namelen = strlen(plock->nameprefix);
@@ -646,7 +647,7 @@ void lock_runtest()
     _ASSERT(plock1->id != plock2->id);
 
     /* Initialize first lock */
-    result = lock_initialize(plock1, "LOCK_TEST1", 0, LOCK_TYPE_SHARED, LOCK_USET_SREAD_XWRITE, &rdcount TSRMLS_CC);
+    result = lock_initialize(plock1, "LOCK_TEST1", 1, LOCK_TYPE_SHARED, LOCK_USET_SREAD_XWRITE, &rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         dprintverbose("lock_initialize for plock1 failed");
@@ -661,7 +662,7 @@ void lock_runtest()
     _ASSERT(plock1->hxwrite   != NULL);
 
     /* Initialize second lock */
-    result = lock_initialize(plock2, "LOCK_TEST2", 0, LOCK_TYPE_LOCAL, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(plock2, "LOCK_TEST2", 1, LOCK_TYPE_LOCAL, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         dprintverbose("lock_intialize for plock2 failed");

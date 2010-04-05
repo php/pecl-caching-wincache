@@ -57,6 +57,7 @@ int ocache_create(ocache_context ** ppcache)
 
     pcache->id        = gocacheid++;
     pcache->islocal   = 0;
+    pcache->cachekey  = 0;
     pcache->hinitdone = NULL;
     pcache->resnumber = -1;
     pcache->memaddr   = NULL;
@@ -95,7 +96,7 @@ void ocache_destroy(ocache_context * pcache)
     return;
 }
 
-int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnumber, unsigned int cachesize TSRMLS_DC)
+int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned short cachekey, int resnumber, unsigned int cachesize TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          size     = 0;
@@ -108,6 +109,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
     dprintverbose("start ocache_initialize");
 
     _ASSERT(pcache    != NULL);
+    _ASSERT(cachekey  != 0);
     _ASSERT(resnumber != -1);
     _ASSERT(cachesize >= OCACHE_SIZE_MINIMUM && cachesize <= OCACHE_SIZE_MAXIMUM);
 
@@ -118,6 +120,8 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
         goto Finished;
     }
 
+    pcache->cachekey = cachekey;
+
     if(islocal)
     {
         mapclass = FILEMAP_MAP_LRANDOM;
@@ -127,7 +131,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
     }
 
     /* shmfilepath = NULL */
-    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, mapclass, cachesize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, cachekey, mapclass, cachesize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -144,7 +148,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pcache->palloc, islocal, "BYTECODE_SEGMENT", pcache->memaddr, size, 1 TSRMLS_CC);
+    result = alloc_initialize(pcache->palloc, islocal, "BYTECODE_SEGMENT", cachekey, pcache->memaddr, size, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -167,7 +171,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnu
         goto Finished;
     }
 
-    result = lock_initialize(pcache->prwlock, "BYTECODE_CACHE", 0, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(pcache->prwlock, "BYTECODE_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -740,7 +744,7 @@ void ocache_runtest()
         goto Finished;
     }
 
-    result = ocache_initialize(pcache, islocal, resnum, cachesize TSRMLS_CC);
+    result = ocache_initialize(pcache, islocal, 1, resnum, cachesize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

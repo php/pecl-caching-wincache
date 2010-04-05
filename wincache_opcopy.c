@@ -293,7 +293,7 @@ static int copy_zval_ref(opcopy_context * popcopy, zval ** ppoldz, zval *** pppn
     int     allocated = 0;
     zval ** ppnewz    = NULL;
 
-    dprintverbose("start copy_zval_ref");
+    dprintdecorate("start copy_zval_ref");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(ppoldz  != NULL);
@@ -342,7 +342,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zval_ref");
+    dprintdecorate("end copy_zval_ref");
 
     return result;
 }
@@ -376,7 +376,7 @@ static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info 
     unsigned int         namelen   = 0;
     unsigned int         doclen    = 0;
 
-    dprintverbose("start copy_zend_property_info");
+    dprintdecorate("start copy_zend_property_info");
     
     _ASSERT(popcopy != NULL);
     _ASSERT(poldp   != NULL);
@@ -471,7 +471,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_property_info");
+    dprintdecorate("end copy_zend_property_info");
 
     return result;
 }
@@ -511,7 +511,7 @@ static int copy_zend_arg_info(opcopy_context * popcopy, zend_arg_info * poldarg,
     unsigned int    namelen   = 0;
     unsigned int    cnamelen  = 0;
 
-    dprintverbose("start copy_zend_arg_info");
+    dprintdecorate("start copy_zend_arg_info");
 
     _ASSERT(popcopy  != NULL);
     _ASSERT(poldarg  != NULL);
@@ -597,7 +597,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_arg_info");
+    dprintdecorate("end copy_zend_arg_info");
 
     return result;
 }
@@ -637,7 +637,7 @@ static int copy_zend_arg_info_array(opcopy_context * popcopy, zend_arg_info * po
     zend_arg_info * pnew      = NULL;
     zend_arg_info * ptemp     = NULL;
 
-    dprintverbose("start copy_zend_arg_info_array");
+    dprintdecorate("start copy_zend_arg_info_array");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(pold    != NULL);
@@ -701,7 +701,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_arg_info_array");
+    dprintdecorate("end copy_zend_arg_info_array");
 
     return result;
 }
@@ -735,7 +735,7 @@ static int copy_znode(opcopy_context * popcopy, znode * poldz, znode ** ppnewz)
     znode * pnewz     = NULL;
     zval *  ptemp     = NULL;
 
-    dprintverbose("start copy_znode");
+    dprintdecorate("start copy_znode");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(poldz   != NULL);
@@ -792,7 +792,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_znode");
+    dprintdecorate("end copy_znode");
 
     return result;
 }
@@ -828,7 +828,7 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
     unsigned int    frnlen    = 0;
 
     TSRMLS_FETCH();
-    dprintverbose("start copy_zend_op");
+    dprintdecorate("start copy_zend_op");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(poldop  != NULL);
@@ -917,7 +917,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_op");
+    dprintdecorate("end copy_zend_op");
 
     return result;
 }
@@ -955,7 +955,7 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
     zend_op_array * pnewopa   = NULL;
     unsigned int *  pdata     = NULL;
 
-    dprintverbose("start copy_zend_op_array");
+    dprintdecorate("start copy_zend_op_array");
 
     _ASSERT(popcopy   != NULL);
     _ASSERT(poldopa   != NULL);
@@ -1243,7 +1243,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_op_array");
+    dprintdecorate("end copy_zend_op_array");
 
     return result;
 }
@@ -1339,7 +1339,7 @@ static int copy_zend_function(opcopy_context * popcopy, zend_function * poldf, z
     zend_function * pnewf     = NULL;
     zend_op_array * ptemp     = NULL;
 
-    dprintverbose("start copy_zend_function");
+    dprintdecorate("start copy_zend_function");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(poldf   != NULL);
@@ -1415,7 +1415,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_function");
+    dprintdecorate("end copy_zend_function");
 
     return result;
 }
@@ -1451,7 +1451,7 @@ static int copy_zend_function_entry(opcopy_context * popcopy, zend_function_entr
     int                    allocated = 0;
     zend_function_entry *  pnewfe    = NULL;
 
-    dprintverbose("start copy_zend_function_entry");
+    dprintdecorate("start copy_zend_function_entry");
 
     _ASSERT(popcopy != NULL);
     _ASSERT(poldfe  != NULL);
@@ -1532,7 +1532,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_zend_function_entry");
+    dprintdecorate("end copy_zend_function_entry");
 
     return result;
 }
@@ -1762,7 +1762,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
     HashTable *          phasht    = NULL;
     HashTable *          phashp    = NULL;
 
-    dprintverbose("start check_hashtable_bucket");
+    dprintdecorate("start check_hashtable_bucket");
 
     _ASSERT(pbucket   != NULL);
     _ASSERT(copy_flag != 0);
@@ -1844,7 +1844,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
         }
     }
 
-    dprintverbose("end check_hashtable_bucket");
+    dprintdecorate("end check_hashtable_bucket");
 
     return required;
 }
@@ -1856,7 +1856,7 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     Bucket * pnewb     = NULL;
     int      msize     = 0;
 
-    dprintverbose("start copy_hashtable_bucket");
+    dprintdecorate("start copy_hashtable_bucket");
 
     _ASSERT(popcopy   != NULL);
     _ASSERT(poldb     != NULL);
@@ -1937,7 +1937,7 @@ Finished:
         }
     }
 
-    dprintverbose("end copy_hashtable_bucket");
+    dprintdecorate("end copy_hashtable_bucket");
 
     return result;
 }

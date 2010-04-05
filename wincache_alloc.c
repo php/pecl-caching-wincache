@@ -582,7 +582,7 @@ void alloc_destroy(alloc_context * palloc)
 
 /* initmemory should be 1 for all non file backed shared memory allocators and 0 */
 /* for file backed shared memory allocators when filemap->existing is set to 1 */
-int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC)
+int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, unsigned short cachekey, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC)
 {
     int                    result   = NONFATAL;
     unsigned short         locktype = LOCK_TYPE_SHARED;
@@ -595,9 +595,10 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
 
     dprintverbose("start alloc_initialize");
 
-    _ASSERT(palloc != NULL);
-    _ASSERT(staddr != NULL);
-    _ASSERT(size   >  0);
+    _ASSERT(palloc   != NULL);
+    _ASSERT(cachekey != 0);
+    _ASSERT(staddr   != NULL);
+    _ASSERT(size     >  0);
 
     palloc->localheap = WCG(localheap);
     palloc->memaddr   = staddr;
@@ -619,7 +620,7 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         palloc->islocal = islocal;
     }
 
-    result = lock_initialize(palloc->rwlock, name, 0, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(palloc->rwlock, name, cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1366,7 +1367,7 @@ void alloc_runtest()
         goto Finished;
     }
 
-    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", memaddr, 4096, 1 TSRMLS_CC);
+    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", 1, memaddr, 4096, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

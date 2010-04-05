@@ -49,7 +49,7 @@
 /* won't work for per site php.ini configuration. We will end up sharing the */
 /* cache with all processes which won't be too bad either */
 
-#define PID_MAX_LENGTH                          5   /* 65535 is the max value */
+#define PID_MAX_LENGTH                          5   /* 99999 is the max value */
 #define READWRITE_LOCK_MAX_COUNT                20  /* NOT USED */
 
 #define FILEMAP_TYPE_INVALID                    0   /* Invalid value */
@@ -112,6 +112,7 @@ typedef struct filemap_information_entry filemap_information_entry;
 struct filemap_information_entry
 {
     unsigned short               fmaptype;      /* Type which tells what is the purpose of this filemap */
+    unsigned short               cachekey;      /* short key which uniquely identifies fmap of this type */
     char                         name[MAX_PATH];/* name of filemap */
     size_t                       size;          /* Size of this filemap */
     unsigned int                 mapcount;      /* How many processes mapped this filemap */
@@ -158,7 +159,7 @@ extern unsigned int filemap_getppid(TSRMLS_D);
 
 extern int    filemap_create(filemap_context ** ppfilemap);
 extern void   filemap_destroy(filemap_context * pfilemap);
-extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC);
+extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short cachekey, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC);
 extern void   filemap_terminate(filemap_context * pfilemap);
 
 extern size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC);

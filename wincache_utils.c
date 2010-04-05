@@ -282,6 +282,41 @@ Finished:
     return result;
 }
 
+int utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer, unsigned int length)
+{
+    int    result  = NONFATAL;
+    char * pbslash = NULL;
+
+    _ASSERT(filepath != NULL);
+    _ASSERT(pbuffer  != NULL);
+    _ASSERT(IS_ABSOLUTE_PATH(filepath, flength));
+
+    if(length < flength)
+    {
+        result = FATAL_NEED_MORE_MEMORY;
+        goto Finished;
+    }
+
+    ZeroMemory(pbuffer, length);
+
+    pbslash = strrchr(filepath, '\\');
+    _ASSERT(pbslash != NULL);
+
+    /* length does not include backslash */
+    length = pbslash - filepath;
+    memcpy_s(pbuffer, length, filepath, length);
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in utils_filefolder", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+    }
+
+    return result;
+}
+
 int utils_apoolpid()
 {
     int          retval = -1;

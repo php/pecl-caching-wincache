@@ -198,6 +198,7 @@ int fcache_create(fcache_context ** ppfcache)
 
     pfcache->id        = gfcacheid++;
     pfcache->islocal   = 0;
+    pfcache->cachekey  = 0;
     pfcache->hinitdone = NULL;
     pfcache->maxfsize  = 0;
     pfcache->memaddr   = NULL;
@@ -236,7 +237,7 @@ void fcache_destroy(fcache_context * pfcache)
     return;
 }
 
-int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC)
+int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          size     = 0;
@@ -249,6 +250,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     dprintverbose("start fcache_initialize");
 
     _ASSERT(pfcache   != NULL);
+    _ASSERT(cachekey  != 0);
     _ASSERT(cachesize >= FCACHE_SIZE_MINIMUM && cachesize <= FCACHE_SIZE_MAXIMUM);
     _ASSERT(maxfsize  >= FILE_SIZE_MINIMUM   && maxfsize  <= FILE_SIZE_MAXIMUM);
 
@@ -259,6 +261,8 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
+    pfcache->cachekey = cachekey;
+
     if(islocal)
     {
         mapclass = FILEMAP_MAP_LRANDOM;
@@ -268,7 +272,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     }
 
     /* shmfilepath = NULL to use page file for shared memory */
-    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, mapclass, cachesize, NULL TSRMLS_CC);
+    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -285,7 +289,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", pfcache->memaddr, size, 1 TSRMLS_CC);
+    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", cachekey, pfcache->memaddr, size, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -308,7 +312,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
-    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", 0, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -901,7 +905,7 @@ void fcache_runtest()
         goto Finished;
     }
 
-    result = fcache_initialize(pfcache, islocal, cachesize, maxfsize TSRMLS_CC);
+    result = fcache_initialize(pfcache, islocal, 1, cachesize, maxfsize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

@@ -37,14 +37,22 @@
 /* fcnotify_value   - LOCAL */
 /* fcnotify_context - LOCAL */
 
+typedef struct fcnotify_listen fcnotify_listen;
+struct fcnotify_listen
+{
+    char *                  folder_path;   /* Path to folder excluding '\\' */
+    HANDLE                  folder_handle; /* handle to folder */
+    OVERLAPPED              overlapped;    /* overlapped structure */
+    BYTE                    fninfo[1024];  /* file notify information */
+};
+
 typedef struct fcnotify_value fcnotify_value;
 struct fcnotify_value
 {
     size_t                  folder_path;   /* folder path */
     unsigned int            owner_pid;     /* pid listening to changes */
-    HANDLE                  folder_handle; /* handle to folder */
-    OVERLAPPED              overlapped;    /* overlapped structure */
-    FILE_NOTIFY_INFORMATION information;   /* file notify information */
+    fcnotify_listen *       plistener;     /* Listener information */
+    unsigned int            refcount;      /* number of aplist entries for this folder */
     size_t                  prev_value;    /* previous aplist_value offset */
     size_t                  next_value;    /* next aplist_value offset */
 };
@@ -53,7 +61,7 @@ typedef struct fcnotify_header fcnotify_header;
 struct fcnotify_header
 {
     unsigned int            rdcount;       /* Reader count for shared lock */
-    unsigned int            active_count;  /* Folders count which have active listeners */
+    unsigned int            itemcount;     /* Folders count which have active listeners */
     unsigned int            valuecount;    /* Total number of entries in entries */
     size_t                  values[1];     /* HashTable for fcnotify_value entries */
 };
@@ -70,18 +78,40 @@ struct fcnotify_context
     fcnotify_header *       fcheader;      /* Pointer to fcnotify_header */
     alloc_context *         fcalloc;       /* Allocator to be used for fcnotify */
     lock_context *          fclock;        /* Lock to deal with data in shared memory */
+    void *                  fcaplist;      /* Aplist which receives change notification */
 
     HANDLE                  listen_thread; /* Change listener thread handle */
     HANDLE                  port_handle;   /* Completion port for change notifications */
     HashTable *             pidhandles;    /* Key = processid, value = process handle */
 };
 
+typedef struct fcnotify_entry_info fcnotify_entry_info;
+struct fcnotify_entry_info
+{
+    char *                  folderpath;    /* folder path for which fcn is active */
+    unsigned int            ownerpid;      /* owner pid listening to changes */
+    unsigned int            filecount;     /* Number of files under this folder */
+    fcnotify_entry_info *   next;          /* next entry */
+};
+
+typedef struct fcnotify_info fcnotify_info;
+struct fcnotify_info
+{
+    unsigned int            itemcount;     /* Total number of items in subcache */
+    fcnotify_entry_info *   entries;       /* Individual entries */
+};
+
 extern int  fcnotify_create(fcnotify_context ** ppnotify);
 extern void fcnotify_destroy(fcnotify_context * pnotify);
-extern int  fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, alloc_context * palloc, unsigned int filecount TSRMLS_DC);
+extern int  fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void * paplist, alloc_context * palloc, unsigned int filecount TSRMLS_DC);
+extern void fcnotify_initheader(fcnotify_context * pnotify, unsigned int filecount);
 extern void fcnotify_terminate(fcnotify_context * pnotify);
 
-extern int  fcnotify_ispresent(fcnotify_context * pnotify);
+extern int  fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t offset, size_t * poffset);
+extern void fcnotify_close(fcnotify_context * pnotify, size_t offset);
+extern int  fcnotify_getinfo(fcnotify_context * pcache, zend_bool summaryonly, fcnotify_info ** ppinfo);
+extern void fcnotify_freeinfo(fcnotify_info * pinfo);
+
 extern void fcnotify_runtest();
 
 #endif /* _WINCACHE_FCNOTIFY_H_ */

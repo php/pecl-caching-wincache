@@ -63,6 +63,7 @@ struct fcache_context
 {
     unsigned int      id;        /* unique identifier for cache */
     unsigned short    islocal;   /* is cache local to process */
+    unsigned short    cachekey;  /* unique cache key used in names */
     HANDLE            hinitdone; /* event indicating if memory is initialized */
     unsigned int      maxfsize;  /* maximum size of file in bytes */
     char *            memaddr;   /* base memory address of segment */
@@ -92,7 +93,7 @@ struct fcache_entry_info
 
 extern int  fcache_create(fcache_context ** ppfcache);
 extern void fcache_destroy(fcache_context * pfcache);
-extern int  fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC);
+extern int  fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC);
 extern void fcache_terminate(fcache_context * pfcache);
 
 extern int  fcache_createval(fcache_context * pfcache, const char * filename, fcache_value ** ppvalue);

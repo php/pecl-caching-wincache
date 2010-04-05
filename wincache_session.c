@@ -35,22 +35,87 @@
 
 ps_module ps_mod_wincache = { PS_MOD(wincache) };
 
+static void scache_destructor(void * pdestination)
+{
+    zvcache_context * pcache = NULL;
+
+    _ASSERT(pdestination != NULL);
+
+    pcache = (zvcache_context *)pdestination;
+
+    zvcache_terminate(pcache);
+    zvcache_destroy(pcache);
+
+    pcache = NULL;
+    return;
+}
+
 /* Called on session start. Nothing to do */
 PS_OPEN_FUNC(wincache)
 {
-    int               result   = NONFATAL;
-    static char       dummy    = 0;
-    zvcache_context * pzcache  = NULL;
-
-    char *            scolon   = NULL;
-    char  *           filepath = NULL;
-    unsigned int      fpathlen = 0;
+    int                result     = NONFATAL;
+    zvcache_context ** ppcache    = NULL;
+    zvcache_context *  pzcache    = NULL;
+    zend_ini_entry *   pinientry  = NULL;
+    HashTable *        phtable    = NULL;
+    unsigned char      hashupdate = 0;
+    char *             scolon     = NULL;
+    char  *            filepath   = NULL;
+    unsigned int       fpathlen   = 0;
+    unsigned int       cachekey   = 0;
 
     dprintverbose("start ps_open_func");
 
+    if(WCG(inisavepath) == NULL)
+    {
+        _ASSERT(zend_hash_find(EG(ini_directives), "session.save_path", sizeof("session.save_path"), (void **)&pinientry) != FAILURE);
+        WCG(inisavepath) = pinientry;
+    }
+
+    /* Create hashtable if not created yet */
+    if(WCG(phscache) == NULL)
+    {
+        phtable = alloc_pemalloc(sizeof(HashTable));
+        if(phtable == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
+
+        zend_hash_init(phtable, 0, NULL, scache_destructor, 1);
+        WCG(phscache) = phtable;
+        phtable = NULL;
+    }
+
+    /* Use zvscache for unmodified save_path. Else get zvcache_context from phscache */
+    /* If save path is modified but is same as PHP_INI_SYSTEM, use zvscache */
+    if(WCG(inisavepath)->modified == 0 || _stricmp(WCG(inisavepath)->orig_value, WCG(inisavepath)->value) == 0)
+    {
+        pzcache  = WCG(zvscache);
+        cachekey = 1;
+        hashupdate = 1;
+    }
+    else
+    {
+        /* If save path is modified and is not blank, use its own session cache */
+        /* savepath specific cache key minimum is 2 and maximum is 65535 */
+        cachekey = utils_hashcalc(save_path, strlen(save_path));
+        cachekey = (cachekey % 65534) + 2;
+
+        if(zend_hash_index_find(WCG(phscache), (ulong)cachekey, (void **)&ppcache) == FAILURE)
+        {
+            /* If cachekey cache is not found, update it after creating it */
+            hashupdate = 1;
+        }
+        else
+        {
+            pzcache = *ppcache;
+        }
+    }
+
     /* If session cache is not created yet create now */
     /* Handling save_path as is done in ext\session\mod_files.c */
-    if(WCG(zvscache) == NULL)
+    if(pzcache == NULL)
     {
         if(*save_path != '\0')
         {
@@ -71,33 +136,36 @@ PS_OPEN_FUNC(wincache)
             /* Check if path is accessible as per open_basedir */
             if((PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) || php_check_open_basedir(save_path TSRMLS_CC))
             {
-                return FAILURE;
+                result = FATAL_SESSION_INITIALIZE;
+                goto Finished;
             }
         }
 
         _ASSERT(save_path != NULL);
 
-        /* Create path as save_path\wincache_session_[<namesalt>_]ppid */
-        fpathlen = strlen(save_path) + 1 + sizeof("wincache_session_.tmp") + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
+        /* Create path as save_path\wincache_session_[<namesalt>_]ppid. 6 for _<cachekey> */
+        fpathlen = strlen(save_path) + 1 + sizeof("wincache_session_.tmp") + 6 + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
         if(fpathlen > MAX_PATH)
         {
-            return FAILURE;
+            result = FATAL_SESSION_PATHLONG;
+            goto Finished;
         }
 
         filepath = (char *)alloc_pemalloc(fpathlen);
         if(filepath == NULL)
         {
-            return FAILURE;
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
         }
 
         ZeroMemory(filepath, fpathlen);
         if(WCG(namesalt) == NULL)
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%d.tmp", save_path, WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%u_%u.tmp", save_path, cachekey, WCG(parentpid));
         }
         else
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%s_%d.tmp", save_path, WCG(namesalt), WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%u_%s_%u.tmp", save_path, cachekey, WCG(namesalt), WCG(parentpid));
         }
 
         /* Create session cache on call to session_start */
@@ -108,18 +176,24 @@ PS_OPEN_FUNC(wincache)
         }
 
         /* issession = 1, islocal = 0, zvcount = 256 */
-        result = zvcache_initialize(pzcache, 1, 0, 256, WCG(scachesize), filepath TSRMLS_CC);
+        result = zvcache_initialize(pzcache, 1, 0, (unsigned short)cachekey, 256, WCG(scachesize), filepath TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
         }
 
-        WCG(zvscache) = pzcache;
+        if(hashupdate)
+        {
+            zend_hash_index_update(WCG(phscache), (ulong)cachekey, (void **)&pzcache, sizeof(zvcache_context *), NULL);
+        }
+
+        if(cachekey == 1)
+        {
+            WCG(zvscache) = pzcache;
+        }
     }
 
-    /* Fool the session module in believing there is a */
-    /* valid data associated with session handler */
-    PS_SET_MOD_DATA(&dummy);
+    PS_SET_MOD_DATA(pzcache);
 
 Finished:
 
@@ -134,6 +208,13 @@ Finished:
         dprintimportant("failure %d in ps_open_func", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
+        if(phtable != NULL)
+        {
+            zend_hash_destroy(phtable);
+            alloc_pefree(phtable);
+            phtable = NULL;
+        }
+
         if(pzcache != NULL)
         {
             zvcache_terminate(pzcache);
@@ -141,6 +222,9 @@ Finished:
 
             pzcache = NULL;
         }
+
+        dprintverbose("end ps_open_func");
+        return FAILURE;
     }
 
     dprintverbose("end ps_open_func");
@@ -161,20 +245,23 @@ PS_CLOSE_FUNC(wincache)
 /* Called on session start which reads all values into memory */
 PS_READ_FUNC(wincache)
 {
-    int    result = NONFATAL;
-    zval * pzval  = NULL;
+    int               result  = NONFATAL;
+    zval *            pzval   = NULL;
+    zvcache_context * pzcache = NULL;
 
     dprintverbose("start ps_read_func");
 
-    _ASSERT(WCG(zvscache) != NULL);
-    _ASSERT(key           != NULL);
-    _ASSERT(val           != NULL);
-    _ASSERT(vallen        != NULL);
+    _ASSERT(key    != NULL);
+    _ASSERT(val    != NULL);
+    _ASSERT(vallen != NULL);
+
+    pzcache = PS_GET_MOD_DATA();
+    _ASSERT(pzcache != NULL);
 
     MAKE_STD_ZVAL(pzval);
     ZVAL_NULL(pzval);
 
-    result = zvcache_get(WCG(zvscache), key, &pzval TSRMLS_CC);
+    result = zvcache_get(pzcache, key, &pzval TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -207,20 +294,23 @@ Finished:
 /* Called on session close which writes all values to memory */
 PS_WRITE_FUNC(wincache)
 {
-    int    result = NONFATAL;
-    zval * pzval  = NULL;
+    int               result  = NONFATAL;
+    zval *            pzval   = NULL;
+    zvcache_context * pzcache = NULL;
 
     dprintverbose("start ps_write_func");
 
-    _ASSERT(WCG(zvscache) != NULL);
-    _ASSERT(key           != NULL);
-    _ASSERT(val           != NULL);
+    _ASSERT(key != NULL);
+    _ASSERT(val != NULL);
+
+    pzcache = PS_GET_MOD_DATA();
+    _ASSERT(pzcache != NULL);
 
     MAKE_STD_ZVAL(pzval);
     ZVAL_STRINGL(pzval, val, vallen, 0);
 
     /* ttl = session.gc_maxlifetime, isadd = 0 */
-    result = zvcache_set(WCG(zvscache), key, pzval, INI_INT("session.gc_maxlifetime"), 0 TSRMLS_CC);
+    result = zvcache_set(pzcache, key, pzval, INI_INT("session.gc_maxlifetime"), 0 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -249,14 +339,17 @@ Finished:
 /* Called on session_destroy */
 PS_DESTROY_FUNC(wincache)
 {
-    int result = NONFATAL;
+    int               result  = NONFATAL;
+    zvcache_context * pzcache = NULL;
 
     dprintverbose("start ps_destroy_func");
 
-    _ASSERT(WCG(zvscache) != NULL);
-    _ASSERT(key           != NULL);
+    _ASSERT(key != NULL);
 
-    result = zvcache_delete(WCG(zvscache), key);
+    pzcache = PS_GET_MOD_DATA();
+    _ASSERT(pzcache != NULL);
+
+    result = zvcache_delete(pzcache, key);
     if(FAILED(result))
     {
         /* Entry not found is not a fatal error */

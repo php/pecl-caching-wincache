@@ -106,11 +106,37 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
                 continue;
             }
 
-            if(docheck && is_file_changed(pcache, pvalue))
+            if(docheck)
             {
-                result = FATAL_FCACHE_FILECHANGED;
+                /* If fcnotify is 0, use traditional file change check */
+                if(pvalue->fcnotify == 0)
+                {
+                    if(is_file_changed(pcache, pvalue))
+                    {
+                        result = FATAL_FCACHE_FILECHANGED;
+                    }
+                }
+                else
+                {
+                    if(pvalue->is_changed == 1)
+                    {
+                        result = FATAL_FCACHE_FILECHANGED;
+                    }
+                    else
+                    {
+                        /* If a listener is present, just check if listener is still active */
+                        if(pcache->pnotify != NULL)
+                        {
+                            result = fcnotify_check(pcache->pnotify, NULL, pvalue->fcnotify, &pvalue->fcnotify);
+                            if(FAILED(result))
+                            {
+                                goto Finished;
+                            }
+                        }
+                    }
+                }
             }
-            
+
             break;
         }
 
@@ -118,6 +144,8 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
     }
 
     *ppvalue = pvalue;
+
+Finished:
 
     dprintverbose("end find_aplist_entry");
 
@@ -200,11 +228,6 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
 
 Finished:
 
-    if(retvalue)
-    {
-        dprintimportant("File is changed. Remove it from cache");        
-    }
-
     dprintverbose("end is_file_changed");
 
     return retvalue;
@@ -228,6 +251,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     unsigned int               flength   = 0;
     unsigned int               alloclen  = 0;
     char *                     pbaseadr  = NULL;
+    char *                     pcurrent  = NULL;
 
     dprintverbose("start create_aplist_data");
 
@@ -268,7 +292,9 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         }
     }
 
-    pvalue = (aplist_value *)pbaseadr;
+    pcurrent = pbaseadr;
+
+    pvalue = (aplist_value *)pcurrent;
     pvalue->file_path = 0;
     
     /* Open the file in shared read mode */
@@ -313,16 +339,16 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         goto Finished;
     }
 
-    /* Point pbaseadr to end of aplist_value */
+    /* Point pcurrent to end of aplist_value */
     /* No goto Finished should exist after this */
-    pbaseadr += sizeof(aplist_value);
+    pcurrent += sizeof(aplist_value);
 
     /* Fill the details in aplist_value */
     /* memcpy_s error code ignored as buffer is of right size */
-    memcpy_s(pbaseadr, flength, filename, flength);
-    *(pbaseadr + flength) = 0;
-    pvalue->file_path     = pbaseadr - pcache->apmemaddr;
-        
+    memcpy_s(pcurrent, flength, filename, flength);
+    *(pcurrent + flength) = 0;
+    pvalue->file_path     = pcurrent - pcache->apmemaddr;
+
     pvalue->file_size     = filesizel;
     pvalue->modified_time = finfo.ftLastWriteTime;
     pvalue->attributes    = finfo.dwFileAttributes;
@@ -332,12 +358,24 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->use_ticks   = ticks;
     pvalue->last_check  = ticks;
     pvalue->is_deleted  = 0;
+    pvalue->is_changed  = 0;
 
-    pvalue->resentry    = 0;
     pvalue->fcacheval   = 0;
     pvalue->ocacheval   = 0;
+    pvalue->resentry    = 0;
+    pvalue->fcnotify    = 0;
     pvalue->prev_value  = 0;
     pvalue->next_value  = 0;
+
+    /* Add file listener only if the file is not pointing to a UNC share */
+    if(pcache->pnotify != NULL && IS_UNC_PATH(filename, flength) == 0)
+    {
+        result = fcnotify_check(pcache->pnotify, filename, 0, &pvalue->fcnotify);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
 
     *ppvalue = pvalue;
 
@@ -376,6 +414,12 @@ static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
 
     if(pvalue != NULL)
     {
+        if(pcache->pnotify != NULL && pvalue->fcnotify != 0)
+        {
+            fcnotify_close(pcache->pnotify, pvalue->fcnotify);
+            pvalue->fcnotify = 0;
+        }
+
         /* Resolve path cache, file cache and ocache entries */
         /* should be deleted by a call to remove_aplist_entry */
         _ASSERT(pvalue->resentry  == 0);
@@ -671,6 +715,7 @@ int aplist_create(aplist_context ** ppcache)
 
     pcache->polocal     = NULL;
     pcache->prplist     = NULL;
+    pcache->pnotify     = NULL;
     pcache->pfcache     = NULL;
     pcache->pocache     = NULL;
     pcache->resnumber   = -1;
@@ -712,6 +757,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     size_t          segsize  = 0;
     aplist_header * header   = NULL;
     unsigned int    msize    = 0;
+    unsigned short  cachekey = 1;
 
     unsigned int    cticks   = 0;
     unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
@@ -755,7 +801,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     }
 
     /* shmfilepath = NULL to make it use page file */
-    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, mapclass, mapsize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -772,7 +818,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", pcache->apfilemap->mapaddr, segsize, 1 TSRMLS_CC);
+    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", cachekey, pcache->apfilemap->mapaddr, segsize, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -796,7 +842,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    result = lock_initialize(pcache->aprwlock, "FILELIST_CACHE", 0, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->aprwlock, "FILELIST_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -818,10 +864,28 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
             goto Finished;
         }
 
-        result = rplist_initialize(pcache->prplist, pcache->islocal, filecount TSRMLS_CC);
+        result = rplist_initialize(pcache->prplist, pcache->islocal, cachekey, filecount TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
+        }
+
+        /* If file change notification is enabled, create fcnotify_context */
+        if(WCG(fcndetect))
+        {
+            result = fcnotify_create(&pcache->pnotify);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+
+            /* Number of folders on which listeners will be active will */
+            /* be very small. Using filecount as 32 so that scavenger is quick */
+            result = fcnotify_initialize(pcache->pnotify, pcache->islocal, pcache, pcache->apalloc, 32 TSRMLS_DC);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
         }
     }
 
@@ -852,6 +916,11 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         if(pcache->prplist != NULL)
         {
             rplist_initheader(pcache->prplist, filecount);
+        }
+
+        if(pcache->pnotify != NULL)
+        {
+            fcnotify_initheader(pcache->pnotify, 32);
         }
 
         cticks = GetTickCount();
@@ -896,6 +965,14 @@ Finished:
     {
         dprintimportant("failure %d in aplist_initialize", result);
         _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(pcache->pnotify != NULL)
+        {
+            fcnotify_terminate(pcache->pnotify);
+            fcnotify_destroy(pcache->pnotify);
+
+            pcache->pnotify = NULL;
+        }
 
         if(pcache->prplist != NULL)
         {
@@ -958,7 +1035,7 @@ int aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsign
         goto Finished;
     }
 
-    result = fcache_initialize(pfcache, plcache->islocal, size, maxfilesize TSRMLS_CC);
+    result = fcache_initialize(pfcache, plcache->islocal, 1, size, maxfilesize TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1038,7 +1115,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         goto Finished;
     }
 
-    result = ocache_initialize(pocache, plcache->islocal, resnumber, size TSRMLS_CC);
+    result = ocache_initialize(pocache, plcache->islocal, 1, resnumber, size TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1126,6 +1203,14 @@ void aplist_terminate(aplist_context * pcache)
         {
             InterlockedDecrement(&pcache->apheader->mapcount);
             pcache->apheader = NULL;
+        }
+
+        if(pcache->pnotify != NULL)
+        {
+            fcnotify_terminate(pcache->pnotify);
+            fcnotify_destroy(pcache->pnotify);
+
+            pcache->pnotify = NULL;
         }
 
         if(pcache->prplist != NULL)
@@ -1514,6 +1599,39 @@ Finished:
     return result;
 }
 
+void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename)
+{
+    unsigned int   findex   = 0;
+    aplist_value * pvalue   = NULL;
+    char           filepath[  MAX_PATH];
+
+    _ASSERT(pcache     != NULL);
+    _ASSERT(folderpath != NULL);
+    _ASSERT(filename   != NULL);
+
+    dprintverbose("start aplist_mark_changed");
+
+    ZeroMemory(filepath, MAX_PATH);
+    _snprintf_s(filepath, MAX_PATH, MAX_PATH - 1, "%s\\%s", folderpath, filename);
+
+    lock_readlock(pcache->aprwlock);
+
+    /* Find the entry for filepath and mark it deleted */
+    findex = utils_getindex(filepath, pcache->apheader->valuecount);
+    find_aplist_entry(pcache, filepath, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
+
+    if(pvalue != NULL)
+    {
+        pvalue->is_changed = 1;
+    }
+
+    lock_readunlock(pcache->aprwlock);
+
+    dprintverbose("end aplist_mark_changed");
+
+    return;
+}
+
 static int set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue TSRMLS_DC)
 {
     int           result       = NONFATAL;
@@ -1568,6 +1686,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     unsigned int     length   = 0;
     unsigned int     findex   = 0;
     unsigned int     addticks = 0;
+    unsigned char    fchanged = 0;
 
     aplist_value *   pvalue   = NULL;
     fcache_value *   pfvalue  = NULL;
@@ -1607,7 +1726,34 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         {
             lock_readlock(pcache->aprwlock);
 
-            if(is_file_changed(pcache, pvalue))
+            if(pvalue->fcnotify == 0)
+            {
+                if(is_file_changed(pcache, pvalue))
+                {
+                    fchanged = 1;
+                }
+            }
+            else
+            {
+                if(pvalue->is_changed == 1)
+                {
+                    fchanged = 1;
+                }
+                else
+                {
+                    /* If a listener is present, just check if listener is still active */
+                    if(pcache->pnotify != NULL)
+                    {
+                        result = fcnotify_check(pcache->pnotify, NULL, pvalue->fcnotify, &pvalue->fcnotify);
+                        if(FAILED(result))
+                        {
+                            goto Finished;
+                        }
+                    }
+                }
+            }
+
+            if(fchanged)
             {
                 addticks = pvalue->add_ticks;
 

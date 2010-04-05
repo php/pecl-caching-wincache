@@ -89,7 +89,7 @@ struct rplist_info
 
 extern int  rplist_create(rplist_context ** ppcache);
 extern void rplist_destroy(rplist_context * pcache);
-extern int  rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned int filecount TSRMLS_DC);
+extern int  rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned short cachekey, unsigned int filecount TSRMLS_DC);
 extern void rplist_initheader(rplist_context * pcache, unsigned int filecount);
 extern void rplist_terminate(rplist_context * pcache);
 

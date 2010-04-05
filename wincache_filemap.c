@@ -170,7 +170,7 @@ static int create_rwlock(char * lockname, lock_context ** pplock TSRMLS_DC)
         goto Finished;
     }
 
-    result = lock_initialize(plock, lockname, 0, LOCK_TYPE_SHARED, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(plock, lockname, 1, LOCK_TYPE_SHARED, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -465,6 +465,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         for(index = 0; index < pinfo->header->maxcount; index++)
         {
             pentry->fmaptype = FILEMAP_TYPE_UNUSED;
+            pentry->cachekey = 0;
             pentry = (filemap_information_entry *)((char *)pentry + FILEMAP_INFO_ENTRY_SIZE);
         }
 
@@ -743,7 +744,7 @@ void filemap_destroy(filemap_context * pfilemap)
     return;
 }
 
-int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC)
+int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short cachekey, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC)
 {
     int           result  = NONFATAL;
     unsigned int  ffree   = 0;
@@ -760,6 +761,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
     dprintverbose("start filemap_initialize");
 
     _ASSERT(WCG(fmapgdata) != NULL);
+    _ASSERT(cachekey       != 0);
     _ASSERT(pfilemap       != NULL);
     _ASSERT(size_mb        >  0);
 
@@ -795,7 +797,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
                 ffree = index;
             }
         
-            if(pentry->fmaptype == fmaptype)
+            if(pentry->fmaptype == fmaptype && pentry->cachekey == cachekey)
             {
                 found = 1;
                 break;
@@ -829,7 +831,8 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             pentry = (filemap_information_entry *)((char *)pentry + (ffree * FILEMAP_INFO_ENTRY_SIZE));
 
             pentry->fmaptype = fmaptype;
-        
+            pentry->cachekey = cachekey;
+
             /* Create name with ppid in it */
             ZeroMemory(pentry->name, MAX_PATH);
 
@@ -837,27 +840,27 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             {
                 if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_RESPATHS_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_FILELIST_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_FILELIST_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_FILECONTENT_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_FILECONTENT_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_BYTECODES_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_USERZVALS_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_SESSZVALS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_SESSZVALS_PREFIX, WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_SESSZVALS_PREFIX, cachekey, WCG(fmapgdata)->ppid);
                 }
                 else
                 {
@@ -868,27 +871,27 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             {
                 if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_RESPATHS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_FILELIST_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_FILELIST_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_FILECONTENT_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_FILECONTENT_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_BYTECODES_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_USERZVALS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else if(pentry->fmaptype == FILEMAP_TYPE_SESSZVALS)
                 {
-                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_SESSZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+                    _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_SESSZVALS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->ppid);
                 }
                 else
                 {
@@ -920,7 +923,8 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
         }
 
         pentry->fmaptype = fmaptype;
-        
+        pentry->cachekey = cachekey;
+
         /* Create name with ppid in it */
         ZeroMemory(pentry->name, MAX_PATH);
 
@@ -928,27 +932,27 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
         {
             if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_RESPATHS_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_FILELIST_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_FILELIST_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_FILECONTENT_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_FILECONTENT_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_BYTECODES_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_USERZVALS_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_SESSZVALS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u", FILEMAP_SESSZVALS_PREFIX, WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%u", FILEMAP_SESSZVALS_PREFIX, cachekey, WCG(fmapgdata)->pid);
             }
             else
             {
@@ -959,27 +963,27 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
         {
             if(pentry->fmaptype == FILEMAP_TYPE_RESPATHS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_RESPATHS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_RESPATHS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILELIST)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_FILELIST_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_FILELIST_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_FILECONTENT_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_FILECONTENT_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_BYTECODES)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_BYTECODES_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_BYTECODES_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_USERZVALS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_USERZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_USERZVALS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else if(pentry->fmaptype == FILEMAP_TYPE_SESSZVALS)
             {
-                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%s_%u", FILEMAP_SESSZVALS_PREFIX, WCG(namesalt), WCG(fmapgdata)->pid);
+                _snprintf_s(pentry->name, MAX_PATH, MAX_PATH - 1, "%s_%u_%s_%u", FILEMAP_SESSZVALS_PREFIX, cachekey, WCG(namesalt), WCG(fmapgdata)->pid);
             }
             else
             {
@@ -1101,6 +1105,7 @@ void filemap_terminate(filemap_context * pfilemap)
                 if(pfilemap->infoentry->mapcount == 0)
                 {
                     pfilemap->infoentry->fmaptype = FILEMAP_TYPE_UNUSED;
+                    pfilemap->infoentry->cachekey = 0;
                     WCG(fmapgdata)->info->header->entry_count--;
                 }
 
@@ -1226,7 +1231,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_FILECONTENT, FILEMAP_MAP_SRANDOM, 20, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_FILECONTENT, 1, FILEMAP_MAP_SRANDOM, 20, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1239,6 +1244,7 @@ void filemap_runtest()
     pentry = pfilemap1->infoentry;
 
     _ASSERT(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT);
+    _ASSERT(pentry->cachekey == 1);
     _ASSERT(pentry->size     == 20 * 1024 * 1024);
     _ASSERT(pentry->mapcount == 1);
     _ASSERT(pentry->cpid     == filemap_getpid(TSRMLS_C));
@@ -1254,7 +1260,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap2, FILEMAP_TYPE_BYTECODES, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap2, FILEMAP_TYPE_BYTECODES, 1, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1267,6 +1273,7 @@ void filemap_runtest()
     pentry = pfilemap2->infoentry;
 
     _ASSERT(pentry->fmaptype == FILEMAP_TYPE_BYTECODES);
+    _ASSERT(pentry->cachekey == 1);
     _ASSERT(pentry->size     == 10 * 1024 * 1024);
     _ASSERT(pentry->mapcount == 1);
     _ASSERT(pentry->cpid     == filemap_getpid(TSRMLS_C));
@@ -1293,7 +1300,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_BYTECODES, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_BYTECODES, 1, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

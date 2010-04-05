@@ -367,7 +367,7 @@ void rplist_destroy(rplist_context * pcache)
     return;
 }
 
-int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned int filecount TSRMLS_DC)
+int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned short cachekey, unsigned int filecount TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          mapsize  = 0;
@@ -396,7 +396,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* shmfilepath = NULL to create filemap on page file */
-    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, mapclass, mapsize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, cachekey, mapclass, mapsize, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -413,7 +413,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pcache->rpalloc, islocal, "RESPATHS_SEGMENT", pcache->rpfilemap->mapaddr, segsize, 1 TSRMLS_CC);
+    result = alloc_initialize(pcache->rpalloc, islocal, "RESPATHS_SEGMENT", cachekey, pcache->rpfilemap->mapaddr, segsize, 1 TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -435,7 +435,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    result = lock_initialize(pcache->rprwlock, "RESPATHS_CACHE", 0, locktype, LOCK_USET_SREAD_XWRITE, &pcache->rpheader->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->rprwlock, "RESPATHS_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &pcache->rpheader->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

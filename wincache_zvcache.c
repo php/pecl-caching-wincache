@@ -1391,6 +1391,7 @@ int zvcache_create(zvcache_context ** ppcache)
 
     pcache->id          = gzvcacheid++;
     pcache->islocal     = 0;
+    pcache->cachekey    = 0;
     pcache->hinitdone   = NULL;
     pcache->issession   = 0;
 
@@ -1433,7 +1434,7 @@ void zvcache_destroy(zvcache_context * pcache)
     return;
 }
 
-int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC)
+int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC)
 {
     int              result    = NONFATAL;
     size_t           segsize   = 0;
@@ -1462,6 +1463,8 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         goto Finished;
     }
 
+    pcache->cachekey = cachekey;
+
     if(islocal)
     {
         mapclass = FILEMAP_MAP_LRANDOM;
@@ -1471,7 +1474,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     }
 
     /* If a shmfilepath is passed, use that to create filemap */
-    result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), mapclass, cachesize, shmfilepath TSRMLS_CC);
+    result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), cachekey, mapclass, cachesize, shmfilepath TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1488,7 +1491,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         goto Finished;
     }
 
-    result = alloc_initialize(pcache->zvalloc, islocal, ((issession) ? "SESSZVALS_SEGMENT" : "USERZVALS_SEGMENT"), pcache->zvfilemap->mapaddr, segsize, initmemory TSRMLS_CC);
+    result = alloc_initialize(pcache->zvalloc, islocal, ((issession) ? "SESSZVALS_SEGMENT" : "USERZVALS_SEGMENT"), cachekey, pcache->zvfilemap->mapaddr, segsize, initmemory TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1512,7 +1515,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         goto Finished;
     }
 
-    result = lock_initialize(pcache->zvrwlock, ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE"), 0, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->zvrwlock, ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE"), cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2080,7 +2083,7 @@ static void zvcache_info_entry_dtor(void * pvoid)
     return;
 }
 
-int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info * pcinfo, zend_llist * plist)
+int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, zvcache_info * pcinfo, zend_llist * plist)
 {
     int                  result = NONFATAL;
     unsigned char        flock  = 0;
@@ -2112,21 +2115,17 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info *
 
     zend_llist_init(plist, sizeof(zvcache_info_entry), zvcache_info_entry_dtor, 0);
 
-    /* Leave count to 0 if only summary is needed */
-    if(!summaryonly)
+    if(pkey != NULL)
     {
-        count = header->valuecount;
-    }
-
-    for(index = 0; index < count; index++)
-    {
-        if(header->values[index] == 0)
+        index = utils_getindex(pkey, header->valuecount);
+ 
+        result = find_zvcache_entry(pcache, pkey, index, &pvalue);
+        if(FAILED(result))
         {
-            continue;
+            goto Finished;
         }
 
-        pvalue = ZVCACHE_VALUE(palloc, header->values[index]);
-        while(pvalue != NULL)
+        if(pvalue != NULL)
         {
             pinfo.key = alloc_estrdup(ZVALUE(pcache->incopy, pvalue->keystr));
             if(pinfo.key == NULL)
@@ -2149,14 +2148,63 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info *
             /* Convert to seconds */
             ticks = ticks / 1000;
 
-            pinfo.ttl       = pvalue->ttlive;
-            pinfo.age       = ticks;
-            pinfo.type      = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
-            pinfo.sizeb     = pvalue->sizeb;
-            pinfo.hitcount  = pvalue->hitcount;
+            pinfo.ttl      = pvalue->ttlive;
+            pinfo.age      = ticks;
+            pinfo.type     = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
+            pinfo.sizeb    = pvalue->sizeb;
+            pinfo.hitcount = pvalue->hitcount;
 
             zend_llist_add_element(plist, &pinfo);
-            pvalue = ZVCACHE_VALUE(palloc, pvalue->next_value);
+        }
+    }
+    else
+    {
+        /* Leave count to 0 if only summary is needed */
+        if(!summaryonly)
+        {
+            count = header->valuecount;
+        }
+
+        for(index = 0; index < count; index++)
+        {
+            if(header->values[index] == 0)
+            {
+                continue;
+            }
+
+            pvalue = ZVCACHE_VALUE(palloc, header->values[index]);
+            while(pvalue != NULL)
+            {
+                pinfo.key = alloc_estrdup(ZVALUE(pcache->incopy, pvalue->keystr));
+                if(pinfo.key == NULL)
+                {
+                    result = FATAL_OUT_OF_LMEMORY;
+                    goto Finished;
+                }
+
+                /* Calculate age in seconds */
+                ticks = GetTickCount();
+                if(ticks >= pvalue->add_ticks)
+                {
+                    ticks = ticks - pvalue->add_ticks;
+                }
+                else
+                {
+                    ticks = (DWORD_MAX - pvalue->add_ticks) + ticks;
+                }
+
+                /* Convert to seconds */
+                ticks = ticks / 1000;
+
+                pinfo.ttl      = pvalue->ttlive;
+                pinfo.age      = ticks;
+                pinfo.type     = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
+                pinfo.sizeb    = pvalue->sizeb;
+                pinfo.hitcount = pvalue->hitcount;
+
+                zend_llist_add_element(plist, &pinfo);
+                pvalue = ZVCACHE_VALUE(palloc, pvalue->next_value);
+            }
         }
     }
 
@@ -2172,6 +2220,8 @@ Finished:
     {
         dprintimportant("failure %d in zvcache_list", result);
         _ASSERT(result > WARNING_COMMON_BASE);
+
+        zend_llist_destroy(plist);
     }
 
     dprintverbose("end zvcache_list");

@@ -139,7 +139,7 @@ struct alloc_info
 
 extern int    alloc_create(alloc_context ** ppalloc);
 extern void   alloc_destroy(alloc_context * palloc);
-extern int    alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC);
+extern int    alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, unsigned short cachekey, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC);
 extern void   alloc_terminate(alloc_context * palloc);
 extern int    alloc_create_mpool(alloc_context * palloc, size_t * phoffset);
 extern void   alloc_free_mpool(alloc_context * palloc, size_t hoffset);

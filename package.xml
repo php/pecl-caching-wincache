@@ -45,6 +45,10 @@
 - Using pagefile backed shared memory if APP_POOL_ID environment variable is not available.
 - Fixed a bug in hashtable copyout. Missed setting hashtable global list tail.
 - Added ability to reroute functions in opcode copy code.
+- Using file change notification to detect changes to files.
+- Create separate session cache for each session.save_path values.
+- Added ability to get info on a single user cache entry.
+- Exposed functions to get information on folders on which file change notification is active.
   </notes>
   <contents>
     <dir name="/">
@@ -81,6 +85,8 @@
       <file role="src" name="wincache_zvcache.c"/>
       <file role="src" name="wincache_session.h"/>
       <file role="src" name="wincache_session.c"/>
+      <file role="src" name="wincache_fcnotify.h"/>
+      <file role="src" name="wincache_fcnotify.c"/>
       <file role="php" name="wincache.php"/>
     </dir>
   </contents>

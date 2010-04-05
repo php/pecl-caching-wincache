@@ -132,10 +132,14 @@
 /* Error codes used by session handler */
 #define FATAL_SESSION_BASE                  1000
 #define FATAL_SESSION_INITIALIZE            FATAL_SESSION_BASE + 1
+#define FATAL_SESSION_PATHLONG              FATAL_SESSION_BASE + 2
 
 /* Error codes used by file change notification */
 #define FATAL_FCNOTIFY_BASE                 1100
 #define FATAL_FCNOTIFY_INITIALIZE           FATAL_FCNOTIFY_BASE + 1
+#define FATAL_FCNOTIFY_OPENPROCESS          FATAL_FCNOTIFY_BASE + 2
+#define FATAL_FCNOTIFY_CREATEFILE           FATAL_FCNOTIFY_BASE + 3
+#define FATAL_FCNOTIFY_COMPPORT             FATAL_FCNOTIFY_BASE + 4
 
 /* Error codes used by detours */
 #define FATAL_DETOURS_BASE                  1200

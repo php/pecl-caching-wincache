@@ -113,8 +113,9 @@ struct ocache_header
 typedef struct ocache_context ocache_context;
 struct ocache_context
 {
-    unsigned short     id;        /* unique identifier for cache */
+    unsigned int       id;        /* unique identifier for cache */
     unsigned short     islocal;   /* is cache local to process */
+    unsigned short     cachekey;  /* unique cache key used in names */
     HANDLE             hinitdone; /* event to indicate memory is initialized */
     int                resnumber; /* resource number to use */
     char *             memaddr;   /* base memory address of segment */
@@ -134,7 +135,7 @@ struct ocache_entry_info
 
 extern int  ocache_create(ocache_context ** pcache);
 extern void ocache_destroy(ocache_context * pcache);
-extern int  ocache_initialize(ocache_context * pcache, unsigned short islocal, int resnumber, unsigned int cachesize TSRMLS_DC);
+extern int  ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned short cachekey, int resnumber, unsigned int cachesize TSRMLS_DC);
 extern void ocache_terminate(ocache_context * pcache);
 
 extern int  ocache_createval(ocache_context * pcache, const char * filename, zend_file_handle * file_handle, int type, zend_op_array ** poparray, ocache_value ** ppvalue TSRMLS_DC);

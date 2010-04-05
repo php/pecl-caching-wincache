@@ -142,8 +142,9 @@ struct zvcopy_context
 typedef struct zvcache_context zvcache_context;
 struct zvcache_context
 {
-    unsigned short    id;                /* unique identifier for cache */
+    unsigned int      id;                /* unique identifier for cache */
     unsigned short    islocal;           /* is the cache local or shared */
+    unsigned short    cachekey;          /* unique cache key used in names */
     HANDLE            hinitdone;         /* event indicating if memory is initialized */
     unsigned int      issession;         /* session cache or user cache */
 
@@ -180,7 +181,7 @@ struct zvcache_info_entry
 
 extern int  zvcache_create(zvcache_context ** ppcache);
 extern void zvcache_destroy(zvcache_context * pcache);
-extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
+extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
 extern void zvcache_terminate(zvcache_context * pcache);
 
 extern int  zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRMLS_DC);
@@ -188,7 +189,7 @@ extern int  zvcache_set(zvcache_context * pcache, const char * key, zval * pzval
 extern int  zvcache_delete(zvcache_context * pcache, const char * key);
 extern int  zvcache_clear(zvcache_context * pcache);
 extern int  zvcache_exists(zvcache_context * pcache, const char * key, unsigned char * pexists);
-extern int  zvcache_list(zvcache_context * pcache, zend_bool summaryonly, zvcache_info * pcinfo, zend_llist * plist);
+extern int  zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, zvcache_info * pcinfo, zend_llist * plist);
 extern int  zvcache_change(zvcache_context * pcache, const char * key, int delta, int * newvalue);
 extern int  zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue, int newvalue);
 
