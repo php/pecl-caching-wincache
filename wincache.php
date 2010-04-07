@@ -147,6 +147,10 @@ if ( isset( $_GET['all'] ) && is_numeric( $_GET['all'] ) ) {
     if ( $show_all_ucache_entries < 0 || $show_all_ucache_entries > 1)
         $show_all_ucache_entries = 0;
 }
+
+$ucache_key = null;
+if ( isset( $_GET['key'] ) )
+    $ucache_key = urldecode( $_GET['key'] );
 // End of input parameters check
 
 // Initialize global variables
@@ -413,12 +417,10 @@ if ( $img > 0 ) {
     
     function create_used_free_chart( $width, $height, $used_memory, $free_memory, $title = 'Free & Used Memory (in %)' ) {
         // Check the input parameters to avoid division by zero and weird cases
-        if ( $free_memory <= 0 ) {
+        if ( $free_memory <= 0 && $used_memory <= 0 ) {
             $free_memory = 1;
             $used_memory = 0;
         }
-        if ($used_memory > $free_memory) 
-            $used_memory = $free_memory;
         
         $centerX = 120;
         $centerY = 120;
@@ -684,6 +686,31 @@ h1 {
     background: #336699;
 }
 /*The end of the menu elements credits */
+#panel{
+    float: left;
+    width: 100%;
+    margin-bottom: 2em;
+    border: 1px solid black;
+}
+#panel_header{
+    background-color: #5C87B2;
+    font-weight: bold;
+    color: #ffffff;
+    border-bottom: 1px solid black;
+    padding: 0.5em;
+}
+#panel_body{
+    background-color: #E7E7E7;
+    padding: 0.5em;
+    white-space: 
+}
+pre {
+    white-space: pre-wrap; /* css-3 */
+    white-space: -moz-pre-wrap !important; /* Mozilla, since 1999 */
+    white-space: -pre-wrap; /* Opera 4-6 */
+    white-space: -o-pre-wrap; /* Opera 7 */
+    word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
 .overview{
     float: left;
     width: inherit;
@@ -1256,7 +1283,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
 ?>
         </table>
     </div>
-<?php } else if ( $page == UCACHE_DATA ) {
+<?php } else if ( $page == UCACHE_DATA && $ucache_key == null ) {
     if ( $user_cache_available ) { 
         init_cache_info( UCACHE_DATA );
 ?>
@@ -1310,11 +1337,12 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     <div class="list" id="filelist">
         <table style="width:100%">
             <tr>
-                <th colspan="5">User cache entries</th>
+                <th colspan="6">User cache entries</th>
             </tr>
             <tr>
                 <th title="Object Key Name">Key name</th>
                 <th title="Type of the object stored">Value type</th>
+                <th title="Size of the object stored (in bytes)">Value size</th>
                 <th title="Total amount of time in seconds which remains until the object is removed from the cache">Total TTL</th>
                 <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
                 <th title="Number of times the object has been served from the cache">Hit Count</th>
@@ -1323,8 +1351,12 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     $count = 0;
     foreach ( $ucache_info['ucache_entries'] as $entry ) {
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
-        echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
+        if ( USE_AUTHENTICATION )
+            echo '<td class="e"><a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&key=', urlencode( $entry['key_name'] ), '">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</a></td>', "\n";
+        else
+            echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
+        echo '<td class="v">', $entry['value_size'], '</td>', "\n";        
         echo '<td class="v">', $entry['ttl_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
@@ -1343,6 +1375,49 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             directive in <strong>php.ini</strong> file.</p>
     </div>
 <?php }?>
+<?php } else if ( $page == UCACHE_DATA && $ucache_key != null && USE_AUTHENTICATION ) { 
+            $ucache_entry_info = wincache_ucache_info( true, $ucache_key );
+            $ucache_entry = wincache_ucache_get( $ucache_key );
+?>
+    <div class="list">
+        <table width="60%">
+            <tr>
+                <th colspan="2">User Cache Entry Information</th>
+            </tr>
+            <tr>
+                <td class="e">Key</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['key_name']; ?></td>
+            </tr>
+            <tr>
+                <td class="e">Value Type</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['value_type']; ?></td>
+            </tr>
+            <tr>
+                <td class="e">Size</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['value_size']; ?></td>
+            </tr>
+            <tr>
+                <td class="e">Total Time To Live (in seconds)</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['ttl_seconds']; ?></td>
+            </tr>
+            <tr>
+                <td class="e">Total Age (in seconds)</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['age_seconds']; ?></td>
+            </tr>
+            <tr>
+                <td class="e">Hit Count</td>
+                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['hitcount']; ?></td>
+            </tr>
+        </table>
+    </div>
+    <div id="panel">
+        <div id="panel_header">
+            User Cache Entry Content
+        </div>
+        <div id="panel_body">
+            <pre><?php print_r( wincache_ucache_get( $ucache_key ) )?></pre>
+        </div>
+    </div>
 <?php } else if ( $page == SCACHE_DATA ) {
     if ( $session_cache_available ) {
         init_cache_info( SCACHE_DATA );

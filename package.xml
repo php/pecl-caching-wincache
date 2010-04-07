@@ -49,6 +49,7 @@
 - Create separate session cache for each session.save_path values.
 - Added ability to get info on a single user cache entry.
 - Exposed functions to get information on folders on which file change notification is active.
+- Updated wincache.php to show the content of the user cache entries only if USE_AUTHENTICATION is enabled.
   </notes>
   <contents>
     <dir name="/">
