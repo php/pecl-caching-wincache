@@ -1342,7 +1342,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <tr>
                 <th title="Object Key Name">Key name</th>
                 <th title="Type of the object stored">Value type</th>
-                <th title="Size of the object stored (in bytes)">Value size</th>
+                <th title="Size of the object stored">Value size</th>
                 <th title="Total amount of time in seconds which remains until the object is removed from the cache">Total TTL</th>
                 <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
                 <th title="Number of times the object has been served from the cache">Hit Count</th>
@@ -1356,7 +1356,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         else
             echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
-        echo '<td class="v">', $entry['value_size'], '</td>', "\n";        
+        echo '<td class="v">', convert_bytes_to_string( $entry['value_size']), '</td>', "\n";        
         echo '<td class="v">', $entry['ttl_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
@@ -1394,7 +1394,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             </tr>
             <tr>
                 <td class="e">Size</td>
-                <td class="v"><?php echo $ucache_entry_info['ucache_entries'][1]['value_size']; ?></td>
+                <td class="v"><?php echo convert_bytes_to_string( $ucache_entry_info['ucache_entries'][1]['value_size'] ); ?></td>
             </tr>
             <tr>
                 <td class="e">Total Time To Live (in seconds)</td>
@@ -1472,11 +1472,12 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
     <div class="list" id="sessionlist">
         <table style="width:100%">
             <tr>
-                <th colspan="5">Session cache entries</th>
+                <th colspan="6">Session cache entries</th>
             </tr>
             <tr>
                 <th title="Object Key Name">Key name</th>
                 <th title="Type of the object stored">Value type</th>
+                <th title="Size of the object stored">Value size</th>
                 <th title="Total amount of time in seconds which remains until the object is removed from the cache">Total TTL</th>
                 <th title="Total amount of time in seconds which has elapsed since the object was added to the cache">Total age</th>
                 <th title="Number of times the object has been served from the cache">Hit Count</th>
@@ -1487,6 +1488,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo '<tr title="', $entry['key_name'] ,'">', "\n";
         echo '<td class="e">', get_trimmed_string( $entry['key_name'], PATH_MAX_LENGTH ),'</td>', "\n";
         echo '<td class="v">', $entry['value_type'], '</td>', "\n";
+        echo '<td class="v">', convert_bytes_to_string( $entry['value_size'] ), '</td>', "\n";
         echo '<td class="v">', $entry['ttl_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['age_seconds'],'</td>', "\n";
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
