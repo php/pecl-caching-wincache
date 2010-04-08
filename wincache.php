@@ -1303,7 +1303,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>                
                 <tr>
                     <td class="e">Cached entries</td>
-                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', UCACHE_DATA, '#filelist'; ?>"><?php echo $ucache_info['total_item_count']; ?></a></td>
+                    <td class="v"><?php echo $ucache_info['total_item_count']; ?></td>
                 </tr>
                 <tr>
                     <td class="e">Hits</td>
@@ -1438,7 +1438,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>                
                 <tr>
                     <td class="e">Cached entries</td>
-                    <td class="v"><a href="<?php echo $PHP_SELF, '?page=', UCACHE_DATA, '#filelist'; ?>"><?php echo $scache_info['total_item_count']; ?></a></td>
+                    <td class="v"><?php echo $scache_info['total_item_count']; ?></td>
                 </tr>
                 <tr>
                     <td class="e">Hits</td>
