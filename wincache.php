@@ -1377,7 +1377,6 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
 <?php }?>
 <?php } else if ( $page == UCACHE_DATA && $ucache_key != null && USE_AUTHENTICATION ) { 
             $ucache_entry_info = wincache_ucache_info( true, $ucache_key );
-            $ucache_entry = wincache_ucache_get( $ucache_key );
 ?>
     <div class="list">
         <table width="60%">
