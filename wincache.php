@@ -1414,7 +1414,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             User Cache Entry Content
         </div>
         <div id="panel_body">
-            <pre><?php print_r( wincache_ucache_get( $ucache_key ) )?></pre>
+            <pre><?php var_dump( wincache_ucache_get( $ucache_key ) )?></pre>
         </div>
     </div>
 <?php } else if ( $page == SCACHE_DATA ) {
