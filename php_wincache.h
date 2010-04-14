@@ -46,8 +46,16 @@ extern zend_module_entry wincache_module_entry;
 typedef struct ocacheval_list ocacheval_list;
 struct ocacheval_list
 {
-    ocache_value *   pvalue; /* ocache value which is in use */
-    ocacheval_list * next;   /* pointer to next ocacheval_list entry */
+    ocache_value *           pvalue;      /* ocache value which is in use */
+    ocacheval_list *         next;        /* pointer to next ocacheval_list entry */
+};
+
+typedef struct wclock_context wclock_context;
+struct wclock_context
+{
+    lock_context *           lockobj;     /* Internal lock context for this wclock */
+    unsigned int             tcreate;     /* Tick count when this was created */
+    unsigned int             tuse;        /* Tick count when this was last used */
 };
 
 /* Module globals */
@@ -81,6 +89,7 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     zend_bool                fcndetect;   /* File change notication detection enabled */
     zend_bool                localheap;   /* Local heap is enabled or disabled */
 
+    HashTable *              wclocks;     /* Locks created using wincache_lock call */
     HashTable *              zvcopied;    /* Copied zvals to make refcounting work */
     ocacheval_list *         oclisthead;  /* List of ocache_value entries in use */
     ocacheval_list *         oclisttail;  /* Tail of ocache_value entries list */

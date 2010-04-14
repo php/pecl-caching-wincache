@@ -37,16 +37,15 @@ ps_module ps_mod_wincache = { PS_MOD(wincache) };
 
 static void scache_destructor(void * pdestination)
 {
-    zvcache_context * pcache = NULL;
+    zvcache_context ** ppcache = NULL;
 
     _ASSERT(pdestination != NULL);
+    ppcache = (zvcache_context **)pdestination;
 
-    pcache = (zvcache_context *)pdestination;
+    zvcache_terminate(*ppcache);
+    zvcache_destroy(*ppcache);
 
-    zvcache_terminate(pcache);
-    zvcache_destroy(pcache);
-
-    pcache = NULL;
+    ppcache = NULL;
     return;
 }
 
@@ -63,12 +62,14 @@ PS_OPEN_FUNC(wincache)
     char  *            filepath   = NULL;
     unsigned int       fpathlen   = 0;
     unsigned int       cachekey   = 0;
+    int                rethash    = 0;
 
     dprintverbose("start ps_open_func");
 
     if(WCG(inisavepath) == NULL)
     {
-        _ASSERT(zend_hash_find(EG(ini_directives), "session.save_path", sizeof("session.save_path"), (void **)&pinientry) != FAILURE);
+        rethash = zend_hash_find(EG(ini_directives), "session.save_path", sizeof("session.save_path"), (void **)&pinientry);
+        _ASSERT(rethash != FAILURE);
         WCG(inisavepath) = pinientry;
     }
 

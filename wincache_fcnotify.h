@@ -73,6 +73,8 @@ struct fcnotify_context
     unsigned char           isshutting;    /* True means process is shutting down */
     unsigned char           iswow64;       /* Take care of wow64 when handling paths */
     unsigned int            processid;     /* Process id of this process */
+    unsigned int            lscavenge;     /* Last scavenger run for this process */
+    unsigned int            ttlticks;      /* How frequently scavenger should run */
 
     char *                  fcmemaddr;     /* Memory address where data is stored */
     fcnotify_header *       fcheader;      /* Pointer to fcnotify_header */

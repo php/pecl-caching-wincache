@@ -416,7 +416,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
         case IS_STRING:
         case IS_CONSTANT:
             if(pcopied->value.str.val > 0)
-            {
+           {
                 length = pcopied->value.str.len + 1;
                 pbuffer = (char *)ZMALLOC(pcopy, length);
 
@@ -470,6 +470,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             pbuffer = ZVALUE(pcopy, pcopied->value.str.val);
 
             PHP_VAR_UNSERIALIZE_INIT(serdata);
+
             if(!php_var_unserialize(&pnewzv, (const unsigned char **)&pbuffer, (const unsigned char *)pbuffer + pcopied->value.str.len, &serdata TSRMLS_CC))
             {
                 /* Destroy zval and set return value to null */
@@ -1081,6 +1082,7 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, zval 
     unsigned int     keylen  = 0;
     zv_zval *        pcopied = NULL;
     zvcopy_context * pcopy   = NULL;
+    unsigned int     cticks  = 0;
 
     dprintverbose("start create_zvcache_data");
 
@@ -1097,8 +1099,9 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, zval 
     _ASSERT(keylen < 4098);
 
     pvalue = (zvcache_value *)ZMALLOC(pcopy, sizeof(zvcache_value) + keylen);
-    if(FAILED(result))
+    if(pvalue == NULL)
     {
+        result = pcopy->oomcode;
         goto Finished;
     }
 
@@ -1118,9 +1121,10 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, zval 
     pvalue->keylen     = (unsigned short)(keylen - 1);
     pvalue->sizeb      = pcopy->allocsize;
     pvalue->zvalue     = ZOFFSET(pcopy, pcopied);
-    pvalue->add_ticks  = GetTickCount();
-    pvalue->use_ticks  = GetTickCount();
 
+    cticks = GetTickCount();
+    pvalue->add_ticks  = cticks;
+    pvalue->use_ticks  = cticks;
 
     pvalue->ttlive     = ttl;
     pvalue->hitcount   = 0;
@@ -1134,7 +1138,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in create_zvcache_data");
+        dprintimportant("failure %d in create_zvcache_data", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pvalue != NULL)
@@ -1346,7 +1350,6 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
             }
 
             /* Remove the entry from cache if its expired */
-            ticks = GetTickCount();
             if(ticks >= ptemp->add_ticks)
             {
                 ticks -= ptemp->add_ticks;
@@ -1547,18 +1550,17 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     /* Initialize the zvcache_header if this is the first process */
     if(islocal || isfirst)
     {
+        cticks = GetTickCount();
+
         if(initmemory)
         {
             /* No need to get a write lock as other processes */
             /* are blocked waiting for hinitdone event */
 
-            cticks = GetTickCount();
-
             /* We can set rdcount to 0 safely as other processes are */
             /* blocked and this process is right now not using lock */
             header->hitcount     = 0;
             header->misscount    = 0;
-            header->init_ticks   = cticks;
             header->rdcount      = 0;
 
             header->lscavenge    = cticks;
@@ -1568,7 +1570,9 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
             memset((void *)header->values, 0, sizeof(size_t) * zvcount);
         }
 
-        header->mapcount = 1;
+        header->init_ticks = cticks;
+        header->mapcount   = 1;
+
         SetEvent(pcache->hinitdone);
     }
     else
@@ -2103,6 +2107,7 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
 
     header = pcache->zvheader;
     palloc = pcache->zvalloc;
+    ticks  = GetTickCount();
 
     lock_readlock(pcache->zvrwlock);
     flock = 1;
@@ -2111,7 +2116,16 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
     pcinfo->misscount = header->misscount;
     pcinfo->itemcount = header->itemcount;
     pcinfo->islocal   = pcache->islocal;
-    pcinfo->initage   = (GetTickCount() - header->init_ticks)/1000;
+
+    /* Take care of tickcount rollover when taking calculating init age */
+    if(ticks > header->init_ticks)
+    {
+        pcinfo->initage = (ticks - header->init_ticks)/1000;
+    }
+    else
+    {
+        pcinfo->initage = ((DWORD_MAX - header->init_ticks) + ticks)/1000;
+    }
 
     zend_llist_init(plist, sizeof(zvcache_info_entry), zvcache_info_entry_dtor, 0);
 
@@ -2135,7 +2149,6 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
             }
 
             /* Calculate age in seconds */
-            ticks = GetTickCount();
             if(ticks >= pvalue->add_ticks)
             {
                 ticks = ticks - pvalue->add_ticks;
@@ -2183,7 +2196,6 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
                 }
 
                 /* Calculate age in seconds */
-                ticks = GetTickCount();
                 if(ticks >= pvalue->add_ticks)
                 {
                     ticks = ticks - pvalue->add_ticks;

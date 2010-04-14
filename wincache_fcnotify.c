@@ -33,10 +33,12 @@
 
 #include "precomp.h"
 
-#define PROCESS_IS_ALIVE             0
-#define PROCESS_IS_DEAD              1
-#define FCNOTIFY_VALUE(p, o)         ((fcnotify_value *)alloc_get_cachevalue(p, o))
-#define FCNOTIFY_TERMKEY             ((ULONG_PTR)-1)
+#define PROCESS_IS_ALIVE              0
+#define PROCESS_IS_DEAD               1
+#define FCNOTIFY_VALUE(p, o)          ((fcnotify_value *)alloc_get_cachevalue(p, o))
+#define FCNOTIFY_TERMKEY              ((ULONG_PTR)-1)
+#define DWORD_MAX                     0xFFFFFFFF
+#define SCAVENGER_FREQUENCY           900000
 
 static unsigned int WINAPI change_notification_thread(void * parg);
 static void WINAPI process_change_notification(aplist_context * pcache, unsigned int bytecount, OVERLAPPED * poverlapped);
@@ -46,8 +48,9 @@ static int  create_fcnotify_data(fcnotify_context * pnotify, const char * folder
 static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * pvalue);
 static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
 static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
+static int  pidhandles_apply(void * pdestination TSRMLS_DC);
 static void run_fcnotify_scavenger(fcnotify_context * pnotify);
-static unsigned char process_still_alive(fcnotify_context * pnotify, unsigned int ownerpid);
+static unsigned char process_alive_check(fcnotify_context * pnotify, unsigned int ownerpid);
 
 static unsigned int WINAPI change_notification_thread(void * parg)
 {
@@ -347,11 +350,10 @@ static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * p
 {
     dprintimportant("start destroy_fcnotify_data");
 
-    /* TBD?? possible handle leak if data is destroyed by */
-    /* non-owner when owner process is still alive*/
-
     if(pvalue != NULL)
     {
+        /* Free memory occupied by plistener and close the handle */
+        /* if owner process is destroying fcnotify data */
         if(pnotify->processid == pvalue->owner_pid && pvalue->plistener != NULL)
         {
             if(pvalue->plistener->folder_path != NULL)
@@ -486,6 +488,7 @@ int fcnotify_create(fcnotify_context ** ppnotify)
     pcontext->isshutting    = 0;
     pcontext->iswow64       = 0;
     pcontext->processid     = 0;
+    pcontext->lscavenge     = 0;
 
     pcontext->fcmemaddr     = NULL;
     pcontext->fcheader      = NULL;
@@ -551,6 +554,7 @@ int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void
 
     pnotify->processid = WCG(fmapgdata)->pid;
     pnotify->fcmemaddr = palloc->memaddr;
+    pnotify->lscavenge = GetTickCount();
 
     /* Get memory for fcnotify header */
     msize = sizeof(fcnotify_header) + (filecount - 1) * sizeof(size_t);
@@ -724,19 +728,44 @@ void fcnotify_terminate(fcnotify_context * pnotify)
     return;
 }
 
+static int pidhandles_apply(void * pdestination TSRMLS_DC)
+{
+    HANDLE *      hprocess = NULL;
+    unsigned int  exitcode = 0;
+
+    _ASSERT(pdestination != NULL);
+    hprocess = (HANDLE *)pdestination;
+
+    if(GetExitCodeProcess(*hprocess, &exitcode) && exitcode != STILL_ACTIVE)
+    {
+        CloseHandle(*hprocess);
+        return ZEND_HASH_APPLY_REMOVE;
+    }
+    else
+    {
+        return ZEND_HASH_APPLY_KEEP;
+    }
+}
+
 static void run_fcnotify_scavenger(fcnotify_context * pnotify)
 {
-    fcnotify_header * pheader = NULL;
-    fcnotify_value *  pvalue  = NULL;
-    fcnotify_value *  pnext   = NULL;
-    unsigned int      index   = 0;
-    unsigned int      count   = 0;
+    fcnotify_header * pheader    = NULL;
+    fcnotify_value *  pvalue     = NULL;
+    fcnotify_value *  pnext      = NULL;
+    unsigned int      index      = 0;
+    unsigned int      count      = 0;
+    HashTable *       phashtable = NULL;
 
+    TSRMLS_FETCH();
     dprintimportant("start run_fcnotify_scavenger");
 
     pheader = pnotify->fcheader;
     count = pheader->valuecount;
 
+    phashtable = pnotify->pidhandles;
+
+    /* Go through all the entries and remove entries for which refcount is 0 */\
+    /* Do it only for processes which are dead or if this was the owner pid */
     lock_writelock(pnotify->fclock);
 
     for(index = 0; index < count; index++)
@@ -747,7 +776,9 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
             pvalue = pnext;
             pnext = FCNOTIFY_VALUE(pnotify->fcalloc, pvalue->next_value);
 
-            if(pnotify->processid == pvalue->owner_pid && pvalue->refcount == 0)
+            /* process alive check will remove entry from pidhandles if necessary */
+            if(pvalue->refcount == 0 &&
+               (pvalue->owner_pid == pnotify->processid || process_alive_check(pnotify, pvalue->owner_pid) == PROCESS_IS_DEAD))
             {
                 remove_fcnotify_entry(pnotify, index, pvalue);
                 pvalue = NULL;
@@ -757,10 +788,14 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
 
     lock_writeunlock(pnotify->fclock);
 
+    /* Go through pidhandles table and remove entries for dead processes */
+    zend_hash_apply(phashtable, pidhandles_apply TSRMLS_CC);
+    pnotify->lscavenge = GetTickCount();
+
     dprintimportant("end run_fcnotify_scavenger");
 }
 
-static unsigned char process_still_alive(fcnotify_context * pnotify, unsigned int ownerpid)
+static unsigned char process_alive_check(fcnotify_context * pnotify, unsigned int ownerpid)
 {
     HashTable *   phashtable = NULL;
     HANDLE        hprocess   = NULL;
@@ -816,7 +851,6 @@ static unsigned char process_still_alive(fcnotify_context * pnotify, unsigned in
         if(GetExitCodeProcess(hprocess, &exitcode) && exitcode != STILL_ACTIVE)
         {
             /* GetProcessId failure means process is gone */
-            /* Close process handle and remove from pidhandles table */
             CloseHandle(hprocess);
             zend_hash_index_del(phashtable, (ulong)ownerpid);
 
@@ -825,8 +859,6 @@ static unsigned char process_still_alive(fcnotify_context * pnotify, unsigned in
     }
 
 Finished:
-
-    dprintimportant("process still alive = %s", (listenp ? "PROCESS_IS_DEAD" : "PROCESS_IS_ALIVE"));
 
     return listenp;
 }
@@ -844,6 +876,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
     fcnotify_value *  pnewval    = NULL;
     unsigned char     listenp    = 0;
     unsigned char     flock      = 0;
+    unsigned int      cticks     = 0;
 
     dprintimportant("start fcnotify_check");
 
@@ -853,6 +886,14 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
 
     *poffset = 0;
     pheader = pnotify->fcheader;
+
+    /* Run scavenger every SCAVENGER_FREQUENCY milliseconds */
+    cticks = GetTickCount();
+    if((cticks < pnotify->lscavenge && ((DWORD_MAX - pnotify->lscavenge) + cticks) >= SCAVENGER_FREQUENCY) ||
+       (cticks > pnotify->lscavenge && cticks - pnotify->lscavenge >= SCAVENGER_FREQUENCY))
+    {
+        run_fcnotify_scavenger(pnotify);
+    }
 
     if(offset != 0)
     {
@@ -896,8 +937,8 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
 
     if(pvalue != NULL)
     {
-        /* If make sure owner_pid is still there */
-        listenp = process_still_alive(pnotify, pvalue->owner_pid);
+        /* Check if owner_pid process is still there */
+        listenp = process_alive_check(pnotify, pvalue->owner_pid);
     }
     else
     {
@@ -924,6 +965,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
             if(pvalue != NULL && pvalue->owner_pid == ptemp->owner_pid)
             {
                 /* Delete existing entry whose owner is now gone */
+                /* Ok to delete fcnotify entry by a non-owner pid if owner is gone */
                 remove_fcnotify_entry(pnotify, index, pvalue);
                 pvalue = NULL;
             }

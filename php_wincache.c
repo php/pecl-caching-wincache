@@ -37,6 +37,7 @@
 #define OCENABLED_INDEX_IN_GLOBALS  1
 #define FCENABLED_INDEX_IN_GLOBALS  0
 #define WINCACHE_TEST_FILE          "wincache.php"
+#define LOCK_KEY_MAXLEN             150
 
 /* START OF PHP EXTENSION MACROS STUFF */
 PHP_MINIT_FUNCTION(wincache);
@@ -60,6 +61,25 @@ PHP_FUNCTION(wincache_refresh_if_changed);
 PHP_FUNCTION(wincache_function_exists);
 PHP_FUNCTION(wincache_class_exists);
 
+PHP_FUNCTION(wincache_file_exists);
+/*
+PHP_FUNCTION(wincache_is_file);
+PHP_FUNCTION(wincache_is_dir);
+PHP_FUNCTION(wincache_file_get_contents);
+PHP_FUNCTION(wincache_realpath);
+PHP_FUNCTION(wincache_is_readable);
+PHP_FUNCTION(wincache_is_writable);
+PHP_FUNCTION(wincache_dirname);
+PHP_FUNCTION(wincache_file);
+PHP_FUNCTION(wincache_setlocale);
+*/
+
+/*
+PHP_FUNCTION(wincache_preg_match);
+PHP_FUNCTION(wincache_preg_replace);
+PHP_FUNCTION(wincache_preg_split);
+*/
+
 /* ZVAL cache functions matching other caches */
 PHP_FUNCTION(wincache_ucache_get);
 PHP_FUNCTION(wincache_ucache_set);
@@ -72,6 +92,8 @@ PHP_FUNCTION(wincache_scache_info);
 PHP_FUNCTION(wincache_ucache_inc);
 PHP_FUNCTION(wincache_ucache_dec);
 PHP_FUNCTION(wincache_ucache_cas);
+PHP_FUNCTION(wincache_lock);
+PHP_FUNCTION(wincache_unlock);
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_ucache_lasterror);
@@ -122,6 +144,10 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_class_exists, 0, 0, 1)
     ZEND_ARG_INFO(0, class_name)
     ZEND_ARG_INFO(0, autoload)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_exists, 0, 0, 1)
+    ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_get, 0, 0, 1)
@@ -178,6 +204,14 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_cas, 0, 0, 3)
     ZEND_ARG_INFO(0, nvalue)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_lock, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_unlock, 0, 0, 1)
+    ZEND_ARG_INFO(0, key)
+ZEND_END_ARG_INFO()
+
 #ifdef WINCACHE_TEST
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_lasterror, 0, 0, 0)
 ZEND_END_ARG_INFO()
@@ -216,6 +250,7 @@ zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
     PHP_FE(wincache_function_exists, arginfo_wincache_function_exists)
     PHP_FE(wincache_class_exists, arginfo_wincache_class_exists)
+    PHP_FE(wincache_file_exists, arginfo_wincache_file_exists)
     PHP_FE(wincache_ucache_get, arginfo_wincache_ucache_get)
     PHP_FE(wincache_ucache_set, arginfo_wincache_ucache_set)
     PHP_FE(wincache_ucache_add, arginfo_wincache_ucache_add)
@@ -227,6 +262,8 @@ zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_ucache_inc, arginfo_wincache_ucache_inc)
     PHP_FE(wincache_ucache_dec, arginfo_wincache_ucache_dec)
     PHP_FE(wincache_ucache_cas, arginfo_wincache_ucache_cas)
+    PHP_FE(wincache_lock, arginfo_wincache_lock)
+    PHP_FE(wincache_unlock, arginfo_wincache_unlock)
 #ifdef WINCACHE_TEST
     PHP_FE(wincache_ucache_lasterror, arginfo_wincache_ucache_lasterror)
     PHP_FE(wincache_runtests, arginfo_wincache_runtests)
@@ -330,6 +367,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(zvscache)    = NULL; /* zvcache_context for session data */
     WCG(phscache)    = NULL; /* Hashtable containing zvcache_contexts */
     WCG(issame)      = 1;    /* Indicates if same aplist is used */
+    WCG(wclocks)     = NULL; /* HashTable for locks created by wincache_lock */
     WCG(zvcopied)    = NULL; /* HashTable which helps with refcounting */
     WCG(oclisthead)  = NULL; /* Head of in-use ocache values list */
     WCG(oclisttail)  = NULL; /* Tail of in-use ocache values list */
@@ -527,6 +565,7 @@ PHP_MINIT_FUNCTION(wincache)
     zend_extension     extension = {0};
     detours_context *  pdetours  = NULL;
     zend_ini_entry *   pinientry = NULL;
+    int                rethash   = 0;
 
     ZEND_INIT_MODULE_GLOBALS(wincache, globals_initialize, globals_terminate);
     REGISTER_INI_ENTRIES();
@@ -535,10 +574,12 @@ PHP_MINIT_FUNCTION(wincache)
     dprintsetlevel(WCG(debuglevel));
     dprintverbose("start php_minit");
 
-    _ASSERT(zend_hash_find(EG(ini_directives), "wincache.fcenabled", sizeof("wincache.fcenabled"), (void **)&pinientry) != FAILURE);
+    rethash = zend_hash_find(EG(ini_directives), "wincache.fcenabled", sizeof("wincache.fcenabled"), (void **)&pinientry);
+    _ASSERT(rethash != FAILURE);
     WCG(inifce) = pinientry;
     
-    _ASSERT(zend_hash_find(EG(ini_directives), "wincache.ocenabled", sizeof("wincache.ocenabled"), (void **)&pinientry) != FAILURE);
+    rethash = zend_hash_find(EG(ini_directives), "wincache.ocenabled", sizeof("wincache.ocenabled"), (void **)&pinientry);
+    _ASSERT(rethash != FAILURE);
     WCG(inioce) = pinientry;
 
     /* If enablecli is set to 0, don't initialize when run with cli sapi */
@@ -719,7 +760,7 @@ PHP_MINIT_FUNCTION(wincache)
     original_error_cb = zend_error_cb;
     dprintverbose("Installed function hooks for compile_file");
 
-    /* Create user cache*/
+    /* Always create user cache as ucenabled can be set by script */
     result = zvcache_create(&pzcache);
     if(FAILED(result))
     {
@@ -827,6 +868,15 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         detours_destroy(WCG(detours));
 
         WCG(detours) = NULL;
+    }
+
+    /* wclocks_destructor will destroy the locks properly */
+    if(WCG(wclocks) != NULL)
+    {
+        zend_hash_destroy(WCG(wclocks));
+        alloc_pefree(WCG(wclocks));
+
+        WCG(wclocks) = NULL;
     }
 
     if(WCG(zvcopied) != NULL)
@@ -1905,6 +1955,7 @@ PHP_FUNCTION(wincache_class_exists)
     static HashTable *  ce_table        = NULL;
     ALLOCA_FLAG(use_heap)
 
+    /* TBD?? This doesn't seem to be working well. Fix this. */
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &class_name, &class_name_len, &autoload) == FAILURE)
     {
         return;
@@ -1974,6 +2025,55 @@ Finished:
     zend_hash_add(ce_table, class_name, class_name_len + 1, &retval, sizeof(void *), NULL);
 
     RETURN_BOOL(retval);
+}
+
+PHP_FUNCTION(wincache_file_exists)
+{
+    int           result   = NONFATAL;
+    char *        filename = NULL;
+    int           flength  = 0;
+    char *        respath  = NULL;
+    unsigned char retval   = 0;
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &flength) == FAILURE)
+    {
+        return;
+    }
+
+    /* Keep last argument as NULL to indicate that we only want fullpath of file */
+    result = aplist_fcache_get(WCG(lfcache), filename, &respath, NULL TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    if(GetFileAttributes(respath) != 0xFFFFFFFF)
+    {
+        retval = 1;
+    }
+
+Finished:
+
+    if(respath != NULL)
+    {
+        alloc_efree(respath);
+        respath = NULL;
+    }
+
+    if(FAILED(result))
+    {
+        dprintimportant("wincache_file_exists failed with error %u", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        return;
+    }
+
+    if(retval)
+    {
+        RETURN_TRUE;
+    }
+
+    RETURN_FALSE;
 }
 
 PHP_FUNCTION(wincache_ucache_get)
@@ -3064,6 +3164,210 @@ Finished:
         {
             php_error_docref(NULL TSRMLS_CC, E_WARNING, "function can only be called for key whose value is long");
         }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+static void wclocks_destructor(void * pdestination)
+{
+    wclock_context *  plock  = NULL;
+    wclock_context ** pplock = NULL;
+
+    _ASSERT(pdestination != NULL);
+
+    pplock = (wclock_context **)pdestination;
+    plock  = *pplock;
+    pplock = NULL;
+
+    _ASSERT(plock != NULL);
+
+    lock_terminate(plock->lockobj);
+    lock_destroy(plock->lockobj);
+
+    alloc_pefree(plock);
+    plock = NULL;
+
+    return;
+}
+
+PHP_FUNCTION(wincache_lock)
+{
+    int               result   = NONFATAL;
+    char *            key      = NULL;
+    unsigned int      keylen   = 0;
+    char              lockname[  MAX_PATH];
+    wclock_context *  plock    = NULL;
+    wclock_context ** pplock   = NULL;
+    lock_context *    pcontext = NULL;
+
+    /* Create hashtable if required */
+    if(WCG(wclocks) == NULL)
+    {
+        WCG(wclocks) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+        if(WCG(wclocks) == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
+
+        zend_hash_init(WCG(wclocks), 0, NULL, wclocks_destructor, 1);
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    if(keylen > LOCK_KEY_MAXLEN)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR, "lock key should be less than %d characters", LOCK_KEY_MAXLEN);
+
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Look for this key in wclocks hashtable */
+    if(zend_hash_find(WCG(wclocks), key, keylen, (void **)&pplock) == FAILURE)
+    {
+        ZeroMemory(lockname, MAX_PATH);
+        strcpy(lockname, "__wclocks__");
+        strcat(lockname, key);
+
+        result = lock_create(&pcontext);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        result = lock_initialize(pcontext, lockname, 1, LOCK_TYPE_SHARED, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+
+        plock = alloc_pemalloc(sizeof(wclock_context));
+        if(plock == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
+
+        plock->lockobj = pcontext;
+        plock->tcreate = GetTickCount();
+        plock->tuse    = 0;
+
+        zend_hash_add(WCG(wclocks), key, keylen, (void **)&plock, sizeof(wclock_context), NULL);
+    }
+    else
+    {
+        plock = *pplock;
+        pcontext = plock->lockobj;
+    }
+
+    _ASSERT(plock    != NULL);
+    _ASSERT(pcontext != NULL);
+
+    if(pcontext->state == LOCK_STATE_WRITELOCK)
+    {
+        /* Ignoring call to wincache_lock as lock is already acquired */
+        result = WARNING_LOCK_IGNORE;
+        goto Finished;
+    }
+
+    lock_writelock(pcontext);
+    plock->tuse = GetTickCount();
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in wincache_lock", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        /* Delete the lock object in case of fatal errors */
+        if(result < WARNING_COMMON_BASE && pplock == NULL)
+        {
+            if(pcontext != NULL)
+            {
+                lock_terminate(pcontext);
+                lock_destroy(pcontext);
+
+                pcontext = NULL;
+            }
+
+            if(plock != NULL)
+            {
+                alloc_pefree(plock);
+                plock = NULL;
+            }
+
+            pplock = NULL;
+        }
+
+        RETURN_FALSE;
+    }
+
+    RETURN_TRUE;
+}
+
+PHP_FUNCTION(wincache_unlock)
+{
+    int               result   = NONFATAL;
+    lock_context *    pcontext = NULL;
+    wclock_context ** pplock   = NULL;
+    char *            key      = NULL;
+    unsigned int      keylen   = 0;
+
+    if(WCG(wclocks) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    if(keylen > LOCK_KEY_MAXLEN)
+    {
+        php_error_docref(NULL TSRMLS_CC, E_ERROR, "lock key should be less than %d characters", LOCK_KEY_MAXLEN);
+
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    /* Look for this key in wclocks hashtable */
+    if(zend_hash_find(WCG(wclocks), key, keylen, (void **)&pplock) == FAILURE)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    pcontext = (*pplock)->lockobj;
+    _ASSERT(pcontext != NULL);
+
+    if(pcontext->state != LOCK_STATE_WRITELOCK)
+    {
+        /* Ignoring call to unlock as the lock is not acquired yet */
+        result = WARNING_LOCK_IGNORE;
+        goto Finished;
+    }
+
+    lock_writeunlock(pcontext);
+    (*pplock)->tuse = GetTickCount();
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in wincache_unlock", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }

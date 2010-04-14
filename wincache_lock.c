@@ -408,7 +408,6 @@ void lock_readlock(lock_context * plock)
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
-    _ASSERT(plock->state   == LOCK_STATE_UNLOCKED);
 
     switch(plock->usetype)
     {
@@ -454,7 +453,6 @@ void lock_readunlock(lock_context * plock)
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
-    _ASSERT(plock->state   == LOCK_STATE_READLOCK);
 
     switch(plock->usetype)
     {
@@ -500,7 +498,6 @@ void lock_writelock(lock_context * plock)
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
-    _ASSERT(plock->state   == LOCK_STATE_UNLOCKED);
 
     switch( plock->usetype )
     {
@@ -544,7 +541,6 @@ void lock_writeunlock(lock_context * plock)
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
-    _ASSERT(plock->state   == LOCK_STATE_WRITELOCK);
 
     switch(plock->usetype)
     {

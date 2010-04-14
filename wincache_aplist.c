@@ -1599,6 +1599,8 @@ Finished:
     return result;
 }
 
+/* This method is called by change listener thread which will run in parallel */
+/* to main thread. Make sure functions used can be used in multithreaded environment */
 void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename)
 {
     unsigned int   findex   = 0;
@@ -1747,6 +1749,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                         result = fcnotify_check(pcache->pnotify, NULL, pvalue->fcnotify, &pvalue->fcnotify);
                         if(FAILED(result))
                         {
+                            lock_readunlock(pcache->aprwlock);
                             goto Finished;
                         }
                     }
@@ -1850,7 +1853,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
             }
         }
 #endif
-        dprintimportant("Path resolved as %s", fullpath);
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */
