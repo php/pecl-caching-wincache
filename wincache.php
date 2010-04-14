@@ -150,7 +150,7 @@ if ( isset( $_GET['all'] ) && is_numeric( $_GET['all'] ) ) {
 
 $ucache_key = null;
 if ( isset( $_GET['key'] ) )
-    $ucache_key = urldecode( $_GET['key'] );
+    $ucache_key = $_GET['key'];
 // End of input parameters check
 
 // Initialize global variables
