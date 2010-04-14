@@ -180,6 +180,7 @@ ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_info, 0, 0, 0)
     ZEND_ARG_INFO(0, summaryonly)
+    ZEND_ARG_INFO(0, key)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_scache_info, 0, 0, 0)
@@ -605,21 +606,27 @@ PHP_MINIT_FUNCTION(wincache)
     /* ttlmax can be set to 0 which means scavenger is completely disabled */
     if(WCG(ttlmax) != 0)
     {
-        WCG(ttlmax)    = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
-        WCG(ttlmax)    = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
+        WCG(ttlmax)  = (WCG(ttlmax)      < TTL_VALUE_MINIMUM)   ? TTL_VALUE_MINIMUM   : WCG(ttlmax);
+        WCG(ttlmax)  = (WCG(ttlmax)      > TTL_VALUE_MAXIMUM)   ? TTL_VALUE_MAXIMUM   : WCG(ttlmax);
     }
 
     /* fcchkfreq can be set to 0 which will mean check is completely disabled */
     if(WCG(fcchkfreq) != 0)
     {
-        WCG(fcchkfreq) = (WCG(fcchkfreq)   < FCHECK_FREQ_MINIMUM) ? FCHECK_FREQ_MINIMUM : WCG(fcchkfreq);
-        WCG(fcchkfreq) = (WCG(fcchkfreq)   > FCHECK_FREQ_MAXIMUM) ? FCHECK_FREQ_MAXIMUM : WCG(fcchkfreq);
+        WCG(fcchkfreq) = (WCG(fcchkfreq) < FCHECK_FREQ_MINIMUM) ? FCHECK_FREQ_MINIMUM : WCG(fcchkfreq);
+        WCG(fcchkfreq) = (WCG(fcchkfreq) > FCHECK_FREQ_MAXIMUM) ? FCHECK_FREQ_MAXIMUM : WCG(fcchkfreq);
     }
 
     /* Truncate namesalt to 8 characters */
     if(WCG(namesalt) != NULL && strlen(WCG(namesalt)) > NAMESALT_LENGTH_MAXIMUM)
     {
-        *(WCG(namesalt) + NAMESALT_LENGTH_MAXIMUM) = 0;
+        rethash = zend_hash_find(EG(ini_directives), "wincache.namesalt", sizeof("wincache.namesalt"), (void **)&pinientry);
+        _ASSERT(rethash != FAILURE);
+
+        *(pinientry->value + NAMESALT_LENGTH_MAXIMUM) = 0;
+        pinientry->value_length = NAMESALT_LENGTH_MAXIMUM;
+
+        /* WCG(namesalt) is already pointing to pinientry->value */
     }
 
     /* Convert ignorelist to lowercase soon enough */

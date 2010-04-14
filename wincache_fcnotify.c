@@ -37,7 +37,6 @@
 #define PROCESS_IS_DEAD               1
 #define FCNOTIFY_VALUE(p, o)          ((fcnotify_value *)alloc_get_cachevalue(p, o))
 #define FCNOTIFY_TERMKEY              ((ULONG_PTR)-1)
-#define DWORD_MAX                     0xFFFFFFFF
 #define SCAVENGER_FREQUENCY           900000
 
 static unsigned int WINAPI change_notification_thread(void * parg);
@@ -747,6 +746,7 @@ static int pidhandles_apply(void * pdestination TSRMLS_DC)
     }
 }
 
+/* This method acquires write lock. Call without any lock */
 static void run_fcnotify_scavenger(fcnotify_context * pnotify)
 {
     fcnotify_header * pheader    = NULL;
@@ -764,7 +764,7 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
 
     phashtable = pnotify->pidhandles;
 
-    /* Go through all the entries and remove entries for which refcount is 0 */\
+    /* Go through all the entries and remove entries for which refcount is 0 */
     /* Do it only for processes which are dead or if this was the owner pid */
     lock_writelock(pnotify->fclock);
 
@@ -876,7 +876,6 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
     fcnotify_value *  pnewval    = NULL;
     unsigned char     listenp    = 0;
     unsigned char     flock      = 0;
-    unsigned int      cticks     = 0;
 
     dprintimportant("start fcnotify_check");
 
@@ -888,9 +887,8 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t off
     pheader = pnotify->fcheader;
 
     /* Run scavenger every SCAVENGER_FREQUENCY milliseconds */
-    cticks = GetTickCount();
-    if((cticks < pnotify->lscavenge && ((DWORD_MAX - pnotify->lscavenge) + cticks) >= SCAVENGER_FREQUENCY) ||
-       (cticks > pnotify->lscavenge && cticks - pnotify->lscavenge >= SCAVENGER_FREQUENCY))
+    /* scavenger function will take a write lock */
+    if(utils_ticksdiff(0, pnotify->lscavenge) >= SCAVENGER_FREQUENCY)
     {
         run_fcnotify_scavenger(pnotify);
     }

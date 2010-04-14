@@ -34,7 +34,6 @@
 #include "precomp.h"
 
 #define PER_RUN_SCAVENGE_COUNT       16
-#define DWORD_MAX                    0xFFFFFFFF
 
 #ifndef IS_CONSTANT_TYPE_MASK
 #define IS_CONSTANT_TYPE_MASK (~IS_CONSTANT_INDEX)
@@ -1020,7 +1019,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
     int              result = NONFATAL;
     zvcache_header * header = NULL;
     zvcache_value *  pvalue = NULL;
-    unsigned int     ticks  = 0;
+    unsigned int     tdiff  = 0;
 
     dprintverbose("start find_zvcache_entry");
 
@@ -1039,21 +1038,10 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
         {
             if(pvalue->ttlive > 0)
             {
-                /* Check if the entry is not expired */
-                ticks = GetTickCount();
-                if(ticks >= pvalue->add_ticks)
-                {
-                    ticks = ticks - pvalue->add_ticks;
-                }
-                else
-                {
-                    ticks = (DWORD_MAX - pvalue->add_ticks) + ticks;
-                }
-
-                ticks = ticks / 1000;
-
+                /* Check if the entry is not expired and */
                 /* Stop looking only if entry is not stale */
-                if(ticks <= pvalue->ttlive)
+                tdiff = utils_ticksdiff(0, pvalue->add_ticks) / 1000;
+                if(tdiff <= pvalue->ttlive)
                 {
                     break;
                 }
@@ -1296,6 +1284,7 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
     unsigned int sindex   = 0;
     unsigned int eindex   = 0;
     unsigned int ticks    = 0;
+    unsigned int tickdiff = 0;
 
     zvcache_header * pheader = NULL;
     alloc_context *  palloc  = NULL;
@@ -1311,7 +1300,7 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
     ticks   = GetTickCount();
 
     /* Only run if lscavenge happened atleast 10 seconds ago */
-    if(ticks > pheader->lscavenge && (ticks - pheader->lscavenge) < 10000)
+    if(utils_ticksdiff(ticks, pheader->lscavenge) < 10000)
     {
         goto Finished;
     }
@@ -1350,17 +1339,8 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
             }
 
             /* Remove the entry from cache if its expired */
-            if(ticks >= ptemp->add_ticks)
-            {
-                ticks -= ptemp->add_ticks;
-            }
-            else
-            {
-                ticks = (DWORD_MAX - ptemp->add_ticks) + ticks;
-            }
-
-            ticks /= 1000;
-            if(ticks >= ptemp->ttlive)
+            tickdiff = utils_ticksdiff(ticks, ptemp->add_ticks) / 1000;
+            if(tickdiff >= ptemp->ttlive)
             {
                 remove_zvcache_entry(pcache, sindex, ptemp);
                 ptemp = NULL;
@@ -2089,15 +2069,15 @@ static void zvcache_info_entry_dtor(void * pvoid)
 
 int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, zvcache_info * pcinfo, zend_llist * plist)
 {
-    int                  result = NONFATAL;
-    unsigned char        flock  = 0;
-    zvcache_header *     header = NULL;
-    alloc_context *      palloc = NULL;
-    zvcache_value *      pvalue = NULL;
-    unsigned int         index  = 0;
-    zvcache_info_entry   pinfo  = {0};
-    unsigned int         ticks  = 0;
-    unsigned int         count  = 0;
+    int                  result   = NONFATAL;
+    unsigned char        flock    = 0;
+    zvcache_header *     header   = NULL;
+    alloc_context *      palloc   = NULL;
+    zvcache_value *      pvalue   = NULL;
+    unsigned int         index    = 0;
+    zvcache_info_entry   pinfo    = {0};
+    unsigned int         cticks   = 0;
+    unsigned int         count    = 0;
 
     dprintverbose("start zvcache_list");
 
@@ -2107,7 +2087,7 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
 
     header = pcache->zvheader;
     palloc = pcache->zvalloc;
-    ticks  = GetTickCount();
+    cticks  = GetTickCount();
 
     lock_readlock(pcache->zvrwlock);
     flock = 1;
@@ -2117,17 +2097,9 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
     pcinfo->itemcount = header->itemcount;
     pcinfo->islocal   = pcache->islocal;
 
-    /* Take care of tickcount rollover when taking calculating init age */
-    if(ticks > header->init_ticks)
-    {
-        pcinfo->initage = (ticks - header->init_ticks)/1000;
-    }
-    else
-    {
-        pcinfo->initage = ((DWORD_MAX - header->init_ticks) + ticks)/1000;
-    }
-
     zend_llist_init(plist, sizeof(zvcache_info_entry), zvcache_info_entry_dtor, 0);
+
+    pcinfo->initage = utils_ticksdiff(cticks, header->init_ticks) / 1000;
 
     if(pkey != NULL)
     {
@@ -2148,21 +2120,8 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
                 goto Finished;
             }
 
-            /* Calculate age in seconds */
-            if(ticks >= pvalue->add_ticks)
-            {
-                ticks = ticks - pvalue->add_ticks;
-            }
-            else
-            {
-                ticks = (DWORD_MAX - pvalue->add_ticks) + ticks;
-            }
-
-            /* Convert to seconds */
-            ticks = ticks / 1000;
-
             pinfo.ttl      = pvalue->ttlive;
-            pinfo.age      = ticks;
+            pinfo.age      = utils_ticksdiff(cticks, pvalue->add_ticks) / 1000;
             pinfo.type     = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
             pinfo.sizeb    = pvalue->sizeb;
             pinfo.hitcount = pvalue->hitcount;
@@ -2195,21 +2154,8 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
                     goto Finished;
                 }
 
-                /* Calculate age in seconds */
-                if(ticks >= pvalue->add_ticks)
-                {
-                    ticks = ticks - pvalue->add_ticks;
-                }
-                else
-                {
-                    ticks = (DWORD_MAX - pvalue->add_ticks) + ticks;
-                }
-
-                /* Convert to seconds */
-                ticks = ticks / 1000;
-
                 pinfo.ttl      = pvalue->ttlive;
-                pinfo.age      = ticks;
+                pinfo.age      = utils_ticksdiff(cticks, pvalue->add_ticks) / 1000;
                 pinfo.type     = (((zv_zval *)ZVALUE(pcache->incopy, pvalue->zvalue))->type) & IS_CONSTANT_TYPE_MASK;
                 pinfo.sizeb    = pvalue->sizeb;
                 pinfo.hitcount = pvalue->hitcount;

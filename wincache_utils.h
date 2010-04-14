@@ -41,6 +41,7 @@ extern char *       utils_fullpath(const char * filename);
 extern int          utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
 extern int          utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer, unsigned int length);
 extern int          utils_apoolpid();
+extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);

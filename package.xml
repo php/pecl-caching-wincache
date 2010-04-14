@@ -51,6 +51,7 @@
 - Exposed functions to get information on folders on which file change notification is active.
 - Updated wincache.php to show the content of the user cache entries only if USE_AUTHENTICATION is enabled.
 - Added wincache_lock, wincache_unlock APIs. Bug fixes to file change notification and user cache.
+- Fixed tickcount rollover related bugs and namesalt truncation bug.
   </notes>
   <contents>
     <dir name="/">

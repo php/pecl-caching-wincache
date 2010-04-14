@@ -47,7 +47,6 @@
 #define FILE_IS_CHANGED               1
 
 #define APLIST_VALUE(p, o)            ((aplist_value *)alloc_get_cachevalue(p, o))
-#define DWORD_MAX                     0xFFFFFFFF
 
 static int  find_aplist_entry(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete);
 static int  is_file_changed(aplist_context * pcache, aplist_value * pvalue);
@@ -175,14 +174,7 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
 
     /* Calculate difftime while taking care of rollover */
     tickcount = GetTickCount();
-    if(tickcount >= pvalue->last_check)
-    {
-        difftime  = tickcount - pvalue->last_check;
-    }
-    else
-    {
-        difftime = tickcount + (DWORD_MAX - pvalue->last_check);
-    }
+    difftime = utils_ticksdiff(tickcount, pvalue->last_check);
 
     if(pvalue->last_check != 0 && difftime < pcache->fchangefreq)
     {
@@ -670,7 +662,7 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
             pvalue = APLIST_VALUE(apalloc, pvalue->next_value);
             
             /* Remove entry if its marked deleted or is unsed for ttlmax time */
-            if(ptemp->is_deleted || ((ticks - ptemp->use_ticks) > apheader->ttlmax))
+            if(ptemp->is_deleted || (utils_ticksdiff(ticks, ptemp->use_ticks) > apheader->ttlmax))
             {
                 remove_aplist_entry(pcache, sindex, ptemp);
                 ptemp = NULL;
@@ -1308,17 +1300,16 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
 
     *ppvalue = NULL;
 
-    ticks    = GetTickCount();
     apheader = pcache->apheader;
+    ticks    = GetTickCount();
 
     /* Check if scavenger is active for this process and if yes run the partual scavenger */
-    if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE && ((ticks - apheader->lscavenge) > apheader->scfreq))
+    if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE && (utils_ticksdiff(ticks, apheader->lscavenge) > apheader->scfreq))
     {
         /* run scavenger under write lock */
         lock_writelock(pcache->aprwlock);
-        ticks = GetTickCount();
 
-        if((ticks - apheader->lscavenge) > apheader->scfreq)
+        if(utils_ticksdiff(ticks, apheader->lscavenge) > apheader->scfreq)
         {
             run_aplist_scavenger(pcache, DO_PARTIAL_SCAVENGER_RUN);
             apheader->lscavenge = GetTickCount();
@@ -1336,7 +1327,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         addtick = pvalue->add_ticks;
         if(SUCCEEDED(result))
         {
-            pvalue->use_ticks = GetTickCount();
+            pvalue->use_ticks = ticks;
         }
     }
 
@@ -2236,7 +2227,7 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
     lock_readlock(pcache->aprwlock);
     flock = 1;
 
-    pcinfo->initage = (ticks - pcache->apheader->init_ticks)/1000;
+    pcinfo->initage = utils_ticksdiff(ticks, pcache->apheader->init_ticks) / 1000;
     pcinfo->islocal = pcache->islocal;
 
     if(type == CACHE_TYPE_FILECONTENT)
@@ -2283,14 +2274,14 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
                 _ASSERT(pvalue->file_path != 0);
 
                 ptemp->filename = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);
-                ptemp->addage   = (ticks - pvalue->add_ticks)/1000;
-                ptemp->useage   = (ticks - pvalue->use_ticks)/1000;
+                ptemp->addage   = utils_ticksdiff(ticks, pvalue->add_ticks) / 1000;
+                ptemp->useage   = utils_ticksdiff(ticks, pvalue->use_ticks) / 1000;
 
                 /* If last_check value is 0, leave it as 0 */
-                ptemp->lchkage  = 0;
+                ptemp->lchkage = 0;
                 if(pvalue->last_check != 0)
                 {
-                    ptemp->lchkage  = (ticks - pvalue->last_check)/1000;
+                    ptemp->lchkage  = utils_ticksdiff(ticks, pvalue->last_check) / 1000;
                 }
 
                 ptemp->cdata    = NULL;

@@ -33,6 +33,8 @@
 
 #include "precomp.h"
 
+#define DWORD_MAX    0xFFFFFFFF
+
 static unsigned int crc32_generate(int n);
 static unsigned int utils_crc32(const char * str, unsigned int strlen);
 
@@ -360,6 +362,31 @@ Finished:
     dprintverbose("end utils_apoolpid");
 
     return retval;
+}
+
+unsigned int utils_ticksdiff(unsigned int present, unsigned int past)
+{
+    unsigned int ticksdiff = 0;
+
+    _ASSERT(past != 0);
+
+    /* If present is 0, get current tickcount */
+    if(present == 0)
+    {
+        present = GetTickCount();
+    }
+
+    /* Take care of rollover while calculating difference */
+    if(present >= past)
+    {
+        ticksdiff = present - past;
+    }
+    else
+    {
+        ticksdiff = (DWORD_MAX - past) + present;
+    }
+
+    return ticksdiff;
 }
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
