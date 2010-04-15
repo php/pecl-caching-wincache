@@ -1375,8 +1375,15 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             directive in <strong>php.ini</strong> file.</p>
     </div>
 <?php }?>
-<?php } else if ( $page == UCACHE_DATA && $ucache_key != null && USE_AUTHENTICATION ) { 
-            $ucache_entry_info = wincache_ucache_info( true, $ucache_key );
+<?php } else if ( $page == UCACHE_DATA && $ucache_key != null && USE_AUTHENTICATION ) {
+            if ( !wincache_ucache_exists( $ucache_key ) ){
+?>
+    <div class="overview">
+        <p class="notice">The variable with this key does not exist in the user cache.</p>
+    </div>
+<?php       } 
+            else{
+                $ucache_entry_info = wincache_ucache_info( true, $ucache_key );
 ?>
     <div class="list">
         <table width="60%">
@@ -1417,6 +1424,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
             <pre><?php var_dump( wincache_ucache_get( $ucache_key ) )?></pre>
         </div>
     </div>
+<?php }?>
 <?php } else if ( $page == SCACHE_DATA ) {
     if ( $session_cache_available ) {
         init_cache_info( SCACHE_DATA );
