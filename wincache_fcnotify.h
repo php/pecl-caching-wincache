@@ -51,7 +51,10 @@ struct fcnotify_value
 {
     size_t                  folder_path;   /* folder path */
     unsigned int            owner_pid;     /* pid listening to changes */
-    fcnotify_listen *       plistener;     /* Listener information */
+    unsigned int            palivechk;     /* last process alive check tickcount */
+    unsigned int            reusecount;    /* count of reuses after handoff */
+    FILETIME                listen_time;   /* system time when listener was activated */
+    fcnotify_listen *       plistener;     /* listener information */
     unsigned int            refcount;      /* number of aplist entries for this folder */
     size_t                  prev_value;    /* previous aplist_value offset */
     size_t                  next_value;    /* next aplist_value offset */
@@ -109,8 +112,8 @@ extern int  fcnotify_initialize(fcnotify_context * pnotify, unsigned short isloc
 extern void fcnotify_initheader(fcnotify_context * pnotify, unsigned int filecount);
 extern void fcnotify_terminate(fcnotify_context * pnotify);
 
-extern int  fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t offset, size_t * poffset);
-extern void fcnotify_close(fcnotify_context * pnotify, size_t offset);
+extern int  fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * poffset, unsigned int * pcount);
+extern void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigned int * pcount);
 extern int  fcnotify_getinfo(fcnotify_context * pcache, zend_bool summaryonly, fcnotify_info ** ppinfo);
 extern void fcnotify_freeinfo(fcnotify_info * pinfo);
 

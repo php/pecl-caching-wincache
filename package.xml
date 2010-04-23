@@ -52,6 +52,8 @@
 - Updated wincache.php to show the content of the user cache entries only if USE_AUTHENTICATION is enabled.
 - Added wincache_lock, wincache_unlock APIs. Bug fixes to file change notification and user cache.
 - Fixed tickcount rollover related bugs and namesalt truncation bug.
+- Bug fixes in usercache. Added optional isglobal to wincache_lock.
+- Forcing file change check on folder after listener is moved to different process.
   </notes>
   <contents>
     <dir name="/">

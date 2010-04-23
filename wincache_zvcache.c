@@ -174,8 +174,8 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
                 }
 
                 pcopy->allocsize += length;
-                memset(pbuffer, 0, length);
                 memcpy_s(pbuffer, length - 1, poriginal->value.str.val, length - 1);
+                *(pbuffer + length - 1) = 0;
                 pnewzv->value.str.val = ZOFFSET(pcopy, pbuffer);
             }
 
@@ -265,8 +265,8 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
                 }
 
                 pcopy->allocsize += (smartstr.len + 1);
-                memset(pbuffer, 0, smartstr.len + 1);
                 memcpy_s(pbuffer, smartstr.len, smartstr.c, smartstr.len);
+                *(pbuffer + smartstr.len) = 0;
                 pnewzv->value.str.val = ZOFFSET(pcopy, pbuffer);
                 pnewzv->value.str.len = smartstr.len;
 
@@ -280,8 +280,8 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             break;
 
         default:
-            _ASSERT(FALSE);
-            break;
+            result = FATAL_ZVCACHE_INVALID_ZVAL;
+            goto Finished;
     }
 
     *pcopied = pnewzv;
@@ -361,7 +361,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
     /* Allocate memory as required */
     if(*poriginal == NULL)
     {
-        pnewzv = (zval *)ZMALLOC(pcopy, sizeof(zval));
+        ALLOC_ZVAL(pnewzv);
         if(pnewzv == NULL)
         {
             result = pcopy->oomcode;
@@ -425,8 +425,8 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
                     goto Finished;
                 }
 
-                memset(pbuffer, 0, length);
                 memcpy_s(pbuffer, length - 1, ZVALUE(pcopy, pcopied->value.str.val), length - 1);
+                *(pbuffer + length - 1) = 0;
                 pnewzv->value.str.val = pbuffer;
             }
 
@@ -481,8 +481,8 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             break;
 
         default:
-            _ASSERT(FALSE);
-            break;
+            result = FATAL_ZVCACHE_INVALID_ZVAL;
+            goto Finished;
     }
 
     *poriginal = pnewzv;
@@ -505,7 +505,7 @@ Finished:
         {
             if(allocated == 1)
             {
-                ZFREE(pcopy, pnewzv);
+                FREE_ZVAL(pnewzv);
                 pnewzv = NULL;
             }
         }
@@ -585,10 +585,12 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     }
 
     pcopy->allocsize += (poriginal->nTableSize * sizeof(size_t));
+
     memset(pbuffer, 0, poriginal->nTableSize * sizeof(size_t));
     pnewh->arBuckets = ZOFFSET(pcopy, pbuffer);
 
     /* Traverse the hashtable and copy the buckets */
+    /* Using index as a boolean to set list head */
     index   = 0;
     pbucket = poriginal->pListHead;
     plast   = NULL;
@@ -682,7 +684,8 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     _ASSERT(poriginal != NULL);
     _ASSERT(pcopied   != NULL);
 
-    msize = sizeof(zv_Bucket) + poriginal->nKeyLength - 1;
+    /* bucket key name is copied starting at last element of struct Bucket */
+    msize = sizeof(zv_Bucket) + poriginal->nKeyLength - sizeof(char);
 
     /* Allocate memory if required */
     if(*pcopied == NULL)
@@ -702,9 +705,6 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
         pnewb = *pcopied;
     }
 
-    memset(pnewb, 0, msize);
-    memcpy_s(&pnewb->arKey, poriginal->nKeyLength, &poriginal->arKey, poriginal->nKeyLength);
-
     pnewb->h          = poriginal->h;
     pnewb->nKeyLength = poriginal->nKeyLength;
     pnewb->pData      = 0;
@@ -713,6 +713,8 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     pnewb->pListLast  = 0;
     pnewb->pNext      = 0;
     pnewb->pLast      = 0;
+
+    memcpy_s(&pnewb->arKey, poriginal->nKeyLength, &poriginal->arKey, poriginal->nKeyLength);
 
     /* Do zval ref copy */
     pbuffer = (size_t *)ZMALLOC(pcopy, sizeof(size_t));
@@ -744,7 +746,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in copyin_bucket");
+        dprintimportant("failure %d in copyin_bucket", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
@@ -840,6 +842,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     }
 
     /* Traverse the hashtable and copy the buckets */
+    /* Reusing index this time as a boolean to set list head */
     index   = 0;
     pbucket = (zv_Bucket *)ZVALUE(pcopy, pcopied->pListHead);
     plast   = NULL;
@@ -931,7 +934,8 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     _ASSERT(pcopied   != NULL);
     _ASSERT(poriginal != NULL);
 
-    msize = sizeof(Bucket) + pcopied->nKeyLength - 1;
+    /* bucket key name is copied starting at last element of struct Bucket */
+    msize = sizeof(Bucket) + pcopied->nKeyLength - sizeof(char);
 
     /* Allocate memory if required */
     if(*poriginal == NULL)
@@ -950,9 +954,6 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
         pnewb = *poriginal;
     }
 
-    memset(pnewb, 0, msize);
-    memcpy_s(&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
-
     pnewb->h          = pcopied->h;
     pnewb->nKeyLength = pcopied->nKeyLength;
     pnewb->pData      = NULL;
@@ -961,6 +962,8 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     pnewb->pListLast  = NULL;
     pnewb->pNext      = NULL;
     pnewb->pLast      = NULL;
+
+    memcpy_s(&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
 
     /* Do zval ref copy */
     pbuffer = (zval **)ZMALLOC(pcopy, sizeof(zval *));
@@ -989,7 +992,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in copyout_bucket");
+        dprintimportant("failure %d in copyout_bucket", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
@@ -1093,7 +1096,8 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, zval 
         goto Finished;
     }
 
-    memset(pvalue, 0, sizeof(zvcache_value) + keylen);
+    /* Only set zvcache_value to 0. Set keyname after zvcache_value */
+    memset(pvalue, 0, sizeof(zvcache_value));
     memcpy_s((char *)pvalue + sizeof(zvcache_value), keylen, key, keylen);
 
     /* Reset allocsize before calling copyin */
@@ -1547,6 +1551,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
             header->scstart      = 0;
             header->itemcount    = 0;
             header->valuecount   = zvcount;
+
             memset((void *)header->values, 0, sizeof(size_t) * zvcount);
         }
 
@@ -1734,7 +1739,7 @@ int zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRML
     _ASSERT(pentry->zvalue  != 0);
     _ASSERT(pcache->outcopy != NULL);
 
-    pentry->use_ticks = GetTickCount();
+    InterlockedExchange(&pentry->use_ticks, GetTickCount());
     pcopied = (zv_zval *)ZVALUE(pcache->incopy, pentry->zvalue);
 
     result = copyout_zval(pcache, pcache->outcopy, NULL, pcopied, pvalue TSRMLS_CC);
@@ -1787,7 +1792,7 @@ int zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsign
     result = find_zvcache_entry(pcache, key, index, &pentry);
     if(pentry != NULL && SUCCEEDED(result))
     {
-        pentry->use_ticks = GetTickCount();
+        InterlockedExchange(&pentry->use_ticks, GetTickCount());
     }
 
     lock_readunlock(pcache->zvrwlock);

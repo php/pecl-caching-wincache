@@ -126,10 +126,22 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
                         /* If a listener is present, just check if listener is still active */
                         if(pcache->pnotify != NULL)
                         {
-                            result = fcnotify_check(pcache->pnotify, NULL, pvalue->fcnotify, &pvalue->fcnotify);
+                            result = fcnotify_check(pcache->pnotify, NULL, &pvalue->fcnotify, &pvalue->fcncount);
                             if(FAILED(result))
                             {
-                                goto Finished;
+                                /* Do a hard file change check if file listener is suggesting it */
+                                if(result == WARNING_FCNOTIFY_FORCECHECK)
+                                {
+                                    result = NONFATAL;
+                                    if(is_file_changed(pcache, pvalue))
+                                    {
+                                        result = FATAL_FCACHE_FILECHANGED;
+                                    }
+                                }
+                                else
+                                {
+                                    goto Finished;
+                                }
                             }
                         }
                     }
@@ -356,13 +368,14 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->ocacheval   = 0;
     pvalue->resentry    = 0;
     pvalue->fcnotify    = 0;
+    pvalue->fcncount    = 0;
     pvalue->prev_value  = 0;
     pvalue->next_value  = 0;
 
     /* Add file listener only if the file is not pointing to a UNC share */
     if(pcache->pnotify != NULL && IS_UNC_PATH(filename, flength) == 0)
     {
-        result = fcnotify_check(pcache->pnotify, filename, 0, &pvalue->fcnotify);
+        result = fcnotify_check(pcache->pnotify, filename, &pvalue->fcnotify, &pvalue->fcncount);
         if(FAILED(result))
         {
             goto Finished;
@@ -408,8 +421,7 @@ static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
     {
         if(pcache->pnotify != NULL && pvalue->fcnotify != 0)
         {
-            fcnotify_close(pcache->pnotify, pvalue->fcnotify);
-            pvalue->fcnotify = 0;
+            fcnotify_close(pcache->pnotify, &pvalue->fcnotify, &pvalue->fcncount);
         }
 
         /* Resolve path cache, file cache and ocache entries */
@@ -1737,11 +1749,23 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                     /* If a listener is present, just check if listener is still active */
                     if(pcache->pnotify != NULL)
                     {
-                        result = fcnotify_check(pcache->pnotify, NULL, pvalue->fcnotify, &pvalue->fcnotify);
+                        result = fcnotify_check(pcache->pnotify, NULL, &pvalue->fcnotify, &pvalue->fcncount);
                         if(FAILED(result))
                         {
-                            lock_readunlock(pcache->aprwlock);
-                            goto Finished;
+                            /* Do a hard file change check if listener suggested it */
+                            if(result == WARNING_FCNOTIFY_FORCECHECK)
+                            {
+                                result = NONFATAL;
+                                if(is_file_changed(pcache, pvalue))
+                                {
+                                    fchanged = 1;
+                                }
+                            }
+                            else
+                            {
+                                lock_readunlock(pcache->aprwlock);
+                                goto Finished;
+                            }
                         }
                     }
                 }

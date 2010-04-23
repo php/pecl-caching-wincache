@@ -36,7 +36,6 @@
 #define NAMESALT_LENGTH_MAXIMUM     8
 #define OCENABLED_INDEX_IN_GLOBALS  1
 #define FCENABLED_INDEX_IN_GLOBALS  0
-#define WINCACHE_TEST_FILE          "wincache.php"
 #define LOCK_KEY_MAXLEN             150
 
 /* START OF PHP EXTENSION MACROS STUFF */
@@ -207,6 +206,7 @@ ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_lock, 0, 0, 1)
     ZEND_ARG_INFO(0, key)
+    ZEND_ARG_INFO(0, isglobal)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_unlock, 0, 0, 1)
@@ -1097,8 +1097,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     
     dprintimportant("zend_resolve_path called for %s", filename);
 
-    /* Hook so that test file is not added to cache */
-    if(isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
+    if(isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
         return original_resolve_path(filename, filename_len TSRMLS_CC);
@@ -1158,8 +1157,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
 
     dprintimportant("zend_stream_open_function called for %s", filename);
 
-    /* Hook so that test file is not added to cache */
-    if(isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
+    if(isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
@@ -1246,7 +1244,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     }
 
     /* Nothing to cleanup. So original_compile triggering bailout is fine */
-    if(filename == NULL || isin_ignorelist(WINCACHE_TEST_FILE, filename) || isin_ignorelist(WCG(ignorelist), filename))
+    if(filename == NULL || isin_ignorelist(WCG(ignorelist), filename))
     {
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
         goto Finished;
@@ -3206,6 +3204,7 @@ PHP_FUNCTION(wincache_lock)
     char *            key      = NULL;
     unsigned int      keylen   = 0;
     char              lockname[  MAX_PATH];
+    zend_bool         isglobal = 0;
     wclock_context *  plock    = NULL;
     wclock_context ** pplock   = NULL;
     lock_context *    pcontext = NULL;
@@ -3223,7 +3222,7 @@ PHP_FUNCTION(wincache_lock)
         zend_hash_init(WCG(wclocks), 0, NULL, wclocks_destructor, 1);
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &key, &keylen) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &key, &keylen, &isglobal) == FAILURE)
     {
         result = FATAL_INVALID_ARGUMENT;
         goto Finished;
@@ -3250,7 +3249,8 @@ PHP_FUNCTION(wincache_lock)
             goto Finished;
         }
 
-        result = lock_initialize(pcontext, lockname, 1, LOCK_TYPE_SHARED, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+        /* Use global or shared locktype based on isglobal value */
+        result = lock_initialize(pcontext, lockname, 1, ((isglobal) ? LOCK_TYPE_GLOBAL : LOCK_TYPE_SHARED), LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;

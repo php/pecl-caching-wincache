@@ -128,6 +128,7 @@
 #define FATAL_ZVCACHE_BASE                  900
 #define FATAL_ZVCACHE_INITIALIZE            FATAL_ZVCACHE_BASE + 1
 #define FATAL_ZVCACHE_INIT_EVENT            FATAL_ZVCACHE_BASE + 2
+#define FATAL_ZVCACHE_INVALID_ZVAL          FATAL_ZVCACHE_BASE + 3
 
 /* Error codes used by session handler */
 #define FATAL_SESSION_BASE                  1000
@@ -158,6 +159,7 @@
 #define WARNING_ZVCACHE_RESCOPYIN           WARNING_COMMON_BASE + 8
 #define WARNING_ZVCACHE_CASNEQ              WARNING_COMMON_BASE + 9
 #define WARNING_LOCK_IGNORE                 WARNING_COMMON_BASE + 10
+#define WARNING_FCNOTIFY_FORCECHECK         WARNING_COMMON_BASE + 11
 
 /* SUCCEEDED and FAILED macros */
 #ifdef SUCCEEDED

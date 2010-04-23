@@ -208,7 +208,6 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
     plock->namelen = strlen(plock->nameprefix);
 
     strcpy_s(objname, namelen - 1, plock->nameprefix);
-    dprintimportant("Named object prefix = %s", objname);
     namelen = plock->namelen;
 
     /* Depending on what type of lock this needs */

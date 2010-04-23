@@ -55,6 +55,7 @@ struct aplist_value
     size_t          ocacheval;      /* Opcode cache value offset */
     size_t          resentry;       /* Offset of first entry in rplist */
     size_t          fcnotify;       /* Offset of file change notification entry */
+    unsigned int    fcncount;       /* fcnotify_value reusecount to detect handoff */
     size_t          prev_value;     /* previous aplist_value offset */
     size_t          next_value;     /* next aplist_value offset */
 };
