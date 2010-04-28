@@ -54,6 +54,7 @@
 - Fixed tickcount rollover related bugs and namesalt truncation bug.
 - Bug fixes in usercache. Added optional isglobal to wincache_lock.
 - Forcing file change check on folder after listener is moved to different process.
+- Fixed fcnotify refcount bug and updated version number for beta2 release.
   </notes>
   <contents>
     <dir name="/">

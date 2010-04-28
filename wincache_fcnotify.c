@@ -911,6 +911,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     unsigned char     listenp    = 0;
     unsigned char     flock      = 0;
     unsigned int      cticks     = 0;
+    unsigned int      reusecount = 0;
 
     dprintverbose("start fcnotify_check");
 
@@ -919,13 +920,6 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     _ASSERT(pcount   != NULL);
 
     pheader = pnotify->fcheader;
-
-    /* Run scavenger every SCAVENGER_FREQUENCY milliseconds */
-    /* scavenger function will take a write lock */
-    if(utils_ticksdiff(0, pnotify->lscavenge) >= SCAVENGER_FREQUENCY)
-    {
-        run_fcnotify_scavenger(pnotify);
-    }
 
     /* Get a reader lock before reading any values */
     lock_readlock(pnotify->fclock);
@@ -1001,6 +995,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         if(utils_ticksdiff(cticks, pvalue->palivechk) >= PALIVECHK_FREQUENCY)
         {
             listenp = process_alive_check(pnotify, pvalue);
+            reusecount = pvalue->reusecount;
             InterlockedExchange(&pvalue->palivechk, cticks);
 
             if(listenp && folderpath == NULL)
@@ -1037,12 +1032,10 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
         if(ptemp != NULL)
         {
-            if(pvalue != NULL && pvalue->owner_pid == ptemp->owner_pid)
+            if(pvalue != NULL && ptemp->reusecount == reusecount)
             {
                 /* Change existing fcnotify entry to rehook change notification */
-                /* and decrement refcount here as it gets incremented again below */
                 create_fcnotify_data(pnotify, folderpath, &pvalue);
-                pvalue->refcount--;
             }
             else
             {
@@ -1067,8 +1060,11 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
             add_fcnotify_entry(pnotify, index, pvalue);
         }
 
-        /* Update the value only if it is changing. Else leave unchanged */
-        pvalue->refcount++;
+        /* Increment refcount if filepath was passed and not offset */
+        if(filepath != NULL)
+        {
+            pvalue->refcount++;
+        }
 
         *poffset = ((char *)pvalue - pnotify->fcmemaddr);
         *pcount  = pvalue->reusecount;
@@ -1093,6 +1089,13 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         }
     }
 
+    /* Run scavenger every SCAVENGER_FREQUENCY milliseconds */
+    /* scavenger function will take a write lock */
+    if(utils_ticksdiff(0, pnotify->lscavenge) >= SCAVENGER_FREQUENCY)
+    {
+        run_fcnotify_scavenger(pnotify);
+    }
+    
 Finished:
 
     if(flock == 1)
@@ -1147,8 +1150,8 @@ void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigned int *
 
     /* Just decrement the refcount. Scavenger will take care of deleting the entry */
     pvalue = FCNOTIFY_VALUE(pnotify->fcalloc, *poffset);
-    InterlockedDecrement(&pvalue->refcount);
-
+    pvalue->refcount--;
+    
     *poffset = 0;
     *pcount  = 0;
 
