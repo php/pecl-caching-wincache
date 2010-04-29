@@ -23,18 +23,86 @@
     <email>ksingla@microsoft.com</email>
     <active>yes</active>
   </lead>
-  <date>2009-11-19</date>
+  <date>2010-04-29</date>
   <version>
     <release>1.1.0</release>
     <api>1.1.0</api>
   </version>
   <stability>
-    <release>beta</release>
-    <api>beta</api>
+    <release>stable</release>
+    <api>stable</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
 1.1.0 RC release:
+  </notes>
+  <contents>
+    <dir name="/">
+      <file role="doc" name="config.w32"/>
+      <file role="doc" name="INSTALL"/>
+      <file role="doc" name="LICENSE"/>
+      <file role="src" name="php_wincache.c"/>
+      <file role="src" name="php_wincache.h"/>
+      <file role="src" name="precomp.h"/>
+      <file role="src" name="template.rc"/>
+      <file role="src" name="wincache_alloc.c"/>
+      <file role="src" name="wincache_alloc.h"/>
+      <file role="src" name="wincache_aplist.c"/>
+      <file role="src" name="wincache_aplist.h"/>
+      <file role="src" name="wincache_debug.c"/>
+      <file role="src" name="wincache_debug.h"/>
+      <file role="src" name="wincache_detours.c"/>
+      <file role="src" name="wincache_detours.h"/>
+      <file role="src" name="wincache_error.c"/>
+      <file role="src" name="wincache_error.h"/>
+      <file role="src" name="wincache_fcache.c"/>
+      <file role="src" name="wincache_fcache.h"/>
+      <file role="src" name="wincache_fcnotify.c"/>
+      <file role="src" name="wincache_fcnotify.h"/>
+      <file role="src" name="wincache_filemap.c"/>
+      <file role="src" name="wincache_filemap.h"/>
+      <file role="src" name="wincache_lock.c"/>
+      <file role="src" name="wincache_lock.h"/>
+      <file role="src" name="wincache_ocache.c"/>
+      <file role="src" name="wincache_ocache.h"/>
+      <file role="src" name="wincache_opcopy.c"/>
+      <file role="src" name="wincache_opcopy.h"/>
+      <file role="src" name="wincache_rplist.c"/>
+      <file role="src" name="wincache_rplist.h"/>
+      <file role="src" name="wincache_utils.c"/>
+      <file role="src" name="wincache_utils.h"/>
+      <file role="src" name="wincache_zvcache.h"/>
+      <file role="src" name="wincache_zvcache.c"/>
+      <file role="src" name="wincache_session.h"/>
+      <file role="src" name="wincache_session.c"/>
+      <file role="php" name="wincache.php"/>
+    </dir>
+  </contents>
+  <dependencies>
+    <required>
+      <php>
+        <min>5.2.0</min>
+      </php>
+      <pearinstaller>
+        <min>1.4.0</min>
+      </pearinstaller>
+    </required>
+  </dependencies>
+  <providesextension>wincache</providesextension>
+  <extsrcrelease/>
+  <changelog>
+   <release>
+    <stability>
+     <release>beta</release>
+     <api>beta</api>
+    </stability>
+    <version>
+     <release>1.1.0beta2</release>
+     <api>1.1.0beta2</api>
+    </version>
+    <date>2010-04-29</date>
+     <notes>
+1.1.0 Beta 2 release:
 - updated wincache.php to not show all user cache entries if the total number of entries exceeds 250
 - Added summaryonly to all the info functions.
 - Separated session cache from user cache. Added wincache_scache_info and wincache_scache_meminfo.
@@ -55,61 +123,9 @@
 - Bug fixes in usercache. Added optional isglobal to wincache_lock.
 - Forcing file change check on folder after listener is moved to different process.
 - Fixed fcnotify refcount bug and updated version number for beta2 release.
-  </notes>
-  <contents>
-    <dir name="/">
-      <file role="doc" name="config.w32"/>
-      <file role="doc" name="INSTALL"/>
-      <file role="doc" name="LICENSE"/>
-      <file role="src" name="php_wincache.c"/>
-      <file role="src" name="php_wincache.h"/>
-      <file role="src" name="precomp.h"/>
-      <file role="src" name="template.rc"/>
-      <file role="src" name="wincache_alloc.c"/>
-      <file role="src" name="wincache_alloc.h"/>
-      <file role="src" name="wincache_aplist.c"/>
-      <file role="src" name="wincache_aplist.h"/>
-      <file role="src" name="wincache_debug.c"/>
-      <file role="src" name="wincache_debug.h"/>
-      <file role="src" name="wincache_error.c"/>
-      <file role="src" name="wincache_error.h"/>
-      <file role="src" name="wincache_fcache.c"/>
-      <file role="src" name="wincache_fcache.h"/>
-      <file role="src" name="wincache_filemap.c"/>
-      <file role="src" name="wincache_filemap.h"/>
-      <file role="src" name="wincache_lock.c"/>
-      <file role="src" name="wincache_lock.h"/>
-      <file role="src" name="wincache_ocache.c"/>
-      <file role="src" name="wincache_ocache.h"/>
-      <file role="src" name="wincache_opcopy.c"/>
-      <file role="src" name="wincache_opcopy.h"/>
-      <file role="src" name="wincache_rplist.c"/>
-      <file role="src" name="wincache_rplist.h"/>
-      <file role="src" name="wincache_utils.c"/>
-      <file role="src" name="wincache_utils.h"/>
-      <file role="src" name="wincache_zvcache.h"/>
-      <file role="src" name="wincache_zvcache.c"/>
-      <file role="src" name="wincache_session.h"/>
-      <file role="src" name="wincache_session.c"/>
-      <file role="src" name="wincache_fcnotify.h"/>
-      <file role="src" name="wincache_fcnotify.c"/>
-      <file role="php" name="wincache.php"/>
-    </dir>
-  </contents>
-  <dependencies>
-    <required>
-      <php>
-        <min>5.2.0</min>
-      </php>
-      <pearinstaller>
-        <min>1.4.0</min>
-      </pearinstaller>
-    </required>
-  </dependencies>
-  <providesextension>wincache</providesextension>
-  <extsrcrelease/>
-  <changelog>
-     <release>
+    </notes>
+   </release>
+   <release>
     <stability>
      <release>beta</release>
      <api>beta</api>
