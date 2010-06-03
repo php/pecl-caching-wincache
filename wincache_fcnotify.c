@@ -373,7 +373,12 @@ static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * p
     {
         /* Free memory occupied by plistener and close the handle */
         /* if owner process is destroying fcnotify data */
-        if(pnotify->processid == pvalue->owner_pid && pvalue->plistener != NULL)
+        /* Detect recycled ownerpid by comparing process times with listen_time */
+        FILETIME ftpstart, ftpexit, ftpkernel, ftpuser;
+        if((pnotify->processid == pvalue->owner_pid) &&
+           (pvalue->plistener != NULL) &&
+           (GetProcessTimes(GetCurrentProcess(), &ftpstart, &ftpexit, &ftpkernel, &ftpuser) != 0) &&
+           (ftpstart.dwHighDateTime <= pvalue->listen_time.dwHighDateTime && ftpstart.dwLowDateTime <= pvalue->listen_time.dwLowDateTime))
         {
             if(pvalue->plistener->folder_path != NULL)
             {
@@ -388,6 +393,11 @@ static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * p
             }
 
             alloc_pefree(pvalue->plistener);
+            pvalue->plistener = NULL;
+        }
+        else
+        {
+            /* Process which owned memory is probably gone and ownerpid is recycled */
             pvalue->plistener = NULL;
         }
 

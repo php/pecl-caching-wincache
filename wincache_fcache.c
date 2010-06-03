@@ -456,13 +456,17 @@ void fcache_terminate(fcache_context * pfcache)
 
 int fcache_createval(fcache_context * pfcache, const char * filename, fcache_value ** ppvalue)
 {
-    int             result    = NONFATAL;
-    fcache_value *  pvalue    = NULL;
-    HANDLE          hFile     = INVALID_HANDLE_VALUE;
-    void *          buffer    = NULL;
-    unsigned int    filesize  = 0;
-    unsigned char * psec      = NULL;
-    unsigned int    openflags = 0;
+    int             result     = NONFATAL;
+    fcache_value *  pvalue     = NULL;
+    HANDLE          hFile      = INVALID_HANDLE_VALUE;
+    void *          buffer     = NULL;
+    unsigned int    filesize   = 0;
+    unsigned char * psec       = NULL;
+    unsigned int    openflags  = 0;
+    unsigned int    attributes = 0;
+    unsigned int    fileflags  = 0;
+
+    BY_HANDLE_FILE_INFORMATION bhfi = {0};
 
     dprintverbose("start fcache_createval");
 
@@ -498,35 +502,45 @@ int fcache_createval(fcache_context * pfcache, const char * filename, fcache_val
         goto Finished;
     }
 
-    filesize = GetFileSize(hFile, NULL);
-    if(filesize == INVALID_FILE_SIZE)
+    if(!GetFileInformationByHandle(hFile, &bhfi))
     {
-        result = FATAL_FCACHE_GETFILESIZE;
+        result = FATAL_FCACHE_BYHANDLE_INFO;
         goto Finished;
     }
 
-    /* Dont cache files bigger than maxfsize */
-    if(filesize > pfcache->maxfsize)
+    attributes = bhfi.dwFileAttributes;
+    if(attributes & FILE_ATTRIBUTE_DIRECTORY)
     {
-        result = WARNING_FCACHE_TOOBIG;
-        goto Finished;
+        fileflags |= FILE_IS_FOLDER;
     }
-
-    /* Allocate memory for entire file in shared memory */
-    buffer = alloc_smalloc(pfcache->palloc, filesize);
-    if(buffer == NULL)
+    else
     {
-        result = FATAL_OUT_OF_SMEMORY;
-        goto Finished;
-    }
-
-    /* If filesize is greater than 0, read file content */
-    if(filesize > 0)
-    {
-        result = read_file_content(hFile, filesize, &buffer);
-        if(FAILED(result))
+        /* Dont cache files bigger than maxfsize */
+        if(bhfi.nFileSizeHigh > 0 || bhfi.nFileSizeLow > pfcache->maxfsize)
         {
+            result = WARNING_FCACHE_TOOBIG;
             goto Finished;
+        }
+
+        /* File size is just the low file size */
+        filesize = bhfi.nFileSizeLow;
+
+        /* Allocate memory for entire file in shared memory */
+        buffer = alloc_smalloc(pfcache->palloc, filesize);
+        if(buffer == NULL)
+        {
+            result = FATAL_OUT_OF_SMEMORY;
+            goto Finished;
+        }
+
+        /* If filesize is greater than 0, read file content */
+        if(filesize > 0)
+        {
+            result = read_file_content(hFile, filesize, &buffer);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
         }
     }
 
@@ -537,12 +551,16 @@ int fcache_createval(fcache_context * pfcache, const char * filename, fcache_val
         goto Finished;
     }
 
-    pvalue->file_size     = filesize;
-    pvalue->file_sec      = psec - pfcache->memaddr;
-    pvalue->file_content  = ((char *)buffer - pfcache->memaddr);
-    pvalue->is_deleted    = 0;
-    pvalue->hitcount      = 0;
-    pvalue->refcount      = 0;
+    fileflags |= FILE_IS_RUNAWARE;
+    fileflags |= FILE_IS_WUNAWARE;
+
+    pvalue->file_size    = filesize;
+    pvalue->file_sec     = psec - pfcache->memaddr;
+    pvalue->file_content = ((buffer == NULL) ? 0 : ((char *)buffer - pfcache->memaddr));
+    pvalue->file_flags   = fileflags;
+    pvalue->is_deleted   = 0;
+    pvalue->hitcount     = 0;
+    pvalue->refcount     = 0;
 
     InterlockedIncrement(&pfcache->header->itemcount);
     InterlockedIncrement(&pfcache->header->misscount);

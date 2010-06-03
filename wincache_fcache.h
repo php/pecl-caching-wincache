@@ -36,59 +36,67 @@
 
 /* fcache_value      - SHARED */
 /* fcache_header     - SHARED */
-/* fcache_context    - LOCAL */
-/* fcache_entry_info - LOCAL */
+/* fcache_context    - LOCAL  */
+/* fcache_entry_info - LOCAL  */
+
+#define FILE_IS_FOLDER    1
+#define FILE_IS_RUNAWARE  2
+#define FILE_IS_READABLE  4
+#define FILE_IS_WUNAWARE  8
+#define FILE_IS_WRITABLE  16
+
 typedef struct fcache_value fcache_value;
 struct fcache_value
 {
-    size_t        file_sec;      /* File security information */
-    size_t        file_content;  /* Pointer to content saved in shared memory */
-    unsigned int  file_size;     /* File size in bytes (Max is 2 MB) */
-    unsigned int  is_deleted;    /* If 1, this entry is marked for deletion */
-    unsigned int  hitcount;      /* Number of times this file entry got used */
-    unsigned int  refcount;      /* How many processes are currently using this */
+    size_t            file_sec;     /* File security information */
+    size_t            file_content; /* Pointer to content saved in shared memory */
+    unsigned int      file_size;    /* File size in bytes (Max is 2 MB) */
+    unsigned int      file_flags;   /* Boolean information about this file */
+    unsigned int      is_deleted;   /* If 1, this entry is marked for deletion */
+    unsigned int      hitcount;     /* Number of times this file entry got used */
+    unsigned int      refcount;     /* How many processes are currently using this */
 };
 
 typedef struct fcache_header fcache_header;
 struct fcache_header
 {
-    unsigned int    mapcount;    /* Number of processes using this file cache */
-    unsigned int    itemcount;   /* Number of items in file cache */
-    unsigned int    hitcount;    /* Cache items cumulative hit count */
-    unsigned int    misscount;   /* Cache items cumulative miss count */
+    unsigned int      mapcount;     /* Number of processes using this file cache */
+    unsigned int      itemcount;    /* Number of items in file cache */
+    unsigned int      hitcount;     /* Cache items cumulative hit count */
+    unsigned int      misscount;    /* Cache items cumulative miss count */
 };
 
 typedef struct fcache_context fcache_context;
 struct fcache_context
 {
-    unsigned int      id;        /* unique identifier for cache */
-    unsigned short    islocal;   /* is cache local to process */
-    unsigned short    cachekey;  /* unique cache key used in names */
-    HANDLE            hinitdone; /* event indicating if memory is initialized */
-    unsigned int      maxfsize;  /* maximum size of file in bytes */
-    char *            memaddr;   /* base memory address of segment */
-    fcache_header *   header;    /* cache header */
-    filemap_context * pfilemap;  /* filemap where file content is kept */
-    lock_context *    prwlock;   /* writer lock for filecache header */
-    alloc_context *   palloc;    /* alloc context for filecache segment */
+    unsigned int      id;           /* unique identifier for cache */
+    unsigned short    islocal;      /* is cache local to process */
+    unsigned short    cachekey;     /* unique cache key used in names */
+    HANDLE            hinitdone;    /* event indicating if memory is initialized */
+    unsigned int      maxfsize;     /* maximum size of file in bytes */
+    char *            memaddr;      /* base memory address of segment */
+    fcache_header *   header;       /* cache header */
+    filemap_context * pfilemap;     /* filemap where file content is kept */
+    lock_context *    prwlock;      /* writer lock for filecache header */
+    alloc_context *   palloc;       /* alloc context for filecache segment */
 };
 
 typedef struct fcache_handle fcache_handle;
 struct fcache_handle
 {
-    fcache_context *  pfcache;   /* Cache context for this process */
-    fcache_value *    pfvalue;   /* Cache value which has file content */
-    size_t            len;       /* Length of file in bytes */
-    size_t            pos;       /* Current position where read is active */
-    void *            map;       /* Address where file content is present */
-    char *            buf;       /* Buffer pointing to file content */
+    fcache_context *  pfcache;      /* Cache context for this process */
+    fcache_value *    pfvalue;      /* Cache value which has file content */
+    size_t            len;          /* Length of file in bytes */
+    size_t            pos;          /* Current position where read is active */
+    void *            map;          /* Address where file content is present */
+    char *            buf;          /* Buffer pointing to file content */
 };
 
 typedef struct fcache_entry_info fcache_entry_info;
 struct fcache_entry_info
 {
-    unsigned int      filesize;  /* Size of file content */
-    unsigned int      hitcount;  /* Hit count for this file entry */
+    unsigned int      filesize;     /* Size of file content */
+    unsigned int      hitcount;     /* Hit count for this file entry */
 };
 
 extern int  fcache_create(fcache_context ** ppfcache);
@@ -113,4 +121,3 @@ extern void   fcache_closer(void * handle TSRMLS_DC);
 extern void fcache_runtest();
 
 #endif /* _WINCACHE_FCACHE_H_ */
-

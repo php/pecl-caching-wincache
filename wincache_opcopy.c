@@ -856,7 +856,7 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
     /* Detour function call if one is configured */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN && WCG(detours) != NULL && poldop->opcode == ZEND_DO_FCALL)
     {
-        result = detours_fcheck(WCG(detours), Z_STRVAL_P(&poldop->op1.u.constant), &frname);
+        result = detours_check(WCG(detours), Z_STRVAL_P(&poldop->op1.u.constant), poldop->extended_value, &frname);
         if(FAILED(result))
         {
             goto Finished;
@@ -864,8 +864,7 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
 
         if(frname != NULL)
         {
-            /* TBD?? Free memory allocated by existing string */
-
+            /* TBD?? Free memory allocated by existing function name string */
             /* Change the function call to replacement function */
             frnlen = strlen(frname);
 

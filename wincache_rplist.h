@@ -36,7 +36,8 @@
 
 /* rplist_value   - SHARED */
 /* rplist_header  - SHARED */
-/* rplist_context - LOCAL */
+/* rplist_context - LOCAL  */
+
 typedef struct rplist_value rplist_value;
 struct rplist_value
 {

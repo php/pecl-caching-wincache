@@ -50,6 +50,7 @@
 #define FATAL_UNEXPECTED_DATA               17
 #define FATAL_UNEXPECTED_FCALL              18
 
+#define FATAL_OPEN_TOKEN                    97
 #define FATAL_ZEND_BAILOUT                  98
 #define FATAL_UNKNOWN_FATAL                 99
 
@@ -103,6 +104,7 @@
 #define FATAL_FCACHE_FILECHANGED            FATAL_FCACHE_BASE + 8
 #define FATAL_FCACHE_INIT_EVENT             FATAL_FCACHE_BASE + 9
 #define FATAL_FCACHE_ORIGINAL_OPEN          FATAL_FCACHE_BASE + 10
+#define FATAL_FCACHE_BYHANDLE_INFO          FATAL_FCACHE_BASE + 11
 
 /* Error codes used by opcode cache */
 #define FATAL_OCACHE_BASE                   700

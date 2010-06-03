@@ -61,6 +61,7 @@
 #include "ext/standard/php_smart_str.h"
 #include "ext/session/php_session.h"
 #include "zend_extensions.h"
+#include "zend/zend_compile.h"
 #include "php_open_temporary_file.h"
 
 #include <tlhelp32.h>
@@ -117,7 +118,7 @@
 #define ZCACHE_SIZE_MINIMUM        5
 #define ZCACHE_SIZE_MAXIMUM        85
 #define FILE_SIZE_MINIMUM          10
-#define FILE_SIZE_MAXIMUM          2048
+#define FILE_SIZE_MAXIMUM          4096
 #define FCHECK_FREQ_MINIMUM        2
 #define FCHECK_FREQ_MAXIMUM        300
 #define TTL_VALUE_MINIMUM          60

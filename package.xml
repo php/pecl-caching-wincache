@@ -35,6 +35,8 @@
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
 1.1.0 RC release:
+- Made reroute functionality take out number of parameters it can handle. Also made reroutes only when less or equal number of parameters are passed.
+- Added wincache_reroute_list and wrote file apis on top of file cache. Added file flags in fcache_value.
   </notes>
   <contents>
     <dir name="/">

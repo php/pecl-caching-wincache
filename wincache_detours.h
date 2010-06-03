@@ -34,26 +34,19 @@
 #ifndef _WINCACHE_DETOURS_H_
 #define _WINCACHE_DETOURS_H_
 
+typedef struct fnroute_element fnroute_element;
+struct fnroute_element
+{
+    int          acount;     /* Number of arguments handled by reroute */
+    char *       rtname;     /* Routed function name */
+};
+
 typedef struct detours_context detours_context;
 struct detours_context
 {
-    char *           inifile;     /* Ini file containing mappings */
-    HashTable *      fnroutes;    /* Function reroutes */
-    HashTable *      clroutes;    /* Class reroutes */
-};
-
-typedef struct dlist_element dlist_element;
-struct dlist_element
-{
-    char *           otname;     /* Original function/class name */
-    char *           rtname;     /* Routed function/class name */
-};
-
-typedef struct detours_info detours_info;
-struct detours_info
-{
-    zend_llist *     fnlist;      /* List of functions */
-    zend_llist *     cllist;      /* List of classes */
+    char *       inifile;     /* Ini file containing mappings */
+    HashTable *  fnroutes;    /* Function reroutes */
+    /* Class reroutes are almost impossible */
 };
 
 extern int  detours_create(detours_context ** ppdetours);
@@ -61,9 +54,8 @@ extern void detours_destroy(detours_context * pdetours);
 extern int  detours_initialize(detours_context * pdetours, char * inifile);
 extern void detours_terminate(detours_context * pdetours);
 
-extern int  detours_fcheck(detours_context * pdetours, char * ofname, char ** rfname);
-extern int  detours_ccheck(detours_context * pdetours, char * ocname, char ** rcname);
-extern int  detours_getinfo(detours_context * pdetours, detours_info ** ppinfo);
-extern void detours_freeinfo(detours_info * pinfo);
+extern int  detours_check(detours_context * pdetours, char * oname, int evalue, char ** rname);
+extern int  detours_getinfo(detours_context * pdetours, HashTable ** pphtable);
+extern void detours_freeinfo(HashTable * phtable);
 
 #endif /* _WINCACHE_DETOURS_H_ */

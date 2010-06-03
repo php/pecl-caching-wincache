@@ -33,16 +33,11 @@
 
 #include "precomp.h"
 
-#define FUNCTION_REROUTE          1
-#define CLASS_REROUTE             2
 #define FUNCTION_SECTION_NAME     "FunctionRerouteList"
-#define CLASS_SECTION_NAME        "ClassRerouteList"
 #define MAX_SECTION_DATA          32760
 
 static int  ini_readfile(HashTable * hrouter, char * filepath, char * sectionname);
 static void ini_parseline(char * line, HashTable * hrouter);
-static int  reroute_verify(HashTable * hrouter, unsigned char type);
-static int  exists_check(detours_context * pdetours, char * oname, char ** rname, unsigned char type);
 
 /* Private functions */
 static int ini_readfile(HashTable * hrouter, char * filepath, char * sectionname)
@@ -100,15 +95,19 @@ Finished:
 
 static void ini_parseline(char * line, HashTable * hrouter)
 {
-    char *       key      = NULL;
-    unsigned int keylen   = 0;
-    char *       value    = NULL;
-    unsigned int valuelen = 0;
-    char *       pchar    = NULL;
+    char *          key      = NULL;
+    unsigned int    keylen   = 0;
+    char *          numarg   = NULL;
+    int             numargv  = -1;
+    char *          value    = NULL;
+    unsigned int    valuelen = 0;
+    char *          pchar    = NULL;
+    fnroute_element element  = {0};
 
     _ASSERT(line    != NULL);
     _ASSERT(hrouter != NULL);
 
+    /* Format of each entry is oldcall : arghandled = newcall */
     pchar = strchr(line, '=');
     if(pchar == NULL)
     {
@@ -120,6 +119,28 @@ static void ini_parseline(char * line, HashTable * hrouter)
 
     *pchar = '\0';
     line = pchar + 1;
+
+    /* Check if : is present in keyname */
+    pchar = strchr(key, ':');
+    if(pchar != NULL)
+    {
+        numarg = pchar + 1;
+
+        /* Remove whitespace before colon if present */
+        pchar--;
+        while(*pchar == ' ' || *pchar == '\t')
+        {
+            pchar--;
+        }
+        *(pchar + 1) = '\0';
+        keylen = pchar + 1 - key;
+
+        numargv = atoi(numarg);
+        if(numargv == 0 && errno == EINVAL)
+        {
+            return;
+        }
+    }
 
     value = line;
 
@@ -142,61 +163,17 @@ static void ini_parseline(char * line, HashTable * hrouter)
     *(pchar + 1) = '\0';
     valuelen = pchar + 1 - value;
 
+    element.acount = numargv;
+    element.rtname = alloc_pestrdup(value);
+    if(element.rtname == NULL)
+    {
+        return;
+    }
+
     /* Add this to hashtable. Ignore if entry already exists */
-    zend_hash_add(hrouter, key, keylen + 1, value, valuelen + 1, NULL);
+    zend_hash_add(hrouter, key, keylen + 1, &element, sizeof(fnroute_element), NULL);
 
     return;
-}
-
-static int reroute_verify(HashTable * hrouter, unsigned char type)
-{
-    int result = NONFATAL;
-
-    /* Function checks */
-    /* Number of arguments are same */
-    /* Type of arguments is same */
-    /* Return type is same */
-
-    /* Class checks */
-    /* Number of functions are same */
-    /* All functions are present in both classes */
-    /* Function arguments and return types match */
-
-    return result;
-}
-
-static int exists_check(detours_context * pdetours, char * oname, char ** rname, unsigned char type)
-{
-    int         result = NONFATAL;
-    HashTable * htable = NULL;
-    char *      pvalue = NULL;
-
-    _ASSERT(pdetours != NULL);
-    _ASSERT(oname    != NULL);
-    _ASSERT(rname    != NULL);
-    _ASSERT(type == FUNCTION_REROUTE || type == CLASS_REROUTE);
-
-    *rname = NULL;
-    htable = ((type == FUNCTION_REROUTE) ? pdetours->fnroutes : pdetours->clroutes);
-
-    /* Find oname in the hashtable */
-    if(zend_hash_find(htable, oname, strlen(oname) + 1, (void **)&pvalue) == FAILURE)
-    {
-        /* result = NONFATAL and rname = NULL indicates not found */
-        goto Finished;
-    }
-
-    *rname = pvalue;
-
-Finished:
-
-    if(FAILED(result))
-    {
-        dprintimportant("failure %d in exists_check", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-    }
-
-    return result;
 }
 
 /* Public functions */
@@ -216,7 +193,6 @@ int detours_create(detours_context ** ppdetours)
 
     pdetours->inifile  = NULL;
     pdetours->fnroutes = NULL;
-    pdetours->clroutes = NULL;
 
     *ppdetours = pdetours;
 
@@ -242,6 +218,21 @@ void detours_destroy(detours_context * pdetours)
     return;
 }
 
+static void fnroutes_destructor(void * pdestination)
+{
+    fnroute_element * pelement = NULL;
+
+    _ASSERT(pdestination != NULL);
+    pelement = (fnroute_element *)pdestination;
+
+    _ASSERT(pelement->rtname != NULL);
+    alloc_pefree(pelement->rtname);
+    pelement->rtname = NULL;
+
+    return;
+}
+
+ 
 int detours_initialize(detours_context * pdetours, char * inifile)
 {
     int    result   = NONFATAL;
@@ -251,6 +242,8 @@ int detours_initialize(detours_context * pdetours, char * inifile)
     _ASSERT(pdetours != NULL);
     _ASSERT(inifile  != NULL);
  
+    dprintverbose("start detours_initialize");
+
     /* Check if ini file exists */
     if(GetFileAttributes(inifile) == 0xFFFFFFFF)
     {
@@ -285,22 +278,8 @@ int detours_initialize(detours_context * pdetours, char * inifile)
         goto Finished;
     }
 
-    zend_hash_init(pdetours->fnroutes, 0, NULL, NULL, 1);
+    zend_hash_init(pdetours->fnroutes, 0, NULL, fnroutes_destructor, 1);
     result = ini_readfile(pdetours->fnroutes, inifile, FUNCTION_SECTION_NAME);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    pdetours->clroutes = (HashTable *)alloc_pemalloc(sizeof(HashTable));
-    if(pdetours->clroutes == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    zend_hash_init(pdetours->clroutes, 0, NULL, NULL, 1);
-    result = ini_readfile(pdetours->clroutes, inifile, CLASS_SECTION_NAME);
     if(FAILED(result))
     {
         goto Finished;
@@ -325,14 +304,9 @@ Finished:
             alloc_pefree(pdetours->fnroutes);
             pdetours->fnroutes = NULL;
         }
-
-        if(pdetours->clroutes != NULL)
-        {
-            zend_hash_destroy(pdetours->clroutes);
-            alloc_pefree(pdetours->clroutes);
-            pdetours->clroutes = NULL;
-        }
     }
+
+    dprintverbose("end detours_initialize");
 
     return result;
 }
@@ -353,148 +327,57 @@ void detours_terminate(detours_context * pdetours)
             alloc_pefree(pdetours->fnroutes);
             pdetours->fnroutes = NULL;
         }
-
-        if(pdetours->clroutes != NULL)
-        {
-            zend_hash_destroy(pdetours->clroutes);
-            alloc_pefree(pdetours->clroutes);
-            pdetours->clroutes = NULL;
-        }
     }
 
     return;
 }
 
-int detours_fcheck(detours_context * pdetours, char * ofname, char ** rfname)
+int detours_check(detours_context * pdetours, char * oname, int evalue, char ** rname)
 {
-    return exists_check(pdetours, ofname, rfname, FUNCTION_REROUTE);
-}
-
-int detours_ccheck(detours_context * pdetours, char * ocname, char ** rcname)
-{
-    return exists_check(pdetours, ocname, rcname, CLASS_REROUTE);
-}
-
-int detours_getinfo(detours_context * pdetours, detours_info ** ppinfo)
-{
-    int            result   = NONFATAL;
-    detours_info * pinfo    = NULL;
-    HashTable *    htable   = NULL;
-    char *         pkey     = NULL;
-    char *         pvalue   = NULL;
-    dlist_element  delement = {0};
+    int               result = NONFATAL;
+    HashTable *       htable = NULL;
+    fnroute_element * pvalue = NULL;
 
     _ASSERT(pdetours != NULL);
-    _ASSERT(ppinfo   != NULL);
+    _ASSERT(oname    != NULL);
+    _ASSERT(rname    != NULL);
 
-    pinfo = (detours_info *)alloc_emalloc(sizeof(detours_info));
-    if(pinfo == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    pinfo->fnlist = NULL;
-    pinfo->cllist = NULL;
-
-    pinfo->fnlist = (zend_llist *)alloc_emalloc(sizeof(zend_llist));
-    if(pinfo->fnlist == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    zend_llist_init(pinfo->fnlist, sizeof(dlist_element), NULL, 0);
-
+    *rname = NULL;
     htable = pdetours->fnroutes;
-    zend_hash_internal_pointer_reset(htable);
 
-    while(zend_hash_has_more_elements(htable) == SUCCESS)
+    /* Find oname in the hashtable */
+    if(zend_hash_find(htable, oname, strlen(oname) + 1, (void **)&pvalue) == FAILURE)
     {
-        zend_hash_get_current_key(htable, &pkey, NULL, 0);
-        zend_hash_get_current_data(htable, (void **)&pvalue);
-
-        delement.otname = pkey;
-        delement.rtname = pvalue;
-        zend_llist_add_element(pinfo->fnlist, &delement);
-
-        zend_hash_move_forward(htable);
-    }
-
-    pinfo->cllist = (zend_llist *)alloc_emalloc(sizeof(zend_llist));
-    if(pinfo->cllist == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
+        /* result = NONFATAL and rname = NULL indicates not found */
         goto Finished;
     }
 
-    zend_llist_init(pinfo->cllist, sizeof(dlist_element), NULL, 0);
-
-    htable = pdetours->clroutes;
-    zend_hash_internal_pointer_reset(htable);
-
-    while(zend_hash_has_more_elements(htable) == SUCCESS)
+    if(pvalue->acount == -1 || pvalue->acount >= evalue)
     {
-        zend_hash_get_current_key(htable, &pkey, NULL, 0);
-        zend_hash_get_current_data(htable, (void **)&pvalue);
-
-        delement.otname = pkey;
-        delement.rtname = pvalue;
-        zend_llist_add_element(pinfo->cllist, &delement);
-
-        zend_hash_move_forward(htable);
+        *rname = pvalue->rtname;
     }
 
 Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in detours_getinfo", result);
+        dprintimportant("failure %d in detours_check", result);
         _ASSERT(result > WARNING_COMMON_BASE);
-
-        if(pinfo != NULL)
-        {
-            if(pinfo->fnlist != NULL)
-            {
-                zend_llist_destroy(pinfo->fnlist);
-                alloc_efree(pinfo->fnlist);
-                pinfo->fnlist = NULL;
-            }
-
-            if(pinfo->cllist != NULL)
-            {
-                zend_llist_destroy(pinfo->cllist);
-                alloc_efree(pinfo->cllist);
-                pinfo->cllist = NULL;
-            }
-
-            alloc_efree(pinfo);
-            pinfo = NULL;
-        }
     }
 
     return result;
 }
 
-void detours_freeinfo(detours_info * pinfo)
+int detours_getinfo(detours_context * pdetours, HashTable ** pphtable)
 {
-    if(pinfo != NULL)
-    {
-        if(pinfo->fnlist != NULL)
-        {
-            zend_llist_destroy(pinfo->fnlist);
-            alloc_efree(pinfo->fnlist);
-            pinfo->fnlist = NULL;
-        }
+    _ASSERT(pdetours != NULL);
+    _ASSERT(pphtable != NULL);
 
-        if(pinfo->cllist != NULL)
-        {
-            zend_llist_destroy(pinfo->cllist);
-            alloc_efree(pinfo->cllist);
-            pinfo->cllist = NULL;
-        }
+    *pphtable = pdetours->fnroutes;
+    return NONFATAL;
+}
 
-        alloc_efree(pinfo);
-        pinfo = NULL;
-    }
+void detours_freeinfo(HashTable * phtable)
+{
+    /* Nothing to do */
 }
