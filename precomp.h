@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.1.0427.0"
+#define PHP_WINCACHE_EXTVER    "1.1.0603.0"
 
 /* comment following line for release builds */
 /*#define WINCACHE_DEBUG*/
@@ -61,7 +61,6 @@
 #include "ext/standard/php_smart_str.h"
 #include "ext/session/php_session.h"
 #include "zend_extensions.h"
-#include "zend/zend_compile.h"
 #include "php_open_temporary_file.h"
 
 #include <tlhelp32.h>

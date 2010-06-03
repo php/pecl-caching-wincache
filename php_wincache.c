@@ -60,18 +60,14 @@ PHP_FUNCTION(wincache_reroute_list);
 PHP_FUNCTION(wincache_refresh_if_changed);
 
 /* Replacement APIs to increase PHP performance */
-PHP_FUNCTION(wincache_function_exists);
-PHP_FUNCTION(wincache_class_exists);
 PHP_FUNCTION(wincache_file_exists);
 PHP_FUNCTION(wincache_file_get_contents);
-PHP_FUNCTION(wincache_file);
 PHP_FUNCTION(wincache_readfile);
 PHP_FUNCTION(wincache_is_readable);
 PHP_FUNCTION(wincache_is_writable);
 PHP_FUNCTION(wincache_is_file);
 PHP_FUNCTION(wincache_is_dir);
 PHP_FUNCTION(wincache_realpath);
-PHP_FUNCTION(wincache_dirname);
 
 /* Replacement APIs we need but might not implement */
 /*
@@ -147,15 +143,6 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_refresh_if_changed, 0, 0, 0)
     ZEND_ARG_INFO(0, file_list)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_function_exists, 0, 0, 1)
-    ZEND_ARG_INFO(0, function_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_class_exists, 0, 0, 1)
-    ZEND_ARG_INFO(0, class_name)
-    ZEND_ARG_INFO(0, autoload)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_exists, 0, 0, 1)
     ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
@@ -163,10 +150,6 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_get_contents, 0, 0, 1)
     ZEND_ARG_INFO(0, file_name)
     ZEND_ARG_INFO(0, use_include_path)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_readfile, 0, 0, 1)
@@ -191,10 +174,6 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_is_dir, 0, 0, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_realpath, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_dirname, 0, 0, 1)
     ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
 
@@ -299,18 +278,14 @@ zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_scache_meminfo, arginfo_wincache_scache_meminfo)
     PHP_FE(wincache_reroute_list, arginfo_wincache_reroute_list)
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
-    PHP_FE(wincache_function_exists, arginfo_wincache_function_exists)
-    PHP_FE(wincache_class_exists, arginfo_wincache_class_exists)
     PHP_FE(wincache_file_exists, arginfo_wincache_file_exists)
     PHP_FE(wincache_file_get_contents, arginfo_wincache_file_get_contents)
-    PHP_FE(wincache_file, arginfo_wincache_file)
     PHP_FE(wincache_readfile, arginfo_wincache_readfile)
     PHP_FE(wincache_is_readable, arginfo_wincache_is_readable)
     PHP_FE(wincache_is_writable, arginfo_wincache_is_writable)
     PHP_FE(wincache_is_file, arginfo_wincache_is_file)
     PHP_FE(wincache_is_dir, arginfo_wincache_is_dir)
     PHP_FE(wincache_realpath, arginfo_wincache_realpath)
-    PHP_FE(wincache_dirname, arginfo_wincache_dirname)
     PHP_FE(wincache_ucache_get, arginfo_wincache_ucache_get)
     PHP_FE(wincache_ucache_set, arginfo_wincache_ucache_set)
     PHP_FE(wincache_ucache_add, arginfo_wincache_ucache_add)
@@ -364,7 +339,7 @@ PHP_INI_BEGIN()
 /* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
 /* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
 /* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "96", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)
-/* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "1024", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
+/* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
 /* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
 /* index 7 */  STD_PHP_INI_ENTRY("wincache.chkinterval", "30", PHP_INI_SYSTEM, OnUpdateLong, fcchkfreq, zend_wincache_globals, wincache_globals)
 /* index 8 */  STD_PHP_INI_ENTRY("wincache.ttlmax", "1200", PHP_INI_SYSTEM, OnUpdateLong, ttlmax, zend_wincache_globals, wincache_globals)
@@ -405,7 +380,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
     WCG(ucachesize)  = 8;    /* User cache size is 8 MB by default */
     WCG(scachesize)  = 8;    /* Session cache size is 8 MB by default */
-    WCG(maxfilesize) = 1024; /* Maximum file size to cache is 1024 KB */
+    WCG(maxfilesize) = 256;  /* Maximum file size to cache is 256 KB */
     WCG(numfiles)    = 4096; /* 4096 hashtable keys */
     WCG(fcchkfreq)   = 30;   /* File change check done every 30 secs */
     WCG(ttlmax)      = 1200; /* File removed if not used for 1200 secs */
@@ -2013,151 +1988,6 @@ Finished:
     RETURN_TRUE;
 }
 
-PHP_FUNCTION(wincache_function_exists)
-{
-    char *             oname     = NULL;
-    int                oname_len = 0;
-    char *             name      = NULL;
-    int                name_len  = 0;
-    zend_function *    func      = NULL;
-    char *             lcname    = NULL;
-    unsigned int       retval    = 0;
-    unsigned int *     pdata     = NULL;
-    static HashTable * fe_table  = NULL;
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &oname, &oname_len) == FAILURE)
-    {
-        return;
-    }
-
-    /* Initialize static hashtable if not already initialized */
-    if(fe_table == NULL)
-    {
-        fe_table = (HashTable *)alloc_pemalloc(sizeof(HashTable));
-        if(fe_table == NULL)
-        {
-            return;
-        }
-
-        zend_hash_init(fe_table, 0, NULL, NULL, 1);
-    }
-
-    /* Try to find the function name in local hashtable first */
-    if(zend_hash_find(fe_table, oname, oname_len + 1, (void **)&pdata) == SUCCESS)
-    {
-        RETURN_BOOL(*pdata);
-    }
-
-    /* If not found, do what original function_exists does */
-    lcname = zend_str_tolower_dup(oname, oname_len);
-    name = lcname;
-    name_len = oname_len;
-
-    /* Ignore leading "\" */
-    if (lcname[0] == '\\')
-    {
-        name = &lcname[1];
-        name_len--;
-    }
-
-    retval = (zend_hash_find(EG(function_table), name, name_len+1, (void **)&func) == SUCCESS);
-    efree(lcname);
-
-    if(retval && func->type == ZEND_INTERNAL_FUNCTION && func->internal_function.handler == zif_display_disabled_function)
-    {
-        retval = 0;
-    }
-
-    /* Keep this entry in hashtable with original name */
-    zend_hash_add(fe_table, oname, oname_len + 1, &retval, sizeof(void *), NULL);
-
-    RETURN_BOOL(retval);
-}
-
-PHP_FUNCTION(wincache_class_exists)
-{
-    char *              class_name      = NULL;
-    int                 class_name_len  = 0;
-    char *              lc_name         = NULL;
-    zend_class_entry ** ce              = NULL;
-    int                 found           = 0;
-    zend_bool           autoload        = 1;
-    int                 retval          = 0;
-    unsigned int *      pdata           = NULL;
-    static HashTable *  ce_table        = NULL;
-    ALLOCA_FLAG(use_heap)
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &class_name, &class_name_len, &autoload) == FAILURE)
-    {
-        return;
-    }
-
-    /* Initialize static hashtable if not already initialized */
-    if(ce_table == NULL)
-    {
-        ce_table = (HashTable *)alloc_pemalloc(sizeof(HashTable));
-        if(ce_table == NULL)
-        {
-            return;
-        }
-
-        zend_hash_init(ce_table, 0, NULL, NULL, 1);
-    }
-
-    /* Try to find the function name in local hashtable first */
-    if(zend_hash_find(ce_table, class_name, class_name_len + 1, (void **)&pdata) == SUCCESS)
-    {
-        RETURN_BOOL(*pdata);
-    }
-
-    if(!autoload)
-    {
-        char * name = NULL;
-        int    len  = 0;
-
-#ifndef PHP_VERSION_52
-        lc_name = do_alloca(class_name_len + 1, use_heap);
-#else
-        lc_name = do_alloca_with_limit(class_name_len + 1, use_heap);
-#endif
-        zend_str_tolower_copy(lc_name, class_name, class_name_len);
-
-        /* Ignore leading "\" */
-        name = lc_name;
-        len = class_name_len;
-        if (lc_name[0] == '\\')
-        {
-            name = &lc_name[1];
-            len--;
-        }
-
-        found = zend_hash_find(EG(class_table), name, len + 1, (void **)&ce);
-#ifndef PHP_VERSION_52
-        free_alloca(lc_name, use_heap);
-#else
-        free_alloca_with_limit(lc_name, use_heap);
-#endif
-        retval = (found == SUCCESS && !((*ce)->ce_flags & ZEND_ACC_INTERFACE));
-        goto Finished;
-    }
-
-    if(zend_lookup_class(class_name, class_name_len, &ce TSRMLS_CC) == SUCCESS)
-    {
-        retval = (((*ce)->ce_flags & ZEND_ACC_INTERFACE) == 0);
-    }
-    else
-    {
-       retval = 0;
-    }
-
-Finished:
-
-    /* Keep this entry in hashtable with original name */
-    zend_hash_add(ce_table, class_name, class_name_len + 1, &retval, sizeof(void *), NULL);
-
-    RETURN_BOOL(retval);
-}
-
 PHP_FUNCTION(wincache_file_exists)
 {
     int            result   = NONFATAL;
@@ -2172,7 +2002,6 @@ PHP_FUNCTION(wincache_file_exists)
         return;
     }
 
-    /* Keep last argument as NULL to indicate that we only want fullpath of file */
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2277,80 +2106,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("wincache_file_get_contents failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
-        RETURN_FALSE;
-    }
-
-    return;
-}
-
-/* file originally implemented in ext\standard\file.c */
-PHP_FUNCTION(wincache_file)
-{
-    int            result           = NONFATAL;
-    char *         filename         = NULL;
-    int            filename_len     = 0;
-    zend_bool      use_include_path = 0;
-    char *         fullpath         = NULL;
-    char *         respath          = NULL;
-    fcache_value * pvalue           = NULL;
-    char *         contents         = NULL;
-
-    /* TBD?? Call original function if filename contains "://" */
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &filename, &filename_len, &use_include_path) == FAILURE)
-    {
-        return;
-    }
-
-    if(!IS_ABSOLUTE_PATH(filename, filename_len) && (!use_include_path))
-    {
-        fullpath = utils_fullpath(filename);
-        if(fullpath == NULL)
-        {
-            result = FATAL_OUT_OF_LMEMORY;
-            goto Finished;
-        }
-    }
-
-    result = aplist_fcache_get(WCG(lfcache), (fullpath == NULL ? filename : fullpath), &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    contents = alloc_estrdup(WCG(lfcache)->pfcache->memaddr + pvalue->file_content);
-    if(contents == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    RETVAL_STRINGL(contents, pvalue->file_size, 0);
-
-Finished:
-
-    if(fullpath != NULL)
-    {
-        alloc_efree(fullpath);
-        fullpath = NULL;
-    }
-
-    if(respath != NULL)
-    {
-        alloc_efree(respath);
-        respath = NULL;
-    }
-
-    if(pvalue != NULL)
-    {
-        aplist_fcache_close(WCG(lfcache), pvalue);
-        pvalue = NULL;
-    }
-
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_file failed with error %u", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
@@ -2809,24 +2564,6 @@ Finished:
     }
 
     return;
-}
-
-PHP_FUNCTION(wincache_dirname)
-{
-    char *   str     = NULL;
-    char *   ret     = NULL;
-    int      str_len = 0;
-    size_t   ret_len = 0;
-
-    if (zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &str, &str_len) == FAILURE)
-    {
-        return;
-    }
-
-    ret = estrndup(str, str_len);
-    ret_len = zend_dirname(ret, str_len);
-
-    RETURN_STRINGL(ret, ret_len, 0);
 }
 
 PHP_FUNCTION(wincache_ucache_get)
