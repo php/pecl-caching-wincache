@@ -148,6 +148,13 @@ if ( isset( $_GET['all'] ) && is_numeric( $_GET['all'] ) ) {
         $show_all_ucache_entries = 0;
 }
 
+$clear_user_cache = 0;
+if ( isset( $_GET['clc'] ) && is_numeric( $_GET['clc'] ) ) {
+    $clear_user_cache = $_GET['clc'];
+    if ( $clear_user_cache < 0 || $clear_user_cache > 1)
+        $clear_user_cache = 0;
+}
+
 $ucache_key = null;
 if ( isset( $_GET['key'] ) )
     $ucache_key = $_GET['key'];
@@ -620,6 +627,12 @@ function init_cache_info( $cache_data = SUMMARY_DATA )
         $scache_mem_info = wincache_scache_meminfo();
         $scache_info = wincache_scache_info();
     }
+}
+
+if ( USE_AUTHENTICATION && $user_cache_available && $clear_user_cache ){
+    wincache_ucache_clear();
+    header('Location: '.$PHP_SELF.'?page='.UCACHE_DATA);
+    exit;
 }
 
 ?>
@@ -1303,7 +1316,10 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
                 </tr>                
                 <tr>
                     <td class="e">Cached entries</td>
-                    <td class="v"><?php echo $ucache_info['total_item_count']; ?></td>
+                    <td class="v"><?php echo $ucache_info['total_item_count'];
+                    if ( USE_AUTHENTICATION && $ucache_info['total_item_count'] > 0 ) 
+                        echo ' (<a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&amp;clc=1">Clear All</a>)'; ?>
+					</td>
                 </tr>
                 <tr>
                     <td class="e">Hits</td>
@@ -1362,7 +1378,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
         echo "</tr>\n";
         if ($count++ > CACHE_MAX_ENTRY && !$show_all_ucache_entries){
-            echo '<tr><td colspan="5"><a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
+            echo '<tr><td colspan="6"><a href="', $PHP_SELF, '?page=', UCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
             break;
         }
     }
@@ -1501,7 +1517,7 @@ foreach ( ini_get_all( 'wincache' ) as $ini_name => $ini_value) {
         echo '<td class="v">', $entry['hitcount'],'</td>', "\n";
         echo "</tr>\n";
         if ($count++ > CACHE_MAX_ENTRY && !$show_all_ucache_entries){
-            echo '<tr><td colspan="5"><a href="', $PHP_SELF, '?page=', SCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
+            echo '<tr><td colspan="6"><a href="', $PHP_SELF, '?page=', SCACHE_DATA, '&amp;all=1">Show all entries</td></tr>';
             break;
         }
     }
