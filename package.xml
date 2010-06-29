@@ -39,6 +39,7 @@
 - Added wincache_reroute_list and wrote file apis on top of file cache. Added file flags in fcache_value.
 - Removed function hooks which are not giving significant performance boost. Updated version number.
 - Added functionality to clear user cache from wincache.php.
+- Updated build number for RTW release. Removed rerouteini config property.
   </notes>
   <contents>
     <dir name="/">
