@@ -23,23 +23,18 @@
     <email>ksingla@microsoft.com</email>
     <active>yes</active>
   </lead>
-  <date>2010-04-29</date>
+  <date>2010-06-30</date>
   <version>
-    <release>1.1.0</release>
-    <api>1.1.0</api>
+    <release>1.2.0</release>
+    <api>1.2.0</api>
   </version>
   <stability>
-    <release>stable</release>
-    <api>stable</api>
+    <release>beta</release>
+    <api>beta</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-1.1.0 release:
-- Made reroute functionality take out number of parameters it can handle. Also made reroutes only when less or equal number of parameters are passed.
-- Added wincache_reroute_list and wrote file apis on top of file cache. Added file flags in fcache_value.
-- Removed function hooks which are not giving significant performance boost. Updated version number.
-- Added functionality to clear user cache from wincache.php.
-- Updated build number for RTW release. Removed rerouteini config property.
+1.2.0 release:
   </notes>
   <contents>
     <dir name="/">
@@ -96,6 +91,25 @@
   <providesextension>wincache</providesextension>
   <extsrcrelease/>
   <changelog>
+  <release>
+    <stability>
+     <release>stable</release>
+     <api>stable</api>
+    </stability>
+    <version>
+     <release>1.1.0stable</release>
+     <api>1.1.0stable</api>
+    </version>
+    <date>2010-06-30</date>
+     <notes>
+1.1.0 release:
+- Made reroute functionality take out number of parameters it can handle. Also made reroutes only when less or equal number of parameters are passed.
+- Added wincache_reroute_list and wrote file apis on top of file cache. Added file flags in fcache_value.
+- Removed function hooks which are not giving significant performance boost. Updated version number.
+- Added functionality to clear user cache from wincache.php.
+- Updated build number for RTW release. Removed rerouteini config property.
+    </notes>
+   </release>
    <release>
     <stability>
      <release>beta</release>
