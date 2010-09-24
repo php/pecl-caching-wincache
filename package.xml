@@ -35,6 +35,8 @@
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
 1.2.0 release:
+- Fixed wordpress plugin install issue which was caused by open folder in distributed file change notification system.
+- Added utils_resolve_path for PHP 5.2 and using it for getting fullpath.
   </notes>
   <contents>
     <dir name="/">

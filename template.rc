@@ -39,8 +39,8 @@
 #include "main/php_version.h"
 
 #define WINCACHE_VMAJOR     1
-#define WINCACHE_VMINOR     1
-#define WINCACHE_VMMDD      0630
+#define WINCACHE_VMINOR     2
+#define WINCACHE_VMMDD      921
 #define WINCACHE_VREVISION  0
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US

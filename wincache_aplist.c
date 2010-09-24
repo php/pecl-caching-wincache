@@ -1815,46 +1815,15 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     if(pvalue == NULL)
     {
 #ifdef PHP_VERSION_52
-        /* Get fullpath by calling original stream open function */
-        result = original_stream_open_function(filename, &fhandle TSRMLS_CC);
-        if(result != SUCCESS)
-        {
-            result = FATAL_FCACHE_ORIGINAL_OPEN;
-            goto Finished;
-        }
-
-        _ASSERT(fhandle.opened_path != NULL);
-        fullpath = utils_fullpath(fhandle.opened_path);
-
-        if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
-        {
-            fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
-            fhandle.handle.stream.handle = NULL;
-        }
-
-        if(fhandle.opened_path)
-        {
-            efree(fhandle.opened_path);
-            fhandle.opened_path = NULL;
-        }
-
-        if(fhandle.free_filename && fhandle.filename)
-        {
-            efree(fhandle.filename);
-            fhandle.filename = NULL;
-        }
-
-        if(fullpath == NULL)
-        {
-            result = FATAL_OUT_OF_LMEMORY;
-            goto Finished;
-        }
+        /* Get fullpath by using copy of php_resolve_path */
+        fullpath = utils_resolve_path(filename, strlen(filename), PG(include_path) TSRMLS_CC);
 #else
-        /* Get fullpath by calling original resolve path function */
+        /* Get fullpath using original_resolve_path */
         fullpath = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
+#endif
         if(fullpath == NULL)
         {
-            result = FATAL_OUT_OF_LMEMORY;
+            result = WARNING_ORESOLVE_FAILURE;
             goto Finished;
         }
 
@@ -1867,7 +1836,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                 fullpath[findex] = '\\';
             }
         }
-#endif
     }
 
     /* If ppvalue is NULL, just set the fullpath and return */

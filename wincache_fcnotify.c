@@ -41,9 +41,9 @@
 #define PALIVECHK_FREQUENCY           1000
 
 static unsigned int WINAPI change_notification_thread(void * parg);
-static void WINAPI process_change_notification(aplist_context * pcache, unsigned int bytecount, OVERLAPPED * poverlapped);
+static void WINAPI process_change_notification(fcnotify_context * pnotify, unsigned int bytecount, OVERLAPPED * poverlapped);
 static int  findfolder_in_cache(fcnotify_context * pnotify, const char * folderpath, unsigned int index, fcnotify_value ** ppvalue);
-static void register_directory_changes(HANDLE hfolder, BYTE * pfni, OVERLAPPED * poverlapped);
+static unsigned int register_directory_changes(HANDLE hfolder, BYTE * pfni, OVERLAPPED * poverlapped);
 static int  create_fcnotify_data(fcnotify_context * pnotify, const char * folderpath, fcnotify_value ** ppvalue);
 static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * pvalue);
 static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
@@ -83,7 +83,7 @@ static unsigned int WINAPI change_notification_thread(void * parg)
             }
             else if(poverlap != NULL)
             {
-               process_change_notification(pnotify->fcaplist, bytecount, poverlap);
+               process_change_notification(pnotify, bytecount, poverlap);
             }
         }
     }
@@ -91,20 +91,28 @@ static unsigned int WINAPI change_notification_thread(void * parg)
     return ERROR_SUCCESS;
 }
 
-static void WINAPI process_change_notification(aplist_context * pcache, unsigned int bytecount, OVERLAPPED * poverlapped)
+static void WINAPI process_change_notification(fcnotify_context * pnotify, unsigned int bytecount, OVERLAPPED * poverlapped)
 {
     HRESULT                   hr        = S_OK;
+    int                       result    = NONFATAL;
+    aplist_context *          pcache    = NULL;
     fcnotify_listen *         plistener = NULL;
+    fcnotify_value *          pvalue    = NULL;
     FILE_NOTIFY_INFORMATION * pnitem    = NULL;
     FILE_NOTIFY_INFORMATION * pnnext    = NULL;
     wchar_t *                 pwchar    = NULL;
     char *                    pfname    = NULL;
     unsigned int              fnlength  = 0;
+    unsigned int              rdcresult = 0;
+    unsigned int              index     = 0;
 
     dprintverbose("start process_change_notification");
 
-    _ASSERT(pcache      != NULL);
+    _ASSERT(pnotify     != NULL);
     _ASSERT(poverlapped != NULL);
+
+    pcache = pnotify->fcaplist;
+    _ASSERT(pcache != NULL );
 
     plistener = CONTAINING_RECORD(poverlapped, fcnotify_listen, overlapped);
     _ASSERT(plistener != NULL);
@@ -160,10 +168,39 @@ static void WINAPI process_change_notification(aplist_context * pcache, unsigned
 Finished:
 
     /* register for change notification again */
-    register_directory_changes(plistener->folder_handle, plistener->fninfo, poverlapped);
+    rdcresult = register_directory_changes(plistener->folder_handle, plistener->fninfo, poverlapped);
+    if(!rdcresult)
+    {
+        /* Folder is deleted. Close folder handle. Free folder_path and listener memory */
+        /* Ok to close in the current process as this process was listening to this folder */
+        lock_writelock(pnotify->fclock);
+
+        if(plistener->folder_handle != NULL)
+        {
+            CloseHandle(plistener->folder_handle);
+            plistener->folder_handle = NULL;
+        }
+
+        /* Free plistener memory and set the field in pvalue to null */
+        index = utils_getindex(plistener->folder_path, pnotify->fcheader->valuecount);
+        result = findfolder_in_cache(pnotify, plistener->folder_path, index, &pvalue);
+
+        if(plistener->folder_path != NULL)
+        {
+            alloc_pefree(plistener->folder_path);
+            plistener->folder_path = NULL;
+        }
+
+        if(SUCCEEDED(result))
+        {
+            alloc_pefree(pvalue->plistener);
+            pvalue->plistener = NULL;
+        }
+
+        lock_writeunlock(pnotify->fclock);
+    }
 
     dprintverbose("end process_change_notification");
-
     return;
 }
 
@@ -200,21 +237,24 @@ static int findfolder_in_cache(fcnotify_context * pnotify, const char * folderpa
     return result;
 }
 
-static void register_directory_changes(HANDLE hfolder, BYTE * pfni, OVERLAPPED * poverlapped)
+static unsigned int register_directory_changes(HANDLE hfolder, BYTE * pfni, OVERLAPPED * poverlapped)
 {
     unsigned int cflags    = 0;
     unsigned int bytecount = 0;
+    unsigned int result    = 0;
     
     _ASSERT(hfolder     != NULL);
     _ASSERT(hfolder     != INVALID_HANDLE_VALUE);
     _ASSERT(pfni        != NULL);
     _ASSERT(poverlapped != NULL);
 
+    memset(poverlapped, 0, sizeof(OVERLAPPED));
+
     /* file name, last write, attributes and security change should be delivered */
     cflags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SECURITY;
-    ReadDirectoryChangesW(hfolder, pfni, 1024, FALSE, cflags, &bytecount, poverlapped, NULL);
+    result = ReadDirectoryChangesW(hfolder, pfni, 1024, FALSE, cflags, &bytecount, poverlapped, NULL);
 
-    return;
+    return result;
 }
 
 /* This method will either create a new entry altogether or modify an existing entry */
@@ -228,6 +268,7 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
     HANDLE            phandle   = NULL;
     unsigned int      fshare    = 0;
     unsigned int      flags     = 0;
+    unsigned int      rdcresult = 0;
     fcnotify_listen * plistener = NULL;
 
     dprintverbose("start create_fcnotify_data");
@@ -301,7 +342,12 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
         goto Finished;
     }
 
-    register_directory_changes(phandle, plistener->fninfo, &plistener->overlapped);
+    rdcresult = register_directory_changes(phandle, plistener->fninfo, &plistener->overlapped);
+    if(!rdcresult)
+    {
+        result = FATAL_FCNOTIFY_RDCFAILURE;
+        goto Finished;
+    }
 
     plistener->folder_path   = alloc_pestrdup(folderpath);
     plistener->folder_handle = phandle;
@@ -999,19 +1045,29 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
     if(pvalue != NULL)
     {
-        /* Check if owner_pid process is still there */
-        /* Do the check once each second */
-        cticks = GetTickCount();
-        if(utils_ticksdiff(cticks, pvalue->palivechk) >= PALIVECHK_FREQUENCY)
+        /* Check if this entry has a valid non-null listener */
+        /* If not, make the function hook up change notification again */
+        if(pvalue->plistener == NULL)
         {
-            listenp = process_alive_check(pnotify, pvalue);
+            listenp = 1;
             reusecount = pvalue->reusecount;
-            InterlockedExchange(&pvalue->palivechk, cticks);
-
-            if(listenp && folderpath == NULL)
+        }
+        else
+        {
+            /* Check if listener is actually present and owner_pid */
+            /* process is still there. Do the check once each second */
+            cticks = GetTickCount();
+            if(utils_ticksdiff(cticks, pvalue->palivechk) >= PALIVECHK_FREQUENCY)
             {
-                folderpath = (char *)(pnotify->fcmemaddr + pvalue->folder_path);
-                index = utils_getindex(folderpath, pheader->valuecount);
+                listenp = process_alive_check(pnotify, pvalue);
+                reusecount = pvalue->reusecount;
+                InterlockedExchange(&pvalue->palivechk, cticks);
+
+                if(listenp && folderpath == NULL)
+                {
+                    folderpath = (char *)(pnotify->fcmemaddr + pvalue->folder_path);
+                    index = utils_getindex(folderpath, pheader->valuecount);
+                }
             }
         }
     }

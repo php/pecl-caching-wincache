@@ -337,7 +337,7 @@ PHP_INI_BEGIN()
 /* index 0 */  STD_PHP_INI_BOOLEAN("wincache.fcenabled", "1", PHP_INI_ALL, OnUpdateBool, fcenabled, zend_wincache_globals, wincache_globals)
 /* index 1 */  STD_PHP_INI_BOOLEAN("wincache.ocenabled", "1", PHP_INI_ALL, OnUpdateBool, ocenabled, zend_wincache_globals, wincache_globals)
 /* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
-/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
+/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "32", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
 /* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "96", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)
 /* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
 /* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
@@ -353,8 +353,8 @@ PHP_INI_BEGIN()
 /* index 16 */ STD_PHP_INI_ENTRY("wincache.ucachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, ucachesize, zend_wincache_globals, wincache_globals)
 /* index 17 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
 /* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
-#ifdef WINCACHE_TEST
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
+#ifdef WINCACHE_TEST
 /* index 20 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
@@ -376,7 +376,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(ocenabled)   = 1;    /* Opcode cache enabled by default */
     WCG(ucenabled)   = 1;    /* User cache enabled by default */
     WCG(enablecli)   = 0;    /* WinCache not enabled by default for CLI */
-    WCG(fcachesize)  = 24;   /* File cache size is 24 MB by default */
+    WCG(fcachesize)  = 32;   /* File cache size is 32 MB by default */
     WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
     WCG(ucachesize)  = 8;    /* User cache size is 8 MB by default */
     WCG(scachesize)  = 8;    /* Session cache size is 8 MB by default */
@@ -1200,6 +1200,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
     result = aplist_fcache_get(WCG(lfcache), filename, &fullpath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
+        /* If original_stream_open failed, do not try again */
         if(result == FATAL_FCACHE_ORIGINAL_OPEN)
         {
             return FAILURE;
@@ -1217,6 +1218,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
             goto Finished;
         }
 
+        /* fullpath will be freed when close is called */
         file_handle->free_filename = 1;
     }
 
@@ -2002,6 +2004,8 @@ PHP_FUNCTION(wincache_file_exists)
         return;
     }
 
+    dprintimportant("wincache_file_exists - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2057,6 +2061,8 @@ PHP_FUNCTION(wincache_file_get_contents)
     {
         return;
     }
+
+    dprintimportant("wincache_file_get_contents - %s", filename);
 
     if(!IS_ABSOLUTE_PATH(filename, filename_len) && (!use_include_path))
     {
@@ -2130,6 +2136,8 @@ PHP_FUNCTION(wincache_readfile)
         return;
     }
 
+    dprintimportant("wincache_readfile - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2189,6 +2197,8 @@ PHP_FUNCTION(wincache_is_readable)
     {
         return;
     }
+
+    dprintimportant("wincache_is_readable - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
@@ -2317,6 +2327,8 @@ PHP_FUNCTION(wincache_is_writable)
         return;
     }
 
+    dprintimportant("wincache_is_writable - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2433,6 +2445,8 @@ PHP_FUNCTION(wincache_is_file)
         return;
     }
 
+    dprintimportant("wincache_is_file - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2487,6 +2501,8 @@ PHP_FUNCTION(wincache_is_dir)
         return;
     }
 
+    dprintimportant("wincache_is_dir - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
@@ -2538,6 +2554,8 @@ PHP_FUNCTION(wincache_realpath)
     {
         return;
     }
+
+    dprintimportant("wincache_realpath - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, &respath, NULL TSRMLS_CC);
     if(FAILED(result))

@@ -389,6 +389,142 @@ unsigned int utils_ticksdiff(unsigned int present, unsigned int past)
     return ticksdiff;
 }
 
+#ifdef PHP_VERSION_52
+/* Copy of php_resolve_path from PHP 5.3 branch for use in PHP 5.2 */
+char * utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC)
+{
+    char resolved_path[MAXPATHLEN];
+    char trypath[MAXPATHLEN];
+    const char *ptr, *end, *p;
+    char *actual_path;
+    php_stream_wrapper *wrapper;
+
+    if (!filename) {
+        return NULL;
+    }
+
+    /* Don't resolve paths which contain protocol (except of file://) */
+    for (p = filename; isalnum((int)*p) || *p == '+' || *p == '-' || *p == '.'; p++);
+    if ((*p == ':') && (p - filename > 1) && (p[1] == '/') && (p[2] == '/')) {
+        wrapper = php_stream_locate_url_wrapper(filename, &actual_path, STREAM_OPEN_FOR_INCLUDE TSRMLS_CC);
+        if (wrapper == &php_plain_files_wrapper) {
+            if (tsrm_realpath(actual_path, resolved_path TSRMLS_CC)) {
+                return alloc_estrdup(resolved_path);
+            }
+        }
+        return NULL;
+    }
+
+    if ((*filename == '.' && 
+         (IS_SLASH(filename[1]) || 
+          ((filename[1] == '.') && IS_SLASH(filename[2])))) ||
+        IS_ABSOLUTE_PATH(filename, filename_length) ||
+        !path ||
+        !*path) {
+        if (tsrm_realpath(filename, resolved_path TSRMLS_CC)) {
+            return alloc_estrdup(resolved_path);
+        } else {
+            return NULL;
+        }
+    }
+
+    ptr = path;
+    while (ptr && *ptr) {
+        /* Check for stream wrapper */
+        int is_stream_wrapper = 0;
+
+        for (p = ptr; isalnum((int)*p) || *p == '+' || *p == '-' || *p == '.'; p++);
+        if ((*p == ':') && (p - ptr > 1) && (p[1] == '/') && (p[2] == '/')) {
+            /* .:// or ..:// is not a stream wrapper */
+            if (p[-1] != '.' || p[-2] != '.' || p - 2 != ptr) {
+                p += 3;
+                is_stream_wrapper = 1;
+            }
+        }
+        end = strchr(p, DEFAULT_DIR_SEPARATOR);
+        if (end) {
+            if ((end-ptr) + 1 + filename_length + 1 >= MAXPATHLEN) {
+                ptr = end + 1;
+                continue;
+            }
+            memcpy(trypath, ptr, end-ptr);
+            trypath[end-ptr] = '/';
+            memcpy(trypath+(end-ptr)+1, filename, filename_length+1);
+            ptr = end+1;
+        } else {
+            int len = strlen(ptr);
+
+            if (len + 1 + filename_length + 1 >= MAXPATHLEN) {
+                break;
+            }
+            memcpy(trypath, ptr, len);
+            trypath[len] = '/';
+            memcpy(trypath+len+1, filename, filename_length+1);
+            ptr = NULL;
+        }
+        actual_path = trypath;
+        if (is_stream_wrapper) {
+            wrapper = php_stream_locate_url_wrapper(trypath, &actual_path, STREAM_OPEN_FOR_INCLUDE TSRMLS_CC);
+            if (!wrapper) {
+                continue;
+            } else if (wrapper != &php_plain_files_wrapper) {
+                if (wrapper->wops->url_stat) {
+                    php_stream_statbuf ssb;
+
+                    if (SUCCESS == wrapper->wops->url_stat(wrapper, trypath, 0, &ssb, NULL TSRMLS_CC)) {
+                        return alloc_estrdup(trypath);
+                    }
+                }
+                continue;
+            }
+        }
+        if (tsrm_realpath(actual_path, resolved_path TSRMLS_CC)) {
+            return alloc_estrdup(resolved_path);
+        }
+    } /* end provided path */
+
+    /* check in calling scripts' current working directory as a fall back case
+     */
+    if (zend_is_executing(TSRMLS_C)) {
+        char *exec_fname = zend_get_executed_filename(TSRMLS_C);
+        int exec_fname_length = strlen(exec_fname);
+
+        while ((--exec_fname_length >= 0) && !IS_SLASH(exec_fname[exec_fname_length]));
+        if (exec_fname && exec_fname[0] != '[' &&
+            exec_fname_length > 0 &&
+            exec_fname_length + 1 + filename_length + 1 < MAXPATHLEN) {
+            memcpy(trypath, exec_fname, exec_fname_length + 1);
+            memcpy(trypath+exec_fname_length + 1, filename, filename_length+1);
+            actual_path = trypath;
+
+            /* Check for stream wrapper */
+            for (p = trypath; isalnum((int)*p) || *p == '+' || *p == '-' || *p == '.'; p++);
+            if ((*p == ':') && (p - trypath > 1) && (p[1] == '/') && (p[2] == '/')) {
+                wrapper = php_stream_locate_url_wrapper(trypath, &actual_path, STREAM_OPEN_FOR_INCLUDE TSRMLS_CC);
+                if (!wrapper) {
+                    return NULL;
+                } else if (wrapper != &php_plain_files_wrapper) {
+                    if (wrapper->wops->url_stat) {
+                        php_stream_statbuf ssb;
+
+                        if (SUCCESS == wrapper->wops->url_stat(wrapper, trypath, 0, &ssb, NULL TSRMLS_CC)) {
+                            return alloc_estrdup(trypath);
+                        }
+                    }
+                    return NULL;
+                }
+            }
+
+            if (tsrm_realpath(actual_path, resolved_path TSRMLS_CC)) {
+                return alloc_estrdup(resolved_path);
+            }
+        }
+    }
+
+    return NULL;
+}
+#endif
+
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...)
 {
