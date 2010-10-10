@@ -885,7 +885,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
 
             /* Number of folders on which listeners will be active will */
             /* be very small. Using filecount as 32 so that scavenger is quick */
-            result = fcnotify_initialize(pcache->pnotify, pcache->islocal, pcache, pcache->apalloc, 32 TSRMLS_DC);
+            result = fcnotify_initialize(pcache->pnotify, pcache->islocal, pcache, pcache->apalloc, 32 TSRMLS_CC);
             if(FAILED(result))
             {
                 goto Finished;
