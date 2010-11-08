@@ -62,6 +62,7 @@ PHP_FUNCTION(wincache_refresh_if_changed);
 /* Replacement APIs to increase PHP performance */
 PHP_FUNCTION(wincache_file_exists);
 PHP_FUNCTION(wincache_file_get_contents);
+PHP_FUNCTION(wincache_filesize);
 PHP_FUNCTION(wincache_readfile);
 PHP_FUNCTION(wincache_is_readable);
 PHP_FUNCTION(wincache_is_writable);
@@ -150,6 +151,10 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_get_contents, 0, 0, 1)
     ZEND_ARG_INFO(0, file_name)
     ZEND_ARG_INFO(0, use_include_path)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_filesize, 0, 0, 1)
+    ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_readfile, 0, 0, 1)
@@ -280,6 +285,7 @@ zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
     PHP_FE(wincache_file_exists, arginfo_wincache_file_exists)
     PHP_FE(wincache_file_get_contents, arginfo_wincache_file_get_contents)
+    PHP_FE(wincache_filesize, arginfo_wincache_filesize)
     PHP_FE(wincache_readfile, arginfo_wincache_readfile)
     PHP_FE(wincache_is_readable, arginfo_wincache_is_readable)
     PHP_FE(wincache_is_writable, arginfo_wincache_is_writable)
@@ -337,7 +343,7 @@ PHP_INI_BEGIN()
 /* index 0 */  STD_PHP_INI_BOOLEAN("wincache.fcenabled", "1", PHP_INI_ALL, OnUpdateBool, fcenabled, zend_wincache_globals, wincache_globals)
 /* index 1 */  STD_PHP_INI_BOOLEAN("wincache.ocenabled", "1", PHP_INI_ALL, OnUpdateBool, ocenabled, zend_wincache_globals, wincache_globals)
 /* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
-/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "32", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
+/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
 /* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "96", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)
 /* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
 /* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
@@ -376,7 +382,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(ocenabled)   = 1;    /* Opcode cache enabled by default */
     WCG(ucenabled)   = 1;    /* User cache enabled by default */
     WCG(enablecli)   = 0;    /* WinCache not enabled by default for CLI */
-    WCG(fcachesize)  = 32;   /* File cache size is 32 MB by default */
+    WCG(fcachesize)  = 24;   /* File cache size is 24 MB by default */
     WCG(ocachesize)  = 96;   /* Opcode cache size is 96 MB by default */
     WCG(ucachesize)  = 8;    /* User cache size is 8 MB by default */
     WCG(scachesize)  = 8;    /* Session cache size is 8 MB by default */
@@ -667,12 +673,6 @@ PHP_MINIT_FUNCTION(wincache)
     if(WCG(ignorelist) != NULL)
     {
         _strlwr(WCG(ignorelist));
-    }
-
-    /* Enforce opcode cache size to be at least 3 times the file cache size */
-    if(WCG(ocachesize) < 3 * WCG(fcachesize))
-    {
-        WCG(ocachesize) = 3 * WCG(fcachesize);
     }
 
     /* Even if enabled is set to false, create cache and set */
@@ -1103,9 +1103,10 @@ PHP_MINFO_FUNCTION(wincache)
 
 char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
 {
-    int           result       = NONFATAL;
-    char *        resolve_path = NULL;
-    unsigned char cenabled     = 0;
+    int            result       = NONFATAL;
+    char *         resolve_path = NULL;
+    unsigned char  cenabled     = 0;
+    fcache_value * pfvalue      = NULL;
 
 #ifdef PHP_VERSION_52
     dprintimportant("wincache_resolve_path shouldn't get called for 5.2.X");
@@ -1138,7 +1139,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     }
 
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
-    result = aplist_fcache_get(WCG(lfcache), filename, &resolve_path, NULL TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &resolve_path, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1147,6 +1148,12 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     _ASSERT(SUCCEEDED(result));
 
 Finished:
+    
+    if(pfvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
+    }
 
     if(FAILED(result))
     {
@@ -1197,7 +1204,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &fullpath, &pfvalue TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), filename, USE_STREAM_OPEN_CHECK, &fullpath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         /* If original_stream_open failed, do not try again */
@@ -1252,6 +1259,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     char *           filename = NULL;
     char *           fullpath = NULL;
 
+    fcache_value *   pfvalue  = NULL;
     zend_op_array *  oparray  = NULL;
     ocacheval_list * pentry   = NULL;
     ocache_value *   povalue  = NULL;
@@ -1289,7 +1297,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     /* Use file cache to expand relative paths and also standardize all paths */
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
     /* Make sure all caches can be used regardless of enabled setting */
-    result = aplist_fcache_get(WCG(lfcache), filename, &fullpath, NULL TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), filename, USE_STREAM_OPEN_CHECK, &fullpath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1364,6 +1372,12 @@ Finished:
     {
         alloc_efree(fullpath);
         fullpath = NULL;
+    }
+
+    if(pfvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
     }
 
     if(FAILED(result) && result != FATAL_ZEND_BAILOUT)
@@ -1996,7 +2010,7 @@ PHP_FUNCTION(wincache_file_exists)
     char *         filename = NULL;
     int            flength  = 0;
     char *         respath  = NULL;
-    fcache_value * pvalue   = NULL;
+    fcache_value * pfvalue  = NULL;
     unsigned char  retval   = 0;
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &flength) == FAILURE)
@@ -2006,14 +2020,17 @@ PHP_FUNCTION(wincache_file_exists)
 
     dprintimportant("wincache_file_exists - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    if(flength != 0)
     {
-        retval = 0;
-    }
-    else
-    {
-        retval = 1;
+        result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
+        if(FAILED(result))
+        {
+            retval = 0;
+        }
+        else
+        {
+            retval = 1;
+        }
     }
 
     if(respath != NULL)
@@ -2022,10 +2039,10 @@ PHP_FUNCTION(wincache_file_exists)
         respath = NULL;
     }
 
-    if(pvalue != NULL)
+    if(pfvalue != NULL)
     {
-        aplist_fcache_close(WCG(lfcache), pvalue);
-        pvalue = NULL;
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
     }
 
     if(FAILED(result))
@@ -2053,7 +2070,7 @@ PHP_FUNCTION(wincache_file_get_contents)
     zend_bool      use_include_path = 0;
     char *         fullpath         = NULL;
     char *         respath          = NULL;
-    fcache_value * pvalue           = NULL;
+    fcache_value * pfvalue          = NULL;
     char *         contents         = NULL;
 
     /* TBD?? Call original function if filename contains "://" */
@@ -2074,20 +2091,20 @@ PHP_FUNCTION(wincache_file_get_contents)
         }
     }
 
-    result = aplist_fcache_get(WCG(lfcache), (fullpath == NULL ? filename : fullpath), &respath, &pvalue TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), (fullpath == NULL ? filename : fullpath), USE_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    contents = alloc_estrdup(WCG(lfcache)->pfcache->memaddr + pvalue->file_content);
+    contents = alloc_estrdup(WCG(lfcache)->pfcache->memaddr + pfvalue->file_content);
     if(contents == NULL)
     {
         result = FATAL_OUT_OF_LMEMORY;
         goto Finished;
     }
 
-    RETVAL_STRINGL(contents, pvalue->file_size, 0);
+    RETVAL_STRINGL(contents, pfvalue->file_size, 0);
 
 Finished:
 
@@ -2103,15 +2120,63 @@ Finished:
         respath = NULL;
     }
 
-    if(pvalue != NULL)
+    if(pfvalue != NULL)
     {
-        aplist_fcache_close(WCG(lfcache), pvalue);
-        pvalue = NULL;
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
     }
 
     if(FAILED(result))
     {
         dprintimportant("wincache_file_get_contents failed with error %u", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        RETURN_FALSE;
+    }
+
+    return;
+}
+
+PHP_FUNCTION(wincache_filesize)
+{
+    int            result       = NONFATAL;
+    char *         filename     = NULL;
+    int            filename_len = 0;
+    char *         respath      = NULL;
+    fcache_value * pfvalue      = NULL;
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len) == FAILURE)
+    {
+        return;
+    }
+
+    dprintimportant("wincache_filesize - %s", filename);
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    RETVAL_LONG(pfvalue->file_size);
+
+Finished:
+
+    if(respath != NULL)
+    {
+        alloc_efree(respath);
+        respath = NULL;
+    }
+
+    if(pfvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
+    }
+
+    if(FAILED(result))
+    {
+        dprintimportant("wincache_filesize failed with error %u", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
@@ -2128,7 +2193,7 @@ PHP_FUNCTION(wincache_readfile)
     int            filename_len = 0;
     int            flags        = 0;
     char *         respath      = NULL;
-    fcache_value * pvalue       = NULL;
+    fcache_value * pfvalue      = NULL;
 
     /* TBD?? Call original function if filename contains "://" */
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len, &flags) == FAILURE)
@@ -2138,14 +2203,14 @@ PHP_FUNCTION(wincache_readfile)
 
     dprintimportant("wincache_readfile - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), filename, USE_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    PHPWRITE(WCG(lfcache)->pfcache->memaddr + pvalue->file_content, pvalue->file_size);
-    RETVAL_LONG(pvalue->file_size);
+    PHPWRITE(WCG(lfcache)->pfcache->memaddr + pfvalue->file_content, pfvalue->file_size);
+    RETVAL_LONG(pfvalue->file_size);
 
 Finished:
 
@@ -2155,10 +2220,10 @@ Finished:
         respath = NULL;
     }
 
-    if(pvalue != NULL)
+    if(pfvalue != NULL)
     {
-        aplist_fcache_close(WCG(lfcache), pvalue);
-        pvalue = NULL;
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
     }
 
     if(FAILED(result))
@@ -2200,7 +2265,12 @@ PHP_FUNCTION(wincache_is_readable)
 
     dprintimportant("wincache_is_readable - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2329,7 +2399,12 @@ PHP_FUNCTION(wincache_is_writable)
 
     dprintimportant("wincache_is_writable - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2447,7 +2522,12 @@ PHP_FUNCTION(wincache_is_file)
 
     dprintimportant("wincache_is_file - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2503,7 +2583,12 @@ PHP_FUNCTION(wincache_is_dir)
 
     dprintimportant("wincache_is_dir - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2545,10 +2630,11 @@ Finished:
 /* file_get_contents implemented in tsrm\tsrm_win32.c */
 PHP_FUNCTION(wincache_realpath)
 {
-    int    result       = NONFATAL;
-    char * filename     = NULL;
-    int    filename_len = 0;
-    char * respath      = NULL;
+    int            result        = NONFATAL;
+    char *         filename      = NULL;
+    int            filename_len  = 0;
+    char *         respath       = NULL;
+    fcache_value * pfvalue       = NULL;
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
     {
@@ -2557,7 +2643,7 @@ PHP_FUNCTION(wincache_realpath)
 
     dprintimportant("wincache_realpath - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, &respath, NULL TSRMLS_CC);
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2571,6 +2657,12 @@ Finished:
     {
         alloc_efree(respath);
         respath = NULL;
+    }
+
+    if(pfvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pfvalue);
+        pfvalue = NULL;
     }
 
     if(FAILED(result))

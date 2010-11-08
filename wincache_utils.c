@@ -347,8 +347,10 @@ int utils_apoolpid()
 
     /* Keeping number between 65536 and 99999 to not confuse with regular pids */
     /* 99999 - 65537 = 34462. Code dependent on assumption that apoolpid > 65536 */
+    /* If hashcalc returned a -ve value, make it +ve by subtracting from 0 */
     retval = utils_hashcalc(buffer, buflen);
     retval %= 34462;
+    retval = ((retval < 0) ? (0 - retval) : retval);
     retval += 65537;
 
 Finished:
@@ -389,7 +391,6 @@ unsigned int utils_ticksdiff(unsigned int present, unsigned int past)
     return ticksdiff;
 }
 
-#ifdef PHP_VERSION_52
 /* Copy of php_resolve_path from PHP 5.3 branch for use in PHP 5.2 */
 char * utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC)
 {
@@ -523,7 +524,6 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
 
     return NULL;
 }
-#endif
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...)

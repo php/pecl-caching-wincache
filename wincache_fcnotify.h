@@ -37,10 +37,16 @@
 /* fcnotify_value   - LOCAL */
 /* fcnotify_context - LOCAL */
 
+struct fcnotify_value;
+typedef struct fcnotify_value fcnotify_value;
+
 typedef struct fcnotify_listen fcnotify_listen;
 struct fcnotify_listen
 {
-    char *                  folder_path;   /* Path to folder excluding '\\' */
+    unsigned int            lrefcount;     /* reference count for fcnotify_listen */
+    unsigned int            stopcalled;    /* indicates if handle is getting closed */
+    fcnotify_value *        pfcnvalue;     /* fcnotify_value with pointer to this */
+    char *                  folder_path;   /* path to folder excluding '\\' */
     HANDLE                  folder_handle; /* handle to folder */
     OVERLAPPED              overlapped;    /* overlapped structure */
     BYTE                    fninfo[1024];  /* file notify information */

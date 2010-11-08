@@ -37,6 +37,11 @@
 1.2.0 release:
 - Fixed wordpress plugin install issue which was caused by open folder in distributed file change notification system.
 - Added utils_resolve_path for PHP 5.2 and using it for getting fullpath.
+- Made distributed file notification system more robust.
+- Changed lock usage in aplist_fcache_get.
+- Added wincache_filesize.
+- Using wincache_resolve_path both for 5.2 and 5.3.
+- Added a sample reroute.ini with ann function hooks enabled.
   </notes>
   <contents>
     <dir name="/">

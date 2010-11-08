@@ -144,6 +144,7 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     pvalue->open_based  = 0;
 
     pvalue->is_deleted  = 0;
+    pvalue->is_verified = VERIFICATION_NOTDONE;
     pvalue->absentry    = 0;
     pvalue->same_value  = 0;
     pvalue->prev_value  = 0;

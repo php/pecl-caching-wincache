@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.2.921.0"
+#define PHP_WINCACHE_EXTVER    "1.2.930.0"
 
 /* comment following line for release builds */
 /*#define WINCACHE_DEBUG*/
@@ -113,7 +113,7 @@
 #define OCACHE_SIZE_MINIMUM        15
 #define OCACHE_SIZE_MAXIMUM        255
 #define FCACHE_SIZE_MINIMUM        5
-#define FCACHE_SIZE_MAXIMUM        85
+#define FCACHE_SIZE_MAXIMUM        255
 #define ZCACHE_SIZE_MINIMUM        5
 #define ZCACHE_SIZE_MAXIMUM        85
 #define FILE_SIZE_MINIMUM          10

@@ -1651,7 +1651,7 @@ static int set_lastcheck_time(aplist_context * pcache, const char * filename, un
 
     /* Ok to call aplist_fcache_get with lock acquired when last param is NULL */
     /* If file is not accessible or not present, we will throw an error */
-    result = aplist_fcache_get(pcache, filename, &resolve_path, NULL TSRMLS_CC);
+    result = aplist_fcache_get(pcache, filename, SKIP_STREAM_OPEN_CHECK, &resolve_path, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1685,13 +1685,14 @@ Finished:
 /* If ppvalue is passed as null, this function return the standardized form of */
 /* filename which can include resolve path to absolute path mapping as well */
 /* Make sure this function is called without write lock when ppvalue is non-null */
-int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC)
+int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC)
 {
     int              result   = NONFATAL;
     unsigned int     length   = 0;
     unsigned int     findex   = 0;
     unsigned int     addticks = 0;
     unsigned char    fchanged = 0;
+    unsigned char    flock    = 0;
 
     aplist_value *   pvalue   = NULL;
     fcache_value *   pfvalue  = NULL;
@@ -1711,6 +1712,9 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     /* Look for absolute path in resolve path cache first */
     /* All paths in resolve path cache are resolved using */
     /* include_path and don't need checks against open_basedir */
+    lock_readlock(pcache->aprwlock);
+    flock = 1;
+
     result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
     if(FAILED(result))
     {
@@ -1729,8 +1733,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         /* call is not just to get the fullpath, do a file change check here */
         if(pvalue != NULL && ppvalue != NULL)
         {
-            lock_readlock(pcache->aprwlock);
-
             if(pvalue->fcnotify == 0)
             {
                 if(is_file_changed(pcache, pvalue))
@@ -1763,7 +1765,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
                             }
                             else
                             {
-                                lock_readunlock(pcache->aprwlock);
                                 goto Finished;
                             }
                         }
@@ -1777,24 +1778,23 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
 
                 lock_readunlock(pcache->aprwlock);
                 lock_writelock(pcache->aprwlock);
+                flock = 2;
 
                 /* If the entry is unchanged during lock change, remove it from hashtable */
+                /* Deleting the aplist entry will delete rplist entries as well */
                 if(pvalue->add_ticks == addticks)
                 {
                     findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
                     remove_aplist_entry(pcache, findex, pvalue);
-                    pvalue   = NULL;
-
-                    /* Deleting the aplist entry will delete rplist entries as well */
-                    rpvalue  = NULL;
-                    resentry = 0;
                 }
 
+                /* These values should not be used as they belong to changed file */
+                pvalue   = NULL;
+                rpvalue  = NULL;
+                resentry = 0;
+
                 lock_writeunlock(pcache->aprwlock);
-            }
-            else
-            {
-                lock_readunlock(pcache->aprwlock);
+                flock = 0;
             }
         }
 
@@ -1811,16 +1811,19 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         }
     }
 
+    if(flock == 1)
+    {
+        lock_readunlock(pcache->aprwlock);
+        flock = 0;
+    }
+
+    _ASSERT(flock == 0);
+
     /* If no valid absentry is found so far, get the fullpath from php-core */
     if(pvalue == NULL)
     {
-#ifdef PHP_VERSION_52
         /* Get fullpath by using copy of php_resolve_path */
         fullpath = utils_resolve_path(filename, strlen(filename), PG(include_path) TSRMLS_CC);
-#else
-        /* Get fullpath using original_resolve_path */
-        fullpath = original_resolve_path(filename, strlen(filename) TSRMLS_CC);
-#endif
         if(fullpath == NULL)
         {
             result = WARNING_ORESOLVE_FAILURE;
@@ -1858,35 +1861,59 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     }
 
     lock_readlock(pcache->aprwlock);
+    flock = 1;
+
     if(pvalue->fcacheval == 0)
     {
         lock_readunlock(pcache->aprwlock);
-        if(rpvalue == NULL)
+        flock = 0;
+
+        if(usesopen == USE_STREAM_OPEN_CHECK)
         {
-            /* Do a check by calling original stream open function */
-            result = original_stream_open_function(fullpath, &fhandle TSRMLS_CC);
-            if(result != SUCCESS)
+            if(rpvalue == NULL || rpvalue->is_verified == VERIFICATION_NOTDONE)
             {
-                result = FATAL_FCACHE_ORIGINAL_OPEN;
-                goto Finished;
-            }
+                /* Do a check for include_path, open_basedir validity */
+                /* by calling original stream open function */
+                result = original_stream_open_function(fullpath, &fhandle TSRMLS_CC);
 
-            if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
-            {
-                fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
-                fhandle.handle.stream.handle = NULL;
-            }
+                /* Set is_verified status in rpvalue */
+                if(rpvalue != NULL)
+                {
+                    InterlockedExchange(&rpvalue->is_verified, ((result == SUCCESS) ? VERIFICATION_PASSED : VERIFICATION_FAILED));
+                }
 
-            if(fhandle.opened_path)
-            {
-                efree(fhandle.opened_path);
-                fhandle.opened_path = NULL;
-            }
+                if(result != SUCCESS)
+                {
+                    result = FATAL_FCACHE_ORIGINAL_OPEN;
+                    goto Finished;
+                }
 
-            if(fhandle.free_filename && fhandle.filename)
+                if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
+                {
+                    fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
+                    fhandle.handle.stream.handle = NULL;
+                }
+
+                if(fhandle.opened_path)
+                {
+                    efree(fhandle.opened_path);
+                    fhandle.opened_path = NULL;
+                }
+
+                if(fhandle.free_filename && fhandle.filename)
+                {
+                    efree(fhandle.filename);
+                    fhandle.filename = NULL;
+                }
+            }
+            else
             {
-                efree(fhandle.filename);
-                fhandle.filename = NULL;
+                /* Fail if is_verified is set to verification failed */
+                if(rpvalue->is_verified == VERIFICATION_FAILED)
+                {
+                    result = FATAL_FCACHE_ORIGINAL_OPEN;
+                    goto Finished;
+                }
             }
         }
 
@@ -1897,6 +1924,8 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         }
 
         lock_writelock(pcache->aprwlock);
+        flock = 2;
+
         if(pvalue->fcacheval == 0)
         {
             pvalue->fcacheval = fcache_getoffset(pcache->pfcache, pfvalue);
@@ -1914,6 +1943,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
         
         lock_writeunlock(pcache->aprwlock);
         lock_readlock(pcache->aprwlock);
+        flock = 1;
     }
     else
     {
@@ -1943,10 +1973,22 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, char ** pp
     *ppfullpath = fullpath;
 
     lock_readunlock(pcache->aprwlock);
+    flock = 0;
  
     _ASSERT(SUCCEEDED(result));
 
 Finished:
+
+    if(flock == 1)
+    {
+        lock_readunlock(pcache->aprwlock);
+        flock = 0;
+    }
+    else if(flock == 2)
+    {
+        lock_writeunlock(pcache->aprwlock);
+        flock = 0;
+    }
 
     if(FAILED(result))
     {

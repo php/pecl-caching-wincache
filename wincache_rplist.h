@@ -38,6 +38,10 @@
 /* rplist_header  - SHARED */
 /* rplist_context - LOCAL  */
 
+#define VERIFICATION_NOTDONE 0
+#define VERIFICATION_PASSED  1
+#define VERIFICATION_FAILED  2
+
 typedef struct rplist_value rplist_value;
 struct rplist_value
 {
@@ -47,6 +51,7 @@ struct rplist_value
     size_t             open_based; /* open_basedir set */
 
     unsigned int       is_deleted; /* If set to 1, entry is marked deleted */
+    unsigned int       is_verified;/* entry passed openbased check status */
     size_t             absentry;   /* offset of entry in aplist */
     size_t             same_value; /* rplist entry pointing to same absentry */
     size_t             prev_value; /* previous rplist_value offset */

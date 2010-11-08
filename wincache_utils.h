@@ -42,10 +42,7 @@ extern int          utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC)
 extern int          utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer, unsigned int length);
 extern int          utils_apoolpid();
 extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
-
-#ifdef PHP_VERSION_52
 extern char *       utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC);
-#endif
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);

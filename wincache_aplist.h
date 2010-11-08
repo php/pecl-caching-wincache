@@ -37,6 +37,10 @@
 /* aplist_value   - SHARED */
 /* aplist_header  - SHARED */
 /* aplist_context - LOCAL */
+
+#define USE_STREAM_OPEN_CHECK         1
+#define SKIP_STREAM_OPEN_CHECK        0
+
 typedef struct aplist_value aplist_value;
 struct aplist_value
 {
@@ -136,7 +140,7 @@ extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS
 extern void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename);
 
 extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC);
-extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
+extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
 extern int  aplist_fcache_use(aplist_context * pcache, const char * fullpath, fcache_value * pvalue, zend_file_handle ** pphandle);
 extern void aplist_fcache_close(aplist_context * pcache, fcache_value * pvalue);
 
