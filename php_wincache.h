@@ -70,7 +70,8 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned int             fcchkfreq;   /* File change check frequency in seconds */
     unsigned int             ttlmax;      /* Seconds a cache entry can stay dormant */
     detours_context *        detours;     /* Function and class detours set */
-
+                                          /* Pointer to the original rmdir function */
+    void                    (*orig_rmdir)(INTERNAL_FUNCTION_PARAMETERS);
     zend_bool                enablecli;   /* Enable wincache for command line sapi */
     zend_bool                fcenabled;   /* File cache enabled or disabled */
     unsigned int             fcachesize;  /* File cache size in MBs */
@@ -131,5 +132,10 @@ extern char * wincache_resolve_path(const char * filename, int filename_len TSRM
 extern int wincache_stream_open_function(const char * filename, zend_file_handle * file_handle TSRMLS_DC);
 extern zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type TSRMLS_DC);
 extern void wincache_error_cb(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
+
+extern void wincache_intercept_functions_init(TSRMLS_DC);
+extern void wincache_intercept_functions_shutdown(TSRMLS_DC);
+extern void wincache_save_orig_functions(TSRMLS_DC);
+
 
 #endif /* _PHP_WINCACHE_H_ */

@@ -112,7 +112,7 @@ static void WINAPI process_change_notification(aplist_context * pcache, fcnotify
     dprintverbose("start process_change_notification");
 
     _ASSERT(plistener   != NULL);
-    _ASSERT(poverlapped != NULL);
+ //   _ASSERT(poverlapped != NULL);
 
     /* Async IO completed. Update refcount to reflect that */
     listener_refdec(plistener);
@@ -337,7 +337,7 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
     ZeroMemory(plistener, sizeof(fcnotify_listen));
 
     /* Set initial refcount and pointer to fcnotify_value */
-    plistener->lrefcount  = 1;
+    plistener->lrefcount  = 0;
     plistener->pfcnvalue  = pvalue;
 
     /* Open folder_path and attach it to completion port */
@@ -423,11 +423,7 @@ static void listener_refdec(fcnotify_listen * plistener)
 {
     if(InterlockedDecrement(&plistener->lrefcount) == 0)
     {
-        if(plistener->folder_handle != INVALID_HANDLE_VALUE)
-        {
-            CloseHandle(plistener->folder_handle);
-            plistener->folder_handle = INVALID_HANDLE_VALUE;
-        }
+        unregister_directory_changes(plistener);
 
         if(plistener->folder_path != NULL)
         {
@@ -435,6 +431,8 @@ static void listener_refdec(fcnotify_listen * plistener)
             plistener->folder_path = NULL;
         }
 
+        // Set listener to null to rehook change notification if this folder is re-added before scavenger run
+        plistener->pfcnvalue->plistener = NULL;
         alloc_pefree(plistener);
         plistener = NULL;
     }
@@ -611,6 +609,39 @@ Finished:
     }
 
     dprintverbose("end fcnotify_create");
+
+    return result;
+}
+
+int fcnotify_getdata(fcnotify_context *pnotify, const char * folderpath, fcnotify_value ** ppvalue)
+{
+    int                 result    = NONFATAL;
+    int                 index     = 0;
+    fcnotify_value *    pvalue    = NULL;
+
+    dprintverbose("start fcnotify_getdata");
+
+    *ppvalue = NULL;
+
+    /* Look if folder path is present in cache */
+    index = utils_getindex(folderpath, pnotify->fcheader->valuecount);
+    result = findfolder_in_cache(pnotify, folderpath, index, &pvalue);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    *ppvalue = pvalue;
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in fcnotify_getdata", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+    }
+
+    dprintverbose("end fcnotify_getdata");
 
     return result;
 }
@@ -1071,7 +1102,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     {
         /* Check if this entry has a valid non-null listener */
         /* If not, make the function hook up change notification again */
-        if(pvalue->plistener == NULL)
+        if(pvalue->plistener == NULL && folderpath != NULL)
         {
             listenp = 1;
             reusecount = pvalue->reusecount;

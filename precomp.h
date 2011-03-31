@@ -35,10 +35,10 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.2.930.0"
+#define PHP_WINCACHE_EXTVER    "1.2.331.0"
 
 /* comment following line for release builds */
-/*#define WINCACHE_DEBUG*/
+/* #define WINCACHE_DEBUG */
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)

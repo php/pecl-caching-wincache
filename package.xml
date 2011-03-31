@@ -42,7 +42,7 @@
 - Changed lock usage in aplist_fcache_get.
 - Added wincache_filesize.
 - Using wincache_resolve_path both for 5.2 and 5.3.
-- Added a sample reroute.ini with ann function hooks enabled.
+- Added a overwritten rmdir function that waits until all file change notification handles are closed on a directory
   </notes>
   <contents>
     <dir name="/">
