@@ -53,4 +53,5 @@ if (PHP_WINCACHE != "no") {
 
     ADD_FLAG('CFLAGS_WINCACHE', '/GS');
     //ADD_FLAG('CFLAGS_WINCACHE', '/WX');
+    CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
 }

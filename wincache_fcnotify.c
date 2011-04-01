@@ -30,7 +30,7 @@
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
    +----------------------------------------------------------------------------------------------+
 */
-
+#define   _WIN32_WINNT   0x0500
 #include "precomp.h"
 
 #define PROCESS_IS_ALIVE              0
