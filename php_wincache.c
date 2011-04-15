@@ -37,6 +37,7 @@
 #define OCENABLED_INDEX_IN_GLOBALS  1
 #define FCENABLED_INDEX_IN_GLOBALS  0
 #define LOCK_KEY_MAXLEN             150
+#define RMDIR_WAIT_TIME             1000
 
 /* START OF PHP EXTENSION MACROS STUFF */
 PHP_MINIT_FUNCTION(wincache);
@@ -2647,6 +2648,7 @@ WINCACHE_FUNC(wincache_rmdir)
     unsigned char      retval       = 1;
     aplist_context *   pcache       = NULL;
     fcnotify_value *   pfcvalue     = NULL;
+    unsigned int       sticks       = 0;
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &dirname, &dirname_len) == FAILURE)
     {
@@ -2680,10 +2682,18 @@ WINCACHE_FUNC(wincache_rmdir)
     dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
     WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
+    sticks = GetTickCount();
     while(pfcvalue != NULL && pfcvalue->plistener != NULL)
     {
-        dprintimportant("Waiting for file change listener to close");
+        dprintimportant("wincache_rmdir: Waiting for file change listener to close");
         Sleep(50);
+
+        // If it takes more than 1 second then exit to prevent process hangs.
+        if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
+        {
+            dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");
+            break; 
+        }
     }
 
 Finished:

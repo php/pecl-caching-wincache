@@ -41,14 +41,14 @@
 #define PALIVECHK_FREQUENCY           1000
 
 static unsigned int WINAPI change_notification_thread(void * parg);
-static void WINAPI process_change_notification(aplist_context * pcache, fcnotify_listen * plistener, unsigned int dwerror, unsigned int bytecount);
+static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnotify_listen * plistener, unsigned int dwerror, unsigned int bytecount);
 static int  findfolder_in_cache(fcnotify_context * pnotify, const char * folderpath, unsigned int index, fcnotify_value ** ppvalue);
 static void unregister_directory_changes(fcnotify_listen * plistener);
-static unsigned int register_directory_changes(fcnotify_listen * plistener);
+static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnotify_listen * plistener);
 
 static int  create_fcnotify_data(fcnotify_context * pnotify, const char * folderpath, fcnotify_value ** ppvalue);
 static void listener_refinc(fcnotify_listen * plistener);
-static void listener_refdec(fcnotify_listen * plistener);
+static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * plistener);
 static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * pvalue);
 static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
 static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
@@ -91,15 +91,15 @@ static unsigned int WINAPI change_notification_thread(void * parg)
             _ASSERT(plistener != NULL);
 
             listener_refinc(plistener);
-            process_change_notification(pnotify->fcaplist, plistener, dwerror, bytecount);
-            listener_refdec(plistener);
+            process_change_notification(pnotify, plistener, dwerror, bytecount);
+            listener_refdec(pnotify, plistener);
         }
     }
 
     return ERROR_SUCCESS;
 }
 
-static void WINAPI process_change_notification(aplist_context * pcache, fcnotify_listen * plistener, unsigned int dwerror, unsigned int bytecount)
+static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnotify_listen * plistener, unsigned int dwerror, unsigned int bytecount)
 {
     HRESULT                   hr         = S_OK;
     int                       result     = NONFATAL;
@@ -115,7 +115,7 @@ static void WINAPI process_change_notification(aplist_context * pcache, fcnotify
  //   _ASSERT(poverlapped != NULL);
 
     /* Async IO completed. Update refcount to reflect that */
-    listener_refdec(plistener);
+    listener_refdec(pnotify, plistener);
 
     if(plistener->stopcalled)
     {
@@ -128,8 +128,10 @@ static void WINAPI process_change_notification(aplist_context * pcache, fcnotify
         {
             /* Unregister change notification and set plistener to NULL to */
             /* make system set a new change notification system if required */
+            lock_writelock(pnotify->fclock);
             unregister_directory_changes(plistener);
             plistener->pfcnvalue->plistener = NULL;
+            lock_writeunlock(pnotify->fclock);
         }
 
         goto Finished;
@@ -163,7 +165,7 @@ static void WINAPI process_change_notification(aplist_context * pcache, fcnotify
             }
 
             dprintalways("received change notification for file = %s\\%s", plistener->folder_path, pfname);
-            aplist_mark_changed(pcache, plistener->folder_path, pfname);
+            aplist_mark_changed(pnotify->fcaplist, plistener->folder_path, pfname);
 
             alloc_pefree(pwchar);
             pwchar = NULL;
@@ -179,7 +181,7 @@ static void WINAPI process_change_notification(aplist_context * pcache, fcnotify
 
         /* register for change notification again */
         /* If bytecount was 0, no need to register again */
-        register_directory_changes(plistener);
+        register_directory_changes(pnotify, plistener);
     }
 
 Finished:
@@ -244,7 +246,7 @@ static void unregister_directory_changes(fcnotify_listen * plistener)
     }
 }
 
-static unsigned int register_directory_changes(fcnotify_listen * plistener)
+static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnotify_listen * plistener)
 {
     unsigned int cflags    = 0;
     unsigned int bytecount = 0;
@@ -263,7 +265,7 @@ static unsigned int register_directory_changes(fcnotify_listen * plistener)
 
     if(!result)
     {
-        listener_refdec(plistener);
+        listener_refdec(pnotify, plistener);
     }
 
     return result;
@@ -359,7 +361,7 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
         goto Finished;
     }
 
-    rdcresult = register_directory_changes(plistener);
+    rdcresult = register_directory_changes(pnotify, plistener);
     if(!rdcresult)
     {
         result = FATAL_FCNOTIFY_RDCFAILURE;
@@ -419,10 +421,12 @@ static void listener_refinc(fcnotify_listen * plistener)
 }
 
 __inline
-static void listener_refdec(fcnotify_listen * plistener)
+static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * plistener)
 {
     if(InterlockedDecrement(&plistener->lrefcount) == 0)
     {
+        lock_writelock(pnotify->fclock);
+
         unregister_directory_changes(plistener);
 
         if(plistener->folder_path != NULL)
@@ -435,6 +439,8 @@ static void listener_refdec(fcnotify_listen * plistener)
         plistener->pfcnvalue->plistener = NULL;
         alloc_pefree(plistener);
         plistener = NULL;
+
+        lock_writeunlock(pnotify->fclock);
     }
 }
 

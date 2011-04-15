@@ -15,13 +15,13 @@
     <name>Venkat Raman Don</name>
     <user>donraman</user>
     <email>don.raman@microsoft.com</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <lead>
     <name>Kanwaljeet Singla</name>
     <user>ksingla</user>
     <email>ksingla@microsoft.com</email>
-    <active>yes</active>
+    <active>no</active>
   </lead>
   <date>2010-06-30</date>
   <version>
@@ -43,6 +43,8 @@
 - Added wincache_filesize.
 - Using wincache_resolve_path both for 5.2 and 5.3.
 - Added a overwritten rmdir function that waits until all file change notification handles are closed on a directory
+- Added a 1 sec timeout to the overwritten rmdir function in order to avoid process hang
+- Fixed an access violation bug caused by concurrent access to the file change notification listener
   </notes>
   <contents>
     <dir name="/">
