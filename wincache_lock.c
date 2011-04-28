@@ -227,9 +227,8 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             plock->haccess = CreateMutex(NULL, FALSE, objname);
             if(plock->haccess == NULL)
             {
-                error_setlasterror();
+                dprintimportant("Failed to create lock %s due to error %u", objname, error_setlasterror());
                 result = FATAL_LOCK_INIT_CREATEMUTEX;
-                
                 goto Finished;
             }
 
@@ -244,7 +243,7 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             plock->hcanread = CreateEvent(NULL, TRUE, TRUE, objname);
             if(plock->hcanread == NULL)
             {
-                error_setlasterror();
+                dprintimportant("Failed to create lock %s due to error %u", objname, error_setlasterror());
                 result = FATAL_LOCK_INIT_CREATEEVENT;
 
                 goto Finished;
@@ -254,7 +253,7 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             plock->hcanwrite = CreateEvent(NULL, TRUE, TRUE, objname);
             if(plock->hcanwrite == NULL)
             {
-                error_setlasterror();
+                dprintimportant("Failed to create lock %s due to error %u", objname, error_setlasterror());
                 result = FATAL_LOCK_INIT_CREATEEVENT;
 
                 goto Finished;
@@ -264,9 +263,8 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             plock->hxwrite = CreateMutex(NULL, FALSE, objname);
             if(plock->hxwrite == NULL)
             {
-                error_setlasterror();
+                dprintimportant("Failed to create lock %s due to error %u", objname, error_setlasterror());
                 result = FATAL_LOCK_INIT_CREATEMUTEX;
-                
                 goto Finished;
             }
 
@@ -281,6 +279,7 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             plock->hxwrite = CreateMutex(NULL, FALSE, objname);
             if( plock->hxwrite == NULL )
             {
+                dprintimportant("Failed to create lock %s due to error %u", objname, error_setlasterror());
                 result = FATAL_LOCK_INIT_CREATEMUTEX;
                 goto Finished;
             }
@@ -403,7 +402,7 @@ void lock_readlock(lock_context * plock)
     long   rcount    = 0;
     HANDLE hArray[2];
 
-    dprintdecorate("start lock_readlock");
+    dprintverbose("start lock_readlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -439,7 +438,7 @@ void lock_readlock(lock_context * plock)
 
     plock->state = LOCK_STATE_READLOCK;
 
-    dprintdecorate("end lock_readlock");
+    dprintverbose("end lock_readlock");
     return;
 }
 
@@ -448,7 +447,7 @@ void lock_readunlock(lock_context * plock)
 {
     long rcount = 0;
 
-    dprintdecorate("start lock_readunlock");
+    dprintverbose("start lock_readunlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -484,7 +483,7 @@ void lock_readunlock(lock_context * plock)
 
     plock->state = LOCK_STATE_UNLOCKED;
 
-    dprintdecorate("end lock_readunlock");
+    dprintverbose("end lock_readunlock");
     return;
 }
 
@@ -493,7 +492,7 @@ void lock_writelock(lock_context * plock)
 {
     HANDLE hArray[3] = {0};
 
-    dprintdecorate("start lock_writelock");
+    dprintverbose("start lock_writelock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -529,14 +528,14 @@ void lock_writelock(lock_context * plock)
 
     plock->state = LOCK_STATE_WRITELOCK;
 
-    dprintdecorate("end lock_writelock");
+    dprintverbose("end lock_writelock");
     return;
 }
 
 /* Release write lock */
 void lock_writeunlock(lock_context * plock)
 {
-    dprintdecorate("start lock_writeunlock");
+    dprintverbose("start lock_writeunlock");
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -568,7 +567,7 @@ void lock_writeunlock(lock_context * plock)
 
     plock->state = LOCK_STATE_UNLOCKED;
 
-    dprintdecorate("end lock_writeunlock");
+    dprintverbose("end lock_writeunlock");
     return;
 }
 

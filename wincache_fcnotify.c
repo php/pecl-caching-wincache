@@ -619,7 +619,7 @@ Finished:
     return result;
 }
 
-int fcnotify_getdata(fcnotify_context *pnotify, const char * folderpath, fcnotify_value ** ppvalue)
+int fcnotify_listenerexists(fcnotify_context *pnotify, const char * folderpath, unsigned char * listenerexists)
 {
     int                 result    = NONFATAL;
     int                 index     = 0;
@@ -627,7 +627,9 @@ int fcnotify_getdata(fcnotify_context *pnotify, const char * folderpath, fcnotif
 
     dprintverbose("start fcnotify_getdata");
 
-    *ppvalue = NULL;
+    *listenerexists = 0;
+
+    lock_readlock(pnotify->fclock);
 
     /* Look if folder path is present in cache */
     index = utils_getindex(folderpath, pnotify->fcheader->valuecount);
@@ -637,7 +639,11 @@ int fcnotify_getdata(fcnotify_context *pnotify, const char * folderpath, fcnotif
         goto Finished;
     }
 
-    *ppvalue = pvalue;
+    // Check if listener for this folder still exists
+    if (pvalue != NULL && pvalue->plistener != NULL)
+    {
+        *listenerexists = 1;
+    }
 
 Finished:
 
@@ -646,6 +652,8 @@ Finished:
         dprintimportant("failure %d in fcnotify_getdata", result);
         _ASSERT(result > WARNING_COMMON_BASE);
     }
+
+    lock_readunlock(pnotify->fclock);
 
     dprintverbose("end fcnotify_getdata");
 

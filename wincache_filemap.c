@@ -75,7 +75,7 @@ static unsigned int getppid(TSRMLS_D)
         goto Finished;
     }
 
-    /* Use CRC of apppoolname as ppid if available */
+    /* Use CRC of user provided apppoolid as ppid if available */
     poolpid = utils_apoolpid();
     if(poolpid != -1)
     {

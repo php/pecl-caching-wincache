@@ -123,7 +123,7 @@ extern void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigne
 extern int  fcnotify_getinfo(fcnotify_context * pcache, zend_bool summaryonly, fcnotify_info ** ppinfo);
 extern void fcnotify_freeinfo(fcnotify_info * pinfo);
 
-extern int fcnotify_getdata(fcnotify_context *pnotify, const char * folderpath, fcnotify_value ** ppvalue);
+extern int fcnotify_listenerexists(fcnotify_context *pnotify, const char * folderpath, unsigned char* listenerexists);
 
 extern void fcnotify_runtest();
 

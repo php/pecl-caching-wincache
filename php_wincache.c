@@ -2641,21 +2641,21 @@ Finished:
 WINCACHE_FUNC(wincache_rmdir)
 {
     int                result       = NONFATAL;
-    char *             dirname     = NULL;
-    int                dirname_len = 0;
+    char *             dirname      = NULL;
+    int                dirname_len  = 0;
     char *             respath      = NULL;
     fcache_value *     pvalue       = NULL;
     unsigned char      retval       = 1;
     aplist_context *   pcache       = NULL;
-    fcnotify_value *   pfcvalue     = NULL;
     unsigned int       sticks       = 0;
+    unsigned char      lexists      = 0;
+
+    dprintverbose("start wincache_rmdir");
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &dirname, &dirname_len) == FAILURE)
     {
         return;
     }
-
-    dprintimportant("wincache_rmdir - %s", dirname);
 
     if(dirname_len == 0)
     {
@@ -2670,29 +2670,41 @@ WINCACHE_FUNC(wincache_rmdir)
         goto Finished;
     }
 
-    if(pcache->pnotify != NULL)
-    {
-        result = fcnotify_getdata(pcache->pnotify, respath, &pfcvalue);
-    }
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
     dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
     WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-    sticks = GetTickCount();
-    while(pfcvalue != NULL && pfcvalue->plistener != NULL)
+    if (pcache->pnotify != NULL)
     {
-        dprintimportant("wincache_rmdir: Waiting for file change listener to close");
-        Sleep(50);
-
-        // If it takes more than 1 second then exit to prevent process hangs.
-        if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
+        sticks = GetTickCount();
+        
+        while(1)
         {
-            dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");
-            break; 
+            lexists = 1;
+
+            result = fcnotify_listenerexists(pcache->pnotify, respath, &lexists);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+
+            if (lexists)
+            {
+                // If listener still exists then wait until it is cleared out by file change notification thread
+                dprintimportant("wincache_rmdir: Waiting for file change listener to close");
+                Sleep(50);
+            }
+            else
+            {
+                // If listener does not exist for this directory then stop waiting.
+                break;
+            }
+
+            // If it takes more than 1 second then exit to prevent process hangs.
+            if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
+            {
+                dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");
+                break; 
+            }
         }
     }
 
@@ -2716,6 +2728,8 @@ Finished:
         _ASSERT(result > WARNING_COMMON_BASE);
         RETURN_FALSE;
     }
+
+    dprintverbose("end wincache_rmdir");
 }
 
 /* file_get_contents implemented in tsrm\tsrm_win32.c */
