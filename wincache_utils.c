@@ -322,6 +322,8 @@ Finished:
 int utils_apoolpid()
 {
     int          retval = -1;
+    char *       buffer = NULL;
+    unsigned int buflen = 0;
 
     dprintverbose("start utils_apoolpid");
 
@@ -329,14 +331,41 @@ int utils_apoolpid()
     {
         dprintverbose("using apppoolid");
         retval = utils_hashcalc(WCG(apppoolid), strlen(WCG(apppoolid)));
+    } else {
+        buflen = GetEnvironmentVariable("APP_POOL_ID", NULL, 0);
+        if(buflen == 0)
+        {
+            goto Finished;
+        }
 
-        /* Keeping number between 65536 and 99999 to not confuse with regular pids */
-        /* 99999 - 65537 = 34462. Code dependent on assumption that apoolpid > 65536 */
+        buffer = (char *)alloc_pemalloc(buflen);
+        if(buffer == NULL)
+        {
+            goto Finished;
+        }
+
+        buflen = GetEnvironmentVariable("APP_POOL_ID", buffer, buflen);
+        if(buflen == 0)
+        {
+            goto Finished;
+        }
+
+        /* Keeping number between 99999 and 999999 to not confuse with regular pids */
+        /* 999999 - 100000 = 899999. Code dependent on assumption that apoolpid > 99999 */
         /* If hashcalc returned a -ve value, make it +ve by subtracting from 0 */
+        retval = utils_hashcalc(buffer, buflen);
+    }
 
-        retval %= 34462;
-        retval = ((retval < 0) ? (0 - retval) : retval);
-        retval += 65537;
+    retval %= 899999;
+    retval = ((retval < 0) ? (0 - retval) : retval);
+    retval += 100000;
+
+Finished:
+
+    if(buffer != NULL)
+    {
+        alloc_pefree(buffer);
+        buffer = NULL;
     }
 
     dprintverbose("end utils_apoolpid");

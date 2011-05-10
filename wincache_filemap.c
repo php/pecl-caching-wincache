@@ -767,9 +767,9 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
 
     size = size_mb * 1024 * 1024;
 
-    /* If parentpid is greater than 65536, use shmfilepath */
+    /* If parentpid is greater than 99999, use shmfilepath */
     /* Else don't create file backed shared memory */
-    if(WCG(fmapgdata)->ppid <= 65536)
+    if(WCG(fmapgdata)->ppid <= 99999)
     {
         shmfilepath = NULL;
     }

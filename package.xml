@@ -45,6 +45,7 @@
 - Added a overwritten rmdir function that waits until all file change notification handles are closed on a directory
 - Added a 1 sec timeout to the overwritten rmdir function in order to avoid process hang
 - Fixed an access violation bug caused by concurrent access to the file change notification listener
+- Fixed an access violation bug caused by naming collision when creating mutex objects
   </notes>
   <contents>
     <dir name="/">

@@ -625,7 +625,7 @@ int fcnotify_listenerexists(fcnotify_context *pnotify, const char * folderpath, 
     int                 index     = 0;
     fcnotify_value *    pvalue    = NULL;
 
-    dprintverbose("start fcnotify_getdata");
+    dprintverbose("start fcnotify_listenerexists");
 
     *listenerexists = 0;
 
@@ -649,13 +649,13 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in fcnotify_getdata", result);
+        dprintimportant("failure %d in fcnotify_listenerexists", result);
         _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     lock_readunlock(pnotify->fclock);
 
-    dprintverbose("end fcnotify_getdata");
+    dprintverbose("end fcnotify_listenerexists");
 
     return result;
 }

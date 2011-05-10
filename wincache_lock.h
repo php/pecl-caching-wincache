@@ -34,7 +34,7 @@
 #ifndef _WINCACHE_LOCK_H_
 #define _WINCACHE_LOCK_H_
 
-#define PID_MAX_LENGTH          5     /* 99999 being maximum */
+#define PID_MAX_LENGTH          6     /* 999999 being maximum */
 #define LOCK_WAIT_TIMEOUT       200   /* Wait timeout is 200 ms */
 #define LOCK_NUMBER_MAXIMUM     65535 /* Maximum number of instances for same type */
 #define LOCK_NUMBER_MAX_STRLEN  5     /* 65535 is the maximum cachekey supported */

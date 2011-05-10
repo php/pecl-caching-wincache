@@ -49,7 +49,7 @@
 /* won't work for per site php.ini configuration. We will end up sharing the */
 /* cache with all processes which won't be too bad either */
 
-#define PID_MAX_LENGTH                          5   /* 99999 is the max value */
+#define PID_MAX_LENGTH                          6   /* 999999 is the max value */
 #define READWRITE_LOCK_MAX_COUNT                20  /* NOT USED */
 
 #define FILEMAP_TYPE_INVALID                    0   /* Invalid value */
