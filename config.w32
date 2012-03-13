@@ -42,6 +42,7 @@ if (PHP_WINCACHE != "no") {
                            wincache_zvcache.c wincache_session.c wincache_detours.c \
                            wincache_fcnotify.c");
 
+    ADD_EXTENSION_DEP('memcache', 'session');
     AC_DEFINE('HAVE_WINCACHE', 1);
 
     ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
