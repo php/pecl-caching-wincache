@@ -180,9 +180,9 @@ unsigned int utils_getindex(const char * filename, unsigned int numfiles)
     return hash;
 }
 
-char * utils_filepath(zend_file_handle * file_handle)
+const char * utils_filepath(zend_file_handle * file_handle)
 {
-    char * pchar = NULL;
+    const char * pchar = NULL;
 
     dprintverbose("start utils_filepath");
     _ASSERT(file_handle != NULL);
@@ -244,7 +244,7 @@ int utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC)
 {
     int          result   = NONFATAL;
     unsigned int cwdlen   = 0;
-    char *       execname = NULL;
+    const char * execname = NULL;
     unsigned int execlen  = 0;
 
     dprintverbose("start utils_cwdcxec");
@@ -494,7 +494,7 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
     /* check in calling scripts' current working directory as a fall back case
      */
     if (zend_is_executing(TSRMLS_C)) {
-        char *exec_fname = zend_get_executed_filename(TSRMLS_C);
+        const char *exec_fname = zend_get_executed_filename(TSRMLS_C);
         int exec_fname_length = strlen(exec_fname);
 
         while ((--exec_fname_length >= 0) && !IS_SLASH(exec_fname[exec_fname_length]));

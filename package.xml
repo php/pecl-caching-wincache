@@ -23,9 +23,15 @@
     <email>ksingla@microsoft.com</email>
     <active>no</active>
   </lead>
-  <date>2010-06-30</date>
+  <lead>
+    <name>Eric Stenson</name>
+    <user>ericsten</user>
+    <email>ericsten@php.net</email>
+    <active>yes</active>
+  </lead>
+  <date>2012-04-24</date>
   <version>
-    <release>1.2.0</release>
+    <release>1.3.0</release>
     <api>1.2.0</api>
   </version>
   <stability>
@@ -34,18 +40,14 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-1.2.0 release:
-- Added functionality to supply wincache with APP_POOL_ID. Patch provided by Richard Quadling.
-- Fixed wordpress plugin install issue which was caused by open folder in distributed file change notification system.
-- Added utils_resolve_path for PHP 5.2 and using it for getting fullpath.
-- Made distributed file notification system more robust.
-- Changed lock usage in aplist_fcache_get.
-- Added wincache_filesize.
-- Using wincache_resolve_path both for 5.2 and 5.3.
-- Added a overwritten rmdir function that waits until all file change notification handles are closed on a directory
-- Added a 1 sec timeout to the overwritten rmdir function in order to avoid process hang
-- Fixed an access violation bug caused by concurrent access to the file change notification listener
-- Fixed an access violation bug caused by naming collision when creating mutex objects
+1.3.0 release:
+- Added support for PHP 5.4, which includes support for the following:
+  * Zend Engine 2.4 structures (znode_op, zend_class_entry, etc.).
+  * Interned strings.
+  * Stop hooking zend_stream_open_function, due to breaking change in Zend 2.4.
+  * Removed PG(safe_mode) and php_checkuid() checks for Zend 2.4.
+- Cleaned up const compiler warnings.
+- Cleaned up random comments to make them PECL coding standards conformant.
   </notes>
   <contents>
     <dir name="/">
@@ -80,12 +82,14 @@
       <file role="src" name="wincache_opcopy.h"/>
       <file role="src" name="wincache_rplist.c"/>
       <file role="src" name="wincache_rplist.h"/>
+      <file role="src" name="wincache_session.h"/>
+      <file role="src" name="wincache_session.c"/>
+      <file role="src" name="wincache_string.c"/>
+      <file role="src" name="wincache_string.h"/>
       <file role="src" name="wincache_utils.c"/>
       <file role="src" name="wincache_utils.h"/>
       <file role="src" name="wincache_zvcache.h"/>
       <file role="src" name="wincache_zvcache.c"/>
-      <file role="src" name="wincache_session.h"/>
-      <file role="src" name="wincache_session.c"/>
       <file role="php" name="wincache.php"/>
     </dir>
   </contents>
@@ -102,6 +106,32 @@
   <providesextension>wincache</providesextension>
   <extsrcrelease/>
   <changelog>
+  <release>
+    <date>2010-06-30</date>
+    <version>
+      <release>1.2.0</release>
+      <api>1.2.0</api>
+    </version>
+    <stability>
+      <release>beta</release>
+      <api>beta</api>
+    </stability>
+    <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
+    <notes>
+1.2.0 release:
+- Added functionality to supply wincache with APP_POOL_ID. Patch provided by Richard Quadling.
+- Fixed wordpress plugin install issue which was caused by open folder in distributed file change notification system.
+- Added utils_resolve_path for PHP 5.2 and using it for getting fullpath.
+- Made distributed file notification system more robust.
+- Changed lock usage in aplist_fcache_get.
+- Added wincache_filesize.
+- Using wincache_resolve_path both for 5.2 and 5.3.
+- Added a overwritten rmdir function that waits until all file change notification handles are closed on a directory
+- Added a 1 sec timeout to the overwritten rmdir function in order to avoid process hang
+- Fixed an access violation bug caused by concurrent access to the file change notification listener
+- Fixed an access violation bug caused by naming collision when creating mutex objects
+    </notes>
+  </release>
   <release>
     <stability>
      <release>stable</release>

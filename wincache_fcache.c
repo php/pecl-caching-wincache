@@ -691,7 +691,7 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
     phandle->handle.stream.reader  = (zend_stream_reader_t)fcache_reader;
     phandle->handle.stream.closer  = (zend_stream_closer_t)fcache_closer;
 
-#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 3
+#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 3
     phandle->handle.stream.fsizer  = (zend_stream_fsizer_t)fcache_fsizer;
 #elif PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 2
     phandle->handle.stream.fteller = (zend_stream_fteller_t)fcache_fsizer;

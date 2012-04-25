@@ -193,4 +193,4 @@ extern int  zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char *
 extern int  zvcache_change(zvcache_context * pcache, const char * key, int delta, int * newvalue);
 extern int  zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue, int newvalue);
 
-#endif // _WINCACHE_ZVCACHE_H_
+#endif /* _WINCACHE_ZVCACHE_H_ */

@@ -39,4 +39,4 @@ extern ps_module ps_mod_wincache;
 
 PS_FUNCS(wincache);
 
-#endif // _WINCACHE_SESSION_H_
+#endif /* _WINCACHE_SESSION_H_ */

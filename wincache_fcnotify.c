@@ -112,7 +112,6 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
     dprintverbose("start process_change_notification");
 
     _ASSERT(plistener   != NULL);
- //   _ASSERT(poverlapped != NULL);
 
     /* Async IO completed. Update refcount to reflect that */
     listener_refdec(pnotify, plistener);
@@ -435,7 +434,10 @@ static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * pliste
             plistener->folder_path = NULL;
         }
 
-        // Set listener to null to rehook change notification if this folder is re-added before scavenger run
+        /*
+         * Set listener to null to rehook change notification if this folder is
+         * re-added before scavenger run
+         */
         plistener->pfcnvalue->plistener = NULL;
         alloc_pefree(plistener);
         plistener = NULL;
@@ -639,7 +641,7 @@ int fcnotify_listenerexists(fcnotify_context *pnotify, const char * folderpath, 
         goto Finished;
     }
 
-    // Check if listener for this folder still exists
+    /* Check if listener for this folder still exists */
     if (pvalue != NULL && pvalue->plistener != NULL)
     {
         *listenerexists = 1;

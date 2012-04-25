@@ -685,6 +685,7 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     _ASSERT(pcopied   != NULL);
 
     /* bucket key name is copied starting at last element of struct Bucket */
+    // BUGBUG: in some cases nKeyLength can be zero.
     msize = sizeof(zv_Bucket) + poriginal->nKeyLength - sizeof(char);
 
     /* Allocate memory if required */
@@ -935,6 +936,7 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     _ASSERT(poriginal != NULL);
 
     /* bucket key name is copied starting at last element of struct Bucket */
+    // BUGBUG: in some cases nKeyLength can be zero.
     msize = sizeof(Bucket) + pcopied->nKeyLength - sizeof(char);
 
     /* Allocate memory if required */
@@ -963,7 +965,7 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     pnewb->pNext      = NULL;
     pnewb->pLast      = NULL;
 
-    memcpy_s(&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
+    memcpy_s((char *)&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
 
     /* Do zval ref copy */
     pbuffer = (zval **)ZMALLOC(pcopy, sizeof(zval *));

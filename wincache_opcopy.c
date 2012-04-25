@@ -48,10 +48,17 @@
 /* Static function declarations */
 static int  copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz);
 static int  copy_zval_ref(opcopy_context * popcopy, zval ** ppoldz, zval *** pppnewz);
+#ifdef ZEND_ENGINE_2_4
+static int  copy_zval_array(opcopy_context * popcopy, zval ** ppoldz, unsigned int count, zval ***ppnew);
+#endif /* ZEND_ENGINE_2_4 */
 static int  copy_zend_property_info(opcopy_context * popcopy, zend_property_info * poldp, zend_property_info ** ppnewp);
 static int  copy_zend_arg_info(opcopy_context * popcopy, zend_arg_info * poldarg, zend_arg_info ** ppnewarg);
 static int  copy_zend_arg_info_array(opcopy_context * popcopy, zend_arg_info * pold, unsigned int count, zend_arg_info ** ppnew);
+#ifdef ZEND_ENGINE_2_4
+static int  copy_znode_op(opcopy_context * popcopy, int op_type, znode_op * poldz, znode_op ** ppnewz);
+#else /* ZEND_ENGINE_2_3 and below */
 static int  copy_znode(opcopy_context * popcopy, znode * poldz, znode ** ppnewz);
+#endif /* ZEND_ENGINE_2_4 */
 static int  copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** ppnewop);
 static int  copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poparray, zend_op_array ** ppoparray);
 static int  copy_zend_function(opcopy_context * popcopy, zend_function * poldf, zend_function ** ppnew);
@@ -64,10 +71,17 @@ static int  copy_zend_constant_entry(opcopy_context * popcopy, zend_constant * p
 
 static void free_zval(opcopy_context * popcopy, zval * pvalue, unsigned char ffree);
 static void free_zval_ref(opcopy_context * popcopy, zval ** ppvalue, unsigned char ffree);
+#ifdef ZEND_ENGINE_2_4
+static void free_zval_array(opcopy_context * popcopy, zval ** ppvalues, unsigned int count, unsigned char ffree);
+#endif /* ZEND_ENGINE_2_4 */
 static void free_zend_property_info(opcopy_context * popcopy, zend_property_info * pvalue, unsigned char ffree);
 static void free_zend_arg_info(opcopy_context * popcopy, zend_arg_info * pvalue, unsigned char ffree);
 static void free_zend_arg_info_array(opcopy_context * popcopy, zend_arg_info * pvalue, unsigned int count, unsigned char ffree);
+#ifdef ZEND_ENGINE_2_4
+static void free_znode_op(opcopy_context * popcopy, int op_type, znode_op * pvalue, unsigned char ffree);
+#else /* ZEND_ENGINE_2_3 and below */
 static void free_znode(opcopy_context * popcopy, znode * pvalue, unsigned char ffree);
+#endif /* ZEND_ENGINE_2_4 */
 static void free_zend_op(opcopy_context * popcopy, zend_op * pvalue, unsigned char ffree);
 static void free_zend_op_array(opcopy_context * popcopy, zend_op_array * pvalue, unsigned char ffree);
 static void free_zend_function(opcopy_context * popcopy, zend_function * pvalue, unsigned char ffree);
@@ -88,11 +102,54 @@ static int  copyout_zend_function(opcopy_context * popcopy, zend_function * pold
 static int  copyout_zend_class(opcopy_context * popcopy, zend_class_entry * poldce, zend_class_entry ** ppnewce);
 static int  copyout_zend_constant(opcopy_context * popcopy, zend_constant * poldt, zend_constant ** pnewt);
 
+static int  wincache_string_pmemcopy(opcopy_context * popcopy, const char *str, size_t len, const char **newStr TSRMLS_CC);
+
 /* copyin functions are to copy internal data structures to shared memory */
 /* Use offsets where ever pointers types are used */
 
 /* copyout functions are to copy internal data structures from shared */
 /* memory to process local memory take care of offsets */
+
+static int wincache_string_pmemcopy(
+    opcopy_context * popcopy,
+    const char *str,
+    size_t len,
+    const char **newStr
+    TSRMLS_DC
+    )
+{
+    int result = NONFATAL;
+    char * ret = NULL;
+    int length = 0;
+
+    *newStr = NULL;
+
+
+#ifdef ZEND_ENGINE_2_4
+#ifndef ZTS
+    if (popcopy->optype == OPCOPY_OPERATION_COPYOUT) {
+        ret = (char*)wincache_new_interned_string((const char*)str, len TSRMLS_CC);
+        if (ret) {
+            *newStr = ret;
+            goto Finished;
+        }
+    }
+#endif /* !ZTS */
+#endif /* ZEND_ENGINE_2_4 */
+    length = len + 1;
+    ret = OMALLOC(popcopy, length);
+    if(ret == NULL)
+    {
+        result = popcopy->oomcode;
+        goto Finished;
+    }
+
+    memcpy_s(ret, length, str, length);
+    *newStr = ret;
+
+Finished:
+    return result;
+}
 
 static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
 {
@@ -163,15 +220,11 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
             /* Copy string to shared memory */
             if(poldz->value.str.val)
             {
-                length = poldz->value.str.len + 1;
-                pnewz->value.str.val = OMALLOC(popcopy, length);
-                if(pnewz->value.str.val == NULL)
+                result = wincache_string_pmemcopy(popcopy, poldz->value.str.val, poldz->value.str.len + 1, &pnewz->value.str.val TSRMLS_DC);
+                if(FAILED(result))
                 {
-                    result = popcopy->oomcode;
                     goto Finished;
                 }
-
-                memcpy_s(pnewz->value.str.val, length, poldz->value.str.val, length);
             }
 
             pnewz->value.str.len = poldz->value.str.len;
@@ -193,10 +246,11 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
             /* Copying opcodes is immediately after compile file */
             /* No objects are yet created. Just set to NULL */
             pnewz->type = IS_NULL;
+            dprintimportant("ZVAL IS_OBJECT: setting to NULL");
             break;
 
         default:
-            
+
             dprintimportant("ZVAL type = %d", poldz->type);
             _ASSERT(FALSE);
             break;
@@ -260,7 +314,7 @@ static void free_zval(opcopy_context * popcopy, zval * pvalue, unsigned char ffr
 
                 case IS_STRING:
                 case IS_CONSTANT:
-                    if(pvalue->value.str.val)
+                    if(pvalue->value.str.val && !IS_INTERNED(pvalue->value.str.val))
                     {
                         OFREE(popcopy, pvalue->value.str.val);
                         pvalue->value.str.val = NULL;
@@ -324,7 +378,7 @@ static int copy_zval_ref(opcopy_context * popcopy, zval ** ppoldz, zval *** pppn
 
     *pppnewz = ppnewz;
     _ASSERT(SUCCEEDED(result));
- 
+
 Finished:
 
     if(FAILED(result))
@@ -368,6 +422,124 @@ static void free_zval_ref(opcopy_context * popcopy, zval ** ppvalue, unsigned ch
     return;
 }
 
+#ifdef ZEND_ENGINE_2_4
+static int copy_zval_array(opcopy_context * popcopy, zval ** ppoldz, unsigned int count, zval ***ppnew)
+{
+    int     result     = NONFATAL;
+    int     allocated  = 0;
+    unsigned int index = 0;
+    size_t  size       = 0;
+    zval ** prgnewz    = NULL;
+
+    TSRMLS_FETCH();
+    dprintdecorate("start copy_zval_array");
+
+    _ASSERT(popcopy != NULL);
+    _ASSERT(ppoldz  != NULL);
+    _ASSERT(ppnew  != NULL);
+    _ASSERT(count   != 0);
+
+    size = sizeof(zval*) * count;
+
+    if (*ppnew == NULL)
+    {
+        /* Alloc the array */
+        prgnewz = (zval **)OMALLOC(popcopy, size);
+        if(prgnewz == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        /* Zero out the memory in the array */
+        memset(prgnewz, 0, size);
+
+        allocated = 1;
+    }
+    else
+    {
+        prgnewz = *ppnew;
+    }
+
+    _ASSERT(prgnewz != NULL);
+
+    /* Copy each zval over from the source to the dest */
+    for (index = 0; index < count; index++)
+    {
+        if (ppoldz[index] != NULL)
+        {
+            result = copy_zval(popcopy, ppoldz[index], &prgnewz[index]);
+            if (FAILED(result))
+            {
+                goto Finished;
+            }
+        }
+        else
+        {
+            prgnewz[index] = NULL;
+        }
+    }
+
+    *ppnew = prgnewz;
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in copy_zval_array", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        /* First, if we allocated any zval's in the array, free them first */
+        for (index = 0; index < count; index++)
+        {
+            if (prgnewz[index])
+            {
+                free_zval(popcopy, prgnewz[index], DO_FREE);
+            }
+        }
+
+        /* Finally, free the array itself */
+        if(prgnewz != NULL)
+        {
+            if(allocated == 1)
+            {
+                OFREE(popcopy, prgnewz);
+                prgnewz = NULL;
+            }
+        }
+    }
+
+    dprintdecorate("end copy_zval_array");
+
+    return result;
+}
+
+static void free_zval_array(opcopy_context * popcopy, zval ** ppvalues, unsigned int count, unsigned char ffree)
+{
+    _ASSERT(popcopy  != NULL);
+    _ASSERT(ppvalues != NULL);
+
+    if (ppvalues)
+    {
+        unsigned int index = 0;
+
+        /* First, free all the zval's in the array */
+        for (index = 0; index < count; index++)
+        {
+            free_zval(popcopy, ppvalues[index], ffree);
+        }
+
+        /* Then free the array itself */
+        if(ffree == DO_FREE)
+        {
+            OFREE(popcopy, ppvalues);
+            ppvalues = NULL;
+        }
+    }
+    return;
+}
+#endif /* ZEND_ENGINE_2_4 */
+
 static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info * poldp, zend_property_info ** ppnewp)
 {
     int                  result    = NONFATAL;
@@ -377,7 +549,7 @@ static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info 
     unsigned int         doclen    = 0;
 
     dprintdecorate("start copy_zend_property_info");
-    
+
     _ASSERT(popcopy != NULL);
     _ASSERT(poldp   != NULL);
     _ASSERT(ppnewp  != NULL);
@@ -411,17 +583,14 @@ static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info 
         /* pnewp->ce will be set during fixup */
         if(poldp->name != NULL)
         {
-            namelen = poldp->name_length + 1;
-            pnewp->name = OMALLOC(popcopy, namelen);
-            if(pnewp->name == NULL)
+            result = wincache_string_pmemcopy(popcopy, poldp->name, poldp->name_length + 1, &pnewp->name TSRMLS_DC);
+            if(FAILED(result))
             {
-                result = popcopy->oomcode;
                 goto Finished;
             }
-
-            memcpy_s(pnewp->name, namelen, poldp->name, namelen);
         }
 
+        // REVIEW: Question: Is doc_comment no longer used on ZEND_ENGINE_2_4?
         if(poldp->doc_comment != NULL)
         {
             doclen =poldp->doc_comment_len + 1;
@@ -432,7 +601,7 @@ static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info 
                 goto Finished;
             }
 
-            memcpy_s(pnewp->doc_comment, doclen, poldp->doc_comment, doclen);
+            memcpy_s((void *)pnewp->doc_comment, doclen, poldp->doc_comment, doclen);
         }
     }
 
@@ -450,15 +619,15 @@ Finished:
         {
             if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
             {
-                if(pnewp->name != NULL)
+                if(pnewp->name != NULL && !IS_INTERNED(pnewp->name))
                 {
-                    OFREE(popcopy, pnewp->name);
+                    OFREE(popcopy, (void *)pnewp->name);
                     pnewp->name = NULL;
                 }
 
                 if(pnewp->doc_comment != NULL)
                 {
-                    OFREE(popcopy, pnewp->doc_comment);
+                    OFREE(popcopy, (void *)pnewp->doc_comment);
                     pnewp->doc_comment = NULL;
                 }
             }
@@ -477,19 +646,20 @@ Finished:
 }
 
 static void free_zend_property_info(opcopy_context * popcopy, zend_property_info * pvalue, unsigned char ffree)
-{    
+{
     if(pvalue != NULL)
     {
         _ASSERT(popcopy->palloc != NULL);
-        if(pvalue->name != NULL)
+
+        if(pvalue->name != NULL && !IS_INTERNED(pvalue->name))
         {
-            OFREE(popcopy, pvalue->name);
+            OFREE(popcopy, (void *)pvalue->name);
             pvalue->name = NULL;
         }
 
         if(pvalue->doc_comment != NULL)
         {
-            OFREE(popcopy, pvalue->doc_comment);
+            OFREE(popcopy, (void *)pvalue->doc_comment);
             pvalue->doc_comment = NULL;
         }
 
@@ -541,28 +711,20 @@ static int copy_zend_arg_info(opcopy_context * popcopy, zend_arg_info * poldarg,
 
     if(poldarg->name != NULL)
     {
-        namelen = poldarg->name_len + 1;
-        pnewarg->name = OMALLOC(popcopy, namelen);
-        if(pnewarg->name == NULL)
+        result = wincache_string_pmemcopy(popcopy, poldarg->name, poldarg->name_len + 1, &pnewarg->name TSRMLS_DC);
+        if(FAILED(result))
         {
-            result = popcopy->oomcode;
             goto Finished;
         }
-
-        memcpy_s((char *)pnewarg->name, namelen, poldarg->name, namelen);
     }
 
     if(poldarg->class_name != NULL)
     {
-        cnamelen = poldarg->class_name_len + 1;
-        pnewarg->class_name = OMALLOC(popcopy, cnamelen);
-        if(pnewarg->class_name == NULL)
+        result = wincache_string_pmemcopy(popcopy, poldarg->class_name, poldarg->class_name_len + 1, &pnewarg->class_name TSRMLS_DC);
+        if(FAILED(result))
         {
-            result = popcopy->oomcode;
             goto Finished;
         }
-
-        memcpy_s((char *)pnewarg->class_name, cnamelen, poldarg->class_name, cnamelen);
     }
 
     *ppnewarg = pnewarg;
@@ -577,13 +739,13 @@ Finished:
 
         if(pnewarg != NULL)
         {
-            if(pnewarg->name != NULL)
+            if(pnewarg->name != NULL && !IS_INTERNED(pnewarg->name))
             {
                 OFREE(popcopy, (void *)pnewarg->name);
                 pnewarg->name = NULL;
             }
 
-            if(pnewarg->class_name != NULL)
+            if(pnewarg->class_name != NULL && !IS_INTERNED(pnewarg->class_name))
             {
                 OFREE(popcopy, (void *)pnewarg->class_name);
                 pnewarg->class_name = NULL;
@@ -606,14 +768,15 @@ static void free_zend_arg_info(opcopy_context * popcopy, zend_arg_info * pvalue,
 {
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
-        if(pvalue->name != NULL)
+        _ASSERT(popcopy->palloc != NULL);
+
+        if(pvalue->name != NULL && !IS_INTERNED(pvalue->name))
         {
             OFREE(popcopy, (void *)pvalue->name);
             pvalue->name = NULL;
         }
 
-        if(pvalue->class_name != NULL)
+        if(pvalue->class_name != NULL && !IS_INTERNED(pvalue->class_name))
         {
             OFREE(popcopy, (void *)pvalue->class_name);
             pvalue->class_name = NULL;
@@ -712,7 +875,7 @@ static void free_zend_arg_info_array(opcopy_context * popcopy, zend_arg_info * p
 
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         for(index = 0; index < count; index++)
         {
             free_zend_arg_info(popcopy, &pvalue[index], NO_FREE);
@@ -728,12 +891,13 @@ static void free_zend_arg_info_array(opcopy_context * popcopy, zend_arg_info * p
     return;
 }
 
+#ifdef ZEND_ENGINE_2_3
 static int copy_znode(opcopy_context * popcopy, znode * poldz, znode ** ppnewz)
 {
-    int     result    = NONFATAL;
-    int     allocated = 0;
+    int        result    = NONFATAL;
+    int        allocated = 0;
     znode * pnewz     = NULL;
-    zval *  ptemp     = NULL;
+    zval *     ptemp     = NULL;
 
     dprintdecorate("start copy_znode");
 
@@ -750,7 +914,7 @@ static int copy_znode(opcopy_context * popcopy, znode * poldz, znode ** ppnewz)
             result = popcopy->oomcode;
             goto Finished;
         }
-        
+
         allocated = 1;
     }
     else
@@ -801,7 +965,7 @@ static void free_znode(opcopy_context * popcopy, znode * pvalue, unsigned char f
 {
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         if(pvalue->op_type == IS_CONST)
         {
             free_zval(popcopy, &pvalue->u.constant, NO_FREE);
@@ -816,6 +980,98 @@ static void free_znode(opcopy_context * popcopy, znode * pvalue, unsigned char f
 
     return;
 }
+#endif /* ZEND_ENGINE_2_3 */
+
+#ifdef ZEND_ENGINE_2_4
+static int copy_znode_op(opcopy_context * popcopy, int op_type, znode_op * poldz, znode_op ** ppnewz)
+{
+    int        result    = NONFATAL;
+    int        allocated = 0;
+    znode_op * pnewz     = NULL;
+    zval *     ptemp     = NULL;
+
+    dprintdecorate("start copy_znode_op");
+
+    _ASSERT(popcopy != NULL);
+    _ASSERT(poldz   != NULL);
+    _ASSERT(ppnewz  != NULL);
+
+    /* Allocate memory if not allocated */
+    if(*ppnewz == NULL)
+    {
+        pnewz = (znode_op *)OMALLOC(popcopy, sizeof(znode_op));
+        if(pnewz == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        allocated = 1;
+    }
+    else
+    {
+        pnewz = *ppnewz;
+    }
+
+    /* TBD?? How to make sure op_array pointer and */
+    /* jmp_addr pointer are correct in all the processes */
+    memcpy_s(pnewz, sizeof(znode_op), poldz, sizeof(znode_op));
+
+    if(op_type == IS_CONST)
+    {
+        pnewz->zv = NULL;
+        result = copy_zval(popcopy, poldz->zv, &(pnewz->zv));
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+
+    *ppnewz = pnewz;
+    _ASSERT(SUCCEEDED(result));
+
+Finished:
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in copy_znode", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(pnewz != NULL)
+        {
+            if(allocated != 0)
+            {
+                OFREE(popcopy, pnewz);
+                pnewz = NULL;
+            }
+        }
+    }
+
+    dprintdecorate("end copy_znode");
+
+    return result;
+}
+
+static void free_znode_op(opcopy_context * popcopy, int op_type, znode_op * pvalue, unsigned char ffree)
+{
+    if(pvalue != NULL)
+    {
+        _ASSERT(popcopy->palloc != NULL);
+        if(op_type == IS_CONST)
+        {
+            free_zval(popcopy, pvalue->zv, NO_FREE);
+        }
+
+        if(ffree == DO_FREE)
+        {
+            OFREE(popcopy, pvalue);
+            pvalue = NULL;
+        }
+    }
+
+    return;
+}
+#endif /* ZEND_ENGINE_2_4 */
 
 static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** ppnewop)
 {
@@ -823,7 +1079,11 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
     int             allocated = 0;
     zend_op *       pnewop    = NULL;
     zend_op *       pnextop   = NULL;
+#ifdef ZEND_ENGINE_2_4
+    znode_op *      pznode    = NULL;
+#else /* ZEND_ENGINE_2_3 and below */
     znode *         pznode    = NULL;
+#endif /* ZEND_ENGINE_2_4 */
     char *          frname    = NULL;
     unsigned int    frnlen    = 0;
 
@@ -856,7 +1116,11 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
     /* Detour function call if one is configured */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN && WCG(detours) != NULL && poldop->opcode == ZEND_DO_FCALL)
     {
+#ifdef ZEND_ENGINE_2_4
+        result = detours_check(WCG(detours), Z_STRVAL_P(poldop->op1.zv), poldop->extended_value, &frname);
+#else /* ZEND_ENGINE_2_3 and below */
         result = detours_check(WCG(detours), Z_STRVAL_P(&poldop->op1.u.constant), poldop->extended_value, &frname);
+#endif /* ZEND_ENGINE_2_4 */
         if(FAILED(result))
         {
             goto Finished;
@@ -868,29 +1132,48 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
             /* Change the function call to replacement function */
             frnlen = strlen(frname);
 
+#ifdef ZEND_ENGINE_2_4
+            Z_STRVAL_P(poldop->op1.zv) = estrndup(frname, frnlen);
+            Z_STRLEN_P(poldop->op1.zv) = frnlen;
+
+            ZVAL_LONG(poldop->op2.zv, zend_hash_func(frname, frnlen + 1));
+#else /* ZEND_ENGINE_2_3 and below */
             Z_STRVAL(poldop->op1.u.constant) = estrndup(frname, frnlen);
             Z_STRLEN(poldop->op1.u.constant) = frnlen;
 
             ZVAL_LONG(&poldop->op2.u.constant, zend_hash_func(frname, frnlen + 1));
+#endif /* ZEND_ENGINE_2_4 */
         }
     }
 
     pznode = &pnewop->result;
+#ifdef ZEND_ENGINE_2_4
+    result = copy_znode_op(popcopy, poldop->result_type, &poldop->result, &pznode);
+#else /* ZEND_ENGINE_2_3 and below */
     result = copy_znode(popcopy, &poldop->result, &pznode);
+#endif /* ZEND_ENGINE_2_4 */
     if(FAILED(result))
     {
         goto Finished;
     }
 
     pznode = &pnewop->op1;
+#ifdef ZEND_ENGINE_2_4
+    result = copy_znode_op(popcopy, poldop->op1_type, &poldop->op1, &pznode);
+#else /* ZEND_ENGINE_2_3 and below */
     result = copy_znode(popcopy, &poldop->op1, &pznode);
+#endif /* ZEND_ENGINE_2_4 */
     if(FAILED(result))
     {
         goto Finished;
     }
 
     pznode = &pnewop->op2;
+#ifdef ZEND_ENGINE_2_4
+    result = copy_znode_op(popcopy, poldop->op2_type, &poldop->op2, &pznode);
+#else /* ZEND_ENGINE_2_3 and below */
     result = copy_znode(popcopy, &poldop->op2, &pznode);
+#endif /* ZEND_ENGINE_2_4 */
     if(FAILED(result))
     {
         goto Finished;
@@ -927,9 +1210,15 @@ static void free_zend_op(opcopy_context * popcopy, zend_op * pvalue, unsigned ch
     {
         _ASSERT(popcopy->palloc != NULL);
 
+#ifdef ZEND_ENGINE_2_4
+        free_znode_op(popcopy, pvalue->result_type, &pvalue->result, NO_FREE);
+        free_znode_op(popcopy, pvalue->op1_type, &pvalue->op1, NO_FREE);
+        free_znode_op(popcopy, pvalue->op2_type, &pvalue->op2, NO_FREE);
+#else /* ZEND_ENGINE_2_3 and below */
         free_znode(popcopy, &pvalue->result, NO_FREE);
         free_znode(popcopy, &pvalue->op1, NO_FREE);
         free_znode(popcopy, &pvalue->op2, NO_FREE);
+#endif /* ZEND_ENGINE_2_4 */
 
         if(ffree == DO_FREE)
         {
@@ -1015,6 +1304,26 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
         }
     }
 
+#ifdef ZEND_ENGINE_2_4
+    /* Copy the literals */
+    if (poldopa->literals)
+    {
+        zend_literal *src, *dst, *end;
+
+        src = poldopa->literals;
+        dst = pnewopa->literals = (zend_literal*) OMALLOC(popcopy, (sizeof(zend_literal) * poldopa->last_literal));
+        end = src + poldopa->last_literal;
+        while (src < end)
+        {
+            zval *tmp = &dst->constant;
+            *dst = *src; /* struct copy */
+            copy_zval(popcopy, &src->constant, &tmp);
+            src++;
+            dst++;
+        }
+    }
+#endif /* ZEND_ENGINE_2_4 */
+
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
     {
         pnewopa->function_name    = NULL;
@@ -1056,7 +1365,7 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
                 goto Finished;
             }
 
-            memcpy_s(pnewopa->doc_comment, msize, poldopa->doc_comment, msize);
+            memcpy_s((void *)pnewopa->doc_comment, msize, poldopa->doc_comment, msize);
         }
 
         /* Copy arg_info, brk_cont_array, try_catch_array and vars */
@@ -1111,15 +1420,15 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
             {
                 if(poldopa->vars[index].name != NULL)
                 {
-                    msize = poldopa->vars[index].name_len + 1;
-                    pnewopa->vars[index].name = OMALLOC(popcopy, msize);
-                    if(pnewopa->vars[index].name == NULL)
+                    result = wincache_string_pmemcopy(popcopy,
+                                                      poldopa->vars[index].name,
+                                                      poldopa->vars[index].name_len + 1,
+                                                      &pnewopa->vars[index].name TSRMLS_DC);
+                    if(FAILED(result))
                     {
-                        result = popcopy->oomcode;
                         goto Finished;
                     }
 
-                    memcpy_s(pnewopa->vars[index].name, msize, poldopa->vars[index].name, msize);
                     pnewopa->vars[index].name_len = poldopa->vars[index].name_len;
                 }
                 else
@@ -1155,10 +1464,18 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
 
             if(popcopy->optype == OPCOPY_OPERATION_COPYIN ||
                (popcopy->optype == OPCOPY_OPERATION_COPYOUT &&
+#ifdef ZEND_ENGINE_2_4
+                ((poldop->op1_type == IS_CONST &&
+                  Z_TYPE_P(poldop->op1.zv) == IS_CONSTANT_ARRAY) ||
+                (poldop->op2_type == IS_CONST &&
+                  Z_TYPE_P(poldop->op2.zv) == IS_CONSTANT_ARRAY)))
+#else /* ZEND_ENGINE_2_3 and below */
                 ((poldop->op1.op_type == IS_CONST &&
                   poldop->op1.u.constant.type == IS_CONSTANT_ARRAY) ||
                 (poldop->op2.op_type == IS_CONST &&
                   poldop->op2.u.constant.type == IS_CONSTANT_ARRAY))))
+#endif /* ZEND_ENGINE_2_4 */
+                  )
             {
                 result = copy_zend_op(popcopy, poldop, &pnewop);
                 if(FAILED(result))
@@ -1175,17 +1492,30 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
                 switch(pnewop->opcode)
                 {
                     case ZEND_RECV_INIT:
+#ifdef ZEND_ENGINE_2_4
+                        if(pnewop->op2_type == IS_CONST &&
+                           Z_TYPE_P(pnewop->op2.zv) == IS_CONSTANT_ARRAY)
+#else /* ZEND_ENGINE_2_3 and below */
                         if(pnewop->op2.op_type == IS_CONST &&
                            pnewop->op2.u.constant.type == IS_CONSTANT_ARRAY)
+#endif /* ZEND_ENGINE_2_4 */
                         {
                            *pdata |= oparray_has_const;
                         }
                         break;
                     default:
+#ifdef ZEND_ENGINE_2_4
+                        if((pnewop->op1_type == IS_CONST &&
+                            Z_TYPE_P(pnewop->op1.zv) == IS_CONSTANT_ARRAY) ||
+                           (pnewop->op2_type == IS_CONST &&
+                            Z_TYPE_P(pnewop->op2.zv) == IS_CONSTANT_ARRAY))
+#else /* ZEND_ENGINE_2_3 and below */
                         if((pnewop->op1.op_type == IS_CONST &&
                             pnewop->op1.u.constant.type == IS_CONSTANT_ARRAY) ||
                            (pnewop->op2.op_type == IS_CONST &&
                             pnewop->op2.u.constant.type == IS_CONSTANT_ARRAY))
+
+#endif /* ZEND_ENGINE_2_4 */
                         {
                             *pdata |= oparray_has_const;
                         }
@@ -1201,21 +1531,45 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
             switch(pnewop->opcode)
             {
                 case ZEND_JMP:
-#ifndef PHP_VERSION_52
+#ifdef ZEND_ENGINE_2_3
                 case ZEND_GOTO:
-#endif
+#endif /* ZEND_ENGINE_2_3 */
+#ifdef ZEND_ENGINE_2_4
+                    pnewop->op1.jmp_addr = pnewopa->opcodes + (pnewop->op1.jmp_addr - poldopa->opcodes);
+#else /* ZEND_ENGINE_2_3 and below */
                     pnewop->op1.u.jmp_addr = pnewopa->opcodes + (pnewop->op1.u.jmp_addr - poldopa->opcodes);
+#endif /* ZEND_ENGINE_2_4 */
                     break;
                 case ZEND_JMPZ:
                 case ZEND_JMPNZ:
                 case ZEND_JMPZ_EX:
                 case ZEND_JMPNZ_EX:
-#ifndef PHP_VERSION_52
+#ifdef ZEND_ENGINE_2_3
                 case ZEND_JMP_SET:
 #endif
+#ifdef ZEND_ENGINE_2_4
+                case ZEND_JMP_SET_VAR:
+#endif /* ZEND_ENGINE_2_4 */
+#ifdef ZEND_ENGINE_2_4
+                    pnewop->op2.jmp_addr = pnewopa->opcodes + (pnewop->op2.jmp_addr - poldopa->opcodes);
+#else /* ZEND_ENGINE_2_3 and below */
                     pnewop->op2.u.jmp_addr = pnewopa->opcodes + (pnewop->op2.u.jmp_addr - poldopa->opcodes);
+#endif /* ZEND_ENGINE_2_4 */
                     break;
             }
+
+#ifdef ZEND_ENGINE_2_4
+            /* Fixup literal addresses */
+            if (pnewop->op1_type == IS_CONST) {
+                pnewopa->opcodes[index].op1.literal = poldopa->opcodes[index].op1.literal - poldopa->literals + pnewopa->literals;
+            }
+            if (pnewop->op2_type == IS_CONST) {
+                pnewopa->opcodes[index].op2.literal = poldopa->opcodes[index].op2.literal - poldopa->literals + pnewopa->literals;
+            }
+            if (pnewop->result_type == IS_CONST) {
+                pnewopa->opcodes[index].result.literal = poldopa->opcodes[index].result.literal - poldopa->literals + pnewopa->literals;
+            }
+#endif /* ZEND_ENGINE_2_4 */
         }
     }
 
@@ -1253,7 +1607,7 @@ static void free_zend_op_array(opcopy_context * popcopy, zend_op_array * pvalue,
 
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         if(pvalue->refcount != NULL)
         {
             OFREE(popcopy, pvalue->refcount);
@@ -1268,19 +1622,19 @@ static void free_zend_op_array(opcopy_context * popcopy, zend_op_array * pvalue,
 
         if(pvalue->function_name != NULL)
         {
-            OFREE(popcopy, pvalue->function_name);
+            OFREE(popcopy, (void *)pvalue->function_name);
             pvalue->function_name = NULL;
         }
 
         if(pvalue->filename != NULL)
         {
-            OFREE(popcopy, pvalue->filename);
+            OFREE(popcopy, (void *)pvalue->filename);
             pvalue->filename = NULL;
         }
 
         if(pvalue->doc_comment != NULL)
         {
-            OFREE(popcopy, pvalue->doc_comment);
+            OFREE(popcopy, (void *)pvalue->doc_comment);
             pvalue->doc_comment = NULL;
         }
 
@@ -1423,7 +1777,7 @@ static void free_zend_function(opcopy_context * popcopy, zend_function * pvalue,
 {
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         switch(pvalue->type)
         {
             case ZEND_INTERNAL_FUNCTION:
@@ -1474,7 +1828,7 @@ static int copy_zend_function_entry(opcopy_context * popcopy, zend_function_entr
     }
 
     memcpy_s(pnewfe, sizeof(zend_function_entry), poldfe, sizeof(zend_function_entry));
-    
+
     pnewfe->fname = NULL;
     pnewfe->arg_info = NULL;
 
@@ -1540,7 +1894,7 @@ static void free_zend_function_entry(opcopy_context * popcopy, zend_function_ent
 {
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         if(pvalue->fname != NULL)
         {
             OFREE(popcopy, (void *)pvalue->fname);
@@ -1600,7 +1954,7 @@ static int copy_hashtable(opcopy_context * popcopy, HashTable * poldh, unsigned 
 
     /* Do memcpy of HashTable first */
     memcpy_s(pnewh, sizeof(HashTable), poldh, sizeof(HashTable));
-    
+
     pnewh->pInternalPointer = NULL;
     pnewh->pListHead        = NULL;
     pnewh->pListTail        = NULL;
@@ -1719,7 +2073,7 @@ static void free_hashtable(opcopy_context * popcopy, HashTable * pvalue, unsigne
     if(pvalue != NULL)
     {
         _ASSERT(popcopy->palloc != NULL);
-        
+
         pbucket = pvalue->pListHead;
         while(pbucket != NULL)
         {
@@ -1779,7 +2133,8 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
             required = 0;
         }
     }
-    
+
+#if !defined(ZEND_ENGINE_2_4)
     if(copy_flag & copy_flag_def_prop)
     {
         _ASSERT(required == 1);
@@ -1787,7 +2142,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
         pclass = (zend_class_entry *)arg1;
         pparent = pclass->parent;
         ppzval = (zval **)pbucket->pData;
-        
+
         if(pparent != NULL && zend_hash_quick_find(&pparent->default_properties, pbucket->arKey, pbucket->nKeyLength, pbucket->h, (void **)&ppparentz) == SUCCESS)
         {
             if(ppparentz && ppzval && (*ppparentz == *ppzval))
@@ -1796,6 +2151,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
             }
         }
     }
+#endif /* !defined(ZEND_ENGINE_2_4) */
 
     if(copy_flag & copy_flag_prop_info)
     {
@@ -1813,6 +2169,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
         }
     }
 
+#if !defined(ZEND_ENGINE_2_4)
     if(copy_flag & copy_flag_stat_var)
     {
         _ASSERT(required == 1);
@@ -1820,9 +2177,8 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
         pclass = (zend_class_entry *)arg1;
         phasht = (HashTable *)arg2;
         ppzval = (zval **)pbucket->pData;
-        
-        pparent = pclass->parent;
 
+        pparent = pclass->parent;
         /* If parent class is NULL, nothing more to do */
         if(pparent != NULL)
         {
@@ -1842,6 +2198,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
             }
         }
     }
+#endif /* !defined(ZEND_ENGINE_2_4) */
 
     dprintdecorate("end check_hashtable_bucket");
 
@@ -1851,7 +2208,7 @@ static int check_hashtable_bucket(Bucket * pbucket, unsigned int copy_flag, void
 static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsigned int copy_flag, Bucket ** ppnewb)
 {
     int      result    = NONFATAL;
-    int      allocated = 0;
+    int      allocated = 0; /* This is a bitmask in ZEND_ENGINE_2_4: 1 for the Bucket, 2 for the Bucket.arKey */
     Bucket * pnewb     = NULL;
     int      msize     = 0;
 
@@ -1861,6 +2218,38 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     _ASSERT(poldb     != NULL);
     _ASSERT(ppnewb    != NULL);
 
+#ifdef ZEND_ENGINE_2_4
+    if (*ppnewb == NULL)
+    {
+        pnewb = (Bucket *)OMALLOC(popcopy, sizeof(Bucket));
+        if (pnewb == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+        allocated = 1;
+    }
+    memcpy_s(pnewb, sizeof(Bucket), poldb, sizeof(Bucket));
+
+    /* In some cases, poldb->nKeyLength can be zero. */
+    if (poldb->nKeyLength)
+    {
+        const char *arKey = NULL;
+        pnewb->arKey = (char *)OMALLOC(popcopy, poldb->nKeyLength);
+        if (pnewb->arKey == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+        allocated = 2;
+        memcpy_s((void *)pnewb->arKey, poldb->nKeyLength, poldb->arKey, poldb->nKeyLength);
+    }
+#else /* ZEND_ENGINE_2_3 and below */
+    /*
+     * NOTE: This assumes the string for arKey is contiguously alloc'd within
+     * the poldb Bucket.
+     */
+    // REVIEW: what if poldb->nKeyLength is 0?
     msize = sizeof(Bucket) + poldb->nKeyLength - 1;
     if(*ppnewb == NULL)
     {
@@ -1877,6 +2266,9 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     /* Copy hashcode value and set pointers to NULL */
     _ASSERT(pnewb != NULL);
     memcpy_s(pnewb, msize, poldb, msize);
+    // REVIEW: Shouldn't pnewb->arKey get fixed up after copying?
+    // REVIEW: pnewb->arKey = (const char *)(pnewb + 1);
+#endif /* ZEND_ENGINE_2_4 */
 
     pnewb->pData      = NULL;
     pnewb->pDataPtr   = NULL;
@@ -1893,7 +2285,7 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
         if(FAILED(result))
         {
             goto Finished;
-        }    
+        }
     }
 
     if(copy_flag & copy_flag_zval_ref)
@@ -1928,7 +2320,13 @@ Finished:
 
         if(pnewb != NULL)
         {
-            if(allocated != 0)
+#ifdef ZEND_ENGINE_2_4
+            if (allocated & 2)
+            {
+                OFREE(popcopy, (char *)pnewb->arKey);
+            }
+#endif /* ZEND_ENGINE_2_4 */
+            if (allocated & 1)
             {
                 OFREE(popcopy, pnewb);
                 pnewb = NULL;
@@ -1945,9 +2343,15 @@ static void free_hashtable_bucket(opcopy_context * popcopy, Bucket * pvalue, uns
 {
     if(pvalue != NULL)
     {
-        _ASSERT(popcopy->palloc != NULL);        
+        _ASSERT(popcopy->palloc != NULL);
         if(ffree == DO_FREE)
         {
+#ifdef ZEND_ENGINE_2_4
+            if (pvalue->nKeyLength && pvalue->arKey && !IS_INTERNED(pvalue->arKey))
+            {
+                OFREE(popcopy, (char *)pvalue->arKey);
+            }
+#endif /* ZEND_ENGINE_2_4 */
             OFREE(popcopy, pvalue);
             pvalue = NULL;
         }
@@ -1999,15 +2403,26 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     memcpy_s(pnewce, sizeof(zend_class_entry), poldce, sizeof(zend_class_entry));
 
     pnewce->name = NULL;
+    memset(&pnewce->function_table, 0, sizeof(HashTable));
+    memset(&pnewce->properties_info, 0, sizeof(HashTable));
+    memset(&pnewce->constants_table, 0, sizeof(HashTable));
+#ifdef ZEND_ENGINE_2_4
+    pnewce->info.user.doc_comment = NULL;
+    pnewce->info.user.filename = NULL;
+    pnewce->info.internal.builtin_functions = NULL;
+    pnewce->static_members_table = NULL;
+    pnewce->default_properties_count = 0;
+    pnewce->default_properties_table = NULL;
+    pnewce->default_static_members_count = 0;
+    pnewce->default_static_members_table = NULL;
+#else /* ZEND_ENGINE_2_3 and below */
     pnewce->doc_comment = NULL;
     pnewce->filename = NULL;
     pnewce->static_members = NULL;
     pnewce->builtin_functions = NULL;
-    memset(&pnewce->function_table, 0, sizeof(HashTable));
     memset(&pnewce->default_properties, 0, sizeof(HashTable));
-    memset(&pnewce->properties_info, 0, sizeof(HashTable));
-    memset(&pnewce->constants_table, 0, sizeof(HashTable));
     memset(&pnewce->default_static_members, 0, sizeof(HashTable));
+#endif /* ZEND_ENGINE_2_4 */
 
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
     {
@@ -2018,6 +2433,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     /* Copy name, doc_comment and filename */
     if(poldce->name != NULL)
     {
+        /* NOTE: The name is apparently not a candidate for being 'interned' */
         pnewce->name = OSTRDUP(popcopy, poldce->name);
         if(pnewce->name == NULL)
         {
@@ -2026,6 +2442,21 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
         }
     }
 
+#ifdef ZEND_ENGINE_2_4
+    if(poldce->info.user.doc_comment != NULL)
+    {
+        /* NOTE: The doc_comment is apparently not a candidate for being 'interned' */
+        msize = poldce->info.user.doc_comment_len + 1;
+        pnewce->info.user.doc_comment = OMALLOC(popcopy, msize);
+        if(pnewce->info.user.doc_comment == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        memcpy_s((void *)pnewce->info.user.doc_comment, msize, poldce->info.user.doc_comment, msize);
+    }
+#else /* ZEND_ENGINE_2_3 and below */
     if(poldce->doc_comment != NULL)
     {
         msize = poldce->doc_comment_len + 1;
@@ -2038,7 +2469,20 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 
         memcpy_s(pnewce->doc_comment, msize, poldce->doc_comment, msize);
     }
+#endif /* ZEND_ENGINE_2_4 */
 
+#ifdef ZEND_ENGINE_2_4
+    if(poldce->info.user.filename != NULL)
+    {
+        /* NOTE: The filename is apparently not a candidate for being 'interned' */
+        pnewce->info.user.filename = OSTRDUP(popcopy, poldce->info.user.filename);
+        if(pnewce->info.user.filename == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+    }
+#else /* ZEND_ENGINE_2_3 and below */
     if(poldce->filename != NULL)
     {
         pnewce->filename = OSTRDUP(popcopy, poldce->filename);
@@ -2048,6 +2492,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
             goto Finished;
         }
     }
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Calculate num_interfaces not including inherited ones */
     pnewce->interfaces = NULL;
@@ -2152,7 +2597,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
                     {
                         pnewce->__call = pfunction;
                     }
-#ifdef PHP_VERSION_53
+#ifdef ZEND_ENGINE_2_3
                     if(poldce->__callstatic && strcmp(pfunction->common.function_name, poldce->__callstatic->common.function_name) == 0)
                     {
                         pnewce->__callstatic = pfunction;
@@ -2163,7 +2608,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
                         pnewce->__tostring = pfunction;
                     }
                 }
-        
+
                 pfunction->common.scope = pnewce;
             }
 
@@ -2171,6 +2616,15 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
         }
     }
 
+#ifdef ZEND_ENGINE_2_4
+    /* Copy default properties. */
+    result = copy_zval_array(popcopy, poldce->default_properties_table, poldce->default_properties_count, &pnewce->default_properties_table);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+    pnewce->default_properties_count = poldce->default_properties_count;
+#else /* ZEND_ENGINE_2_3 and below */
     /* Copy default properties. pDataPtr is significant */
     phasht = &pnewce->default_properties;
     result = copy_hashtable(popcopy, &poldce->default_properties, copy_flag_zval_ref | copy_flag_pDataPtr | copy_flag_def_prop | checkflag, &phasht, poldce, NULL);
@@ -2178,6 +2632,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     {
         goto Finished;
     }
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Copy property_info and do fixup */
     phasht = &pnewce->properties_info;
@@ -2186,7 +2641,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     {
         goto Finished;
     }
-    
+
     for (index = 0; index < phasht->nTableSize; index++)
     {
         if(phasht->arBuckets == NULL)
@@ -2208,6 +2663,28 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     }
 
     /* Copy default_static_members and static_members */
+#ifdef ZEND_ENGINE_2_4
+    result = copy_zval_array(popcopy, poldce->default_static_members_table, poldce->default_static_members_count, &pnewce->default_static_members_table);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+    pnewce->default_static_members_count = poldce->default_static_members_count;
+
+    if(poldce->static_members_table != poldce->default_static_members_table)
+    {
+        result = copy_zval_array(popcopy, poldce->static_members_table, poldce->default_static_members_count, &pnewce->static_members_table);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+    else
+    {
+        pnewce->static_members_table = pnewce->default_static_members_table;
+        /* Note: count of entries is held in default_static_members_count. */
+    }
+#else /* ZEND_ENGINE_2_3 and below */
     phasht = &pnewce->default_static_members;
     result = copy_hashtable(popcopy, &poldce->default_static_members, copy_flag_zval_ref | copy_flag_stat_var | copy_flag_pDataPtr | checkflag, &phasht, poldce, &poldce->default_static_members);
     if(FAILED(result))
@@ -2227,6 +2704,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     {
         pnewce->static_members = &pnewce->default_static_members;
     }
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Copy constants */
     phasht = &pnewce->constants_table;
@@ -2237,6 +2715,34 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     }
 
     /* Copy built_in functions */
+#ifdef ZEND_ENGINE_2_4
+    if(popcopy->optype == OPCOPY_OPERATION_COPYIN && poldce->info.internal.builtin_functions != NULL)
+    {
+        for(count = 0; poldce->type == ZEND_INTERNAL_CLASS && poldce->info.internal.builtin_functions[count].fname != NULL; count++)
+        {
+            /* build up 'count' so we can set the buildin_functions pointer correctly */
+        }
+
+        pnewce->info.internal.builtin_functions = (zend_function_entry *)OMALLOC(popcopy, (count + 1) * sizeof(zend_function_entry));
+        if(pnewce->info.internal.builtin_functions == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        for(index = 0; index < count; index++)
+        {
+            pfunc = (zend_function_entry *)&pnewce->info.internal.builtin_functions[index];
+            result = copy_zend_function_entry(popcopy, (zend_function_entry *)&poldce->info.internal.builtin_functions[index], &pfunc);
+            if(FAILED(result))
+            {
+                 goto Finished;
+            }
+        }
+
+        *(char **)&(pnewce->info.internal.builtin_functions[count].fname) = NULL;
+    }
+#else /* ZEND_ENGINE_2_3 and below */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN && poldce->builtin_functions != NULL)
     {
         for(count = 0; poldce->type == ZEND_INTERNAL_CLASS && poldce->builtin_functions[count].fname != NULL; count++)
@@ -2262,6 +2768,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 
         *(char **)&(pnewce->builtin_functions[count].fname) = NULL;
     }
+#endif /* ZEND_ENGINE_2_4 */
 
     *ppnewce = pnewce;
     _ASSERT(SUCCEEDED(result));
@@ -2286,23 +2793,53 @@ static void free_zend_class_entry(opcopy_context * popcopy, zend_class_entry * p
         _ASSERT(popcopy->palloc != NULL);
         if(pvalue->name != NULL)
         {
-            OFREE(popcopy, pvalue->name);
+            OFREE(popcopy, (void *)pvalue->name);
             pvalue->name = NULL;
         }
 
+        free_hashtable(popcopy, &pvalue->function_table, NO_FREE); /* copy_flag_zend_func | checkflag */
+        free_hashtable(popcopy, &pvalue->constants_table, NO_FREE);
+
+#ifdef ZEND_ENGINE_2_4
+        if(pvalue->info.user.doc_comment != NULL)
+        {
+            OFREE(popcopy, (void *)pvalue->info.user.doc_comment);
+            pvalue->info.user.doc_comment = NULL;
+        }
+
+        if(pvalue->info.user.filename != NULL)
+        {
+            OFREE(popcopy, (void *)pvalue->info.user.filename);
+            pvalue->info.user.filename = NULL;
+        }
+
+        free_zval_array(popcopy, pvalue->default_properties_table, pvalue->default_properties_count, NO_FREE);
+        free_zval_array(popcopy, pvalue->default_static_members_table, pvalue->default_static_members_count, NO_FREE);
+
+        if(pvalue->static_members_table != pvalue->default_static_members_table)
+        {
+            free_zval_array(popcopy, pvalue->static_members_table, pvalue->default_static_members_count, DO_FREE);
+            pvalue->static_members_table = NULL;
+        }
+
+        if(pvalue->info.internal.builtin_functions != NULL)
+        {
+            OFREE(popcopy, (void *)pvalue->info.internal.builtin_functions);
+            pvalue->info.internal.builtin_functions = NULL;
+        }
+#else /* ZEND_ENGINE_2_3 and below */
         if(pvalue->doc_comment != NULL)
         {
-            OFREE(popcopy, pvalue->doc_comment);
+            OFREE(popcopy, (void *)pvalue->doc_comment);
             pvalue->doc_comment = NULL;
         }
 
         if(pvalue->filename != NULL)
         {
-            OFREE(popcopy, pvalue->filename);
+            OFREE(popcopy, (void *)pvalue->filename);
             pvalue->filename = NULL;
         }
 
-        free_hashtable(popcopy, &pvalue->function_table, NO_FREE); /* copy_flag_zend_func | checkflag */
         free_hashtable(popcopy, &pvalue->default_properties, NO_FREE); /* copy_flag_zval_ref | copy_flag_pDataPtr | copy_flag_def_prop | checkflag */
         free_hashtable(popcopy, &pvalue->default_static_members, NO_FREE); /* copy_flag_prop_info | checkflag */
 
@@ -2312,12 +2849,12 @@ static void free_zend_class_entry(opcopy_context * popcopy, zend_class_entry * p
             pvalue->static_members = NULL;
         }
 
-        free_hashtable(popcopy, &pvalue->constants_table, NO_FREE);
         if(pvalue->builtin_functions != NULL)
         {
             OFREE(popcopy, (void *)pvalue->builtin_functions);
             pvalue->builtin_functions = NULL;
         }
+#endif /* ZEND_ENGINE_2_4 */
 
         if(ffree == DO_FREE)
         {
@@ -2370,15 +2907,11 @@ static int copy_zend_constant_entry(opcopy_context * popcopy, zend_constant * po
 
         if(poldt->name != NULL)
         {
-            namelen = poldt->name_len + 1;
-            pnewt->name = OMALLOC(popcopy, namelen);
-            if(pnewt->name == NULL)
+            result = wincache_string_pmemcopy(popcopy, poldt->name, poldt->name_len + 1, &pnewt->name TSRMLS_DC);
+            if(FAILED(result))
             {
-                result = popcopy->oomcode;
                 goto Finished;
             }
-
-            memcpy_s(pnewt->name, namelen, poldt->name, namelen);
         }
 
         pzval = &poldt->value;
@@ -2526,7 +3059,7 @@ int opcopy_initialize(opcopy_context * popcopy, alloc_context * palloc, size_t h
 void opcopy_terminate(opcopy_context * popcopy)
 {
     dprintverbose("start opcopy_terminate");
-    
+
     if(popcopy != NULL)
     {
         popcopy->palloc    = NULL;
@@ -2676,7 +3209,7 @@ static int copyin_zend_classes(opcopy_context * popcopy, ocache_value * pvalue T
     zend_class_entry *   nzendcl   = NULL;
 
     dprintverbose("start copyin_zend_classes");
-    
+
     _ASSERT(popcopy != NULL);
     _ASSERT(pvalue  != NULL);
 
@@ -2723,7 +3256,7 @@ static int copyin_zend_classes(opcopy_context * popcopy, ocache_value * pvalue T
         }
 
         clvalue[index].centry = nzendcl;
-        
+
         clvalue[index].cname = OMALLOC(popcopy, cnamelen);
         if(clvalue[index].cname == NULL)
         {
@@ -2963,7 +3496,7 @@ static int copyin_auto_globals(opcopy_context * popcopy, ocache_value * pvalue T
         {
             count++;
         }
-        
+
         zend_hash_move_forward(CG(auto_globals));
     }
 
@@ -2990,7 +3523,7 @@ static int copyin_auto_globals(opcopy_context * popcopy, ocache_value * pvalue T
         if(!pzenda->armed)
         {
             pnewag = &aglobals[aindex];
-        
+
             pnewag->aname = OSTRDUP(popcopy, aname);
             if(pnewag->aname == NULL)
             {
@@ -3292,14 +3825,18 @@ int opcopy_zend_copyout(opcopy_context * popcopy, ocache_value * pvalue TSRMLS_D
             if(pclass->pcname != NULL)
             {
                 ppzendc = NULL;
+#ifdef ZEND_ENGINE_2_4
+                if(zend_lookup_class_ex(pclass->pcname, strlen(pclass->pcname), NULL, 0, &ppzendc TSRMLS_CC) == FAILURE)
+#else /* ZEND_ENGINE_2_3 and below */
                 if(zend_lookup_class_ex(pclass->pcname, strlen(pclass->pcname), 0, &ppzendc TSRMLS_CC) == FAILURE)
+#endif /* ZEND_ENGINE_2_4 */
                 {
                     for(index = index - 1; index >= 0; index--)
                     {
                         pclass = &pvalue->classes[index];
                         zend_hash_del(EG(class_table), pclass->cname, pclass->cnamelen + 1);
                     }
-                    
+
                     result = WARNING_OPCOPY_MISSING_PARENT;
                     goto Finished;
                 }
@@ -3400,7 +3937,7 @@ int opcopy_zend_copyout(opcopy_context * popcopy, ocache_value * pvalue TSRMLS_D
         {
             paglobal = &pvalue->aglobals[index];
             _ASSERT(paglobal != NULL);
- 
+
             zend_is_auto_global(paglobal->aname, paglobal->anamelen TSRMLS_CC);
         }
     }

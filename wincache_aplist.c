@@ -1489,7 +1489,7 @@ int aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC)
     unsigned int     count     = 0;
     unsigned int     index     = 0;
     size_t           offset    = 0;
-    char *           execfile  = NULL;
+    const char *     execfile  = NULL;
 
     dprintverbose("start aplist_force_fccheck");
 
@@ -1701,7 +1701,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     char *           fullpath = NULL;
     zend_file_handle fhandle  = {0};
 
-    dprintverbose("start aplist_fcache_get");
+    dprintverbose("start aplist_fcache_get (%s)", filename);
 
     _ASSERT(pcache     != NULL);
     _ASSERT(filename   != NULL);
@@ -1902,7 +1902,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
 
                 if(fhandle.free_filename && fhandle.filename)
                 {
-                    efree(fhandle.filename);
+                    efree((void *)fhandle.filename);
                     fhandle.filename = NULL;
                 }
             }

@@ -70,10 +70,25 @@
 
 #if PHP_VERSION_ID >= 60000
  #define PHP_VERSION_60
+#elif PHP_VERSION_ID >= 50400
+ #define PHP_VERSION_54
 #elif PHP_VERSION_ID >= 50300
  #define PHP_VERSION_53
 #elif PHP_VERSION_ID >= 50200
  #define PHP_VERSION_52
+#endif
+
+#if ZEND_MODULE_API_NO >= 20100409
+#define ZEND_ENGINE_2_4
+#endif
+#if ZEND_MODULE_API_NO > 20060613
+#define ZEND_ENGINE_2_3
+#endif
+#if ZEND_MODULE_API_NO > 20050922
+#define ZEND_ENGINE_2_2
+#endif
+#if ZEND_MODULE_API_NO > 20050921
+#define ZEND_ENGINE_2_1
 #endif
 
 #ifdef _ASSERT
@@ -122,6 +137,8 @@
 #define FCHECK_FREQ_MAXIMUM        300
 #define TTL_VALUE_MINIMUM          60
 #define TTL_VALUE_MAXIMUM          7200
+#define INTERNED_SIZE_MINIMUM      4
+#define INTERNED_SIZE_MAXIMUM      32
 
 #include "wincache_error.h"
 #include "wincache_debug.h"
@@ -138,6 +155,7 @@
 #include "wincache_aplist.h"
 #include "wincache_zvcache.h"
 #include "wincache_session.h"
+#include "wincache_string.h"
 #include "php_wincache.h"
 
 #endif /* _PRECOMP_H_ */

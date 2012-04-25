@@ -363,9 +363,12 @@ PHP_INI_BEGIN()
 /* index 17 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
 /* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
+#ifdef ZEND_ENGINE_2_4
+/* index 20 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
+#endif /* ZEND_ENGINE_2_4 */
 #ifdef WINCACHE_TEST
-/* index 20 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
-/* index 21 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+/* index 21 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
+/* index 22 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
 
@@ -424,7 +427,11 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(inisavepath) = NULL; /* Fill when ps_open is called */
     WCG(dooctoggle)  = 0;    /* If set to 1, toggle value of ocenabled */
     WCG(dofctoggle)  = 0;    /* If set to 1, toggle value of fcenabled */
-    WCG(apppoolid)    = NULL; /* Use this application id */
+    WCG(apppoolid)   = NULL; /* Use this application id */
+
+#ifdef ZEND_ENGINE_2_4
+    WCG(internedsize) = 4;   /* 4MB for interned strings cache */
+#endif /* ZEND_ENGINE_2_4 */
 
 #ifdef WINCACHE_TEST
     WCG(olocaltest)  = 0;    /* Local opcode test disabled by default */
@@ -647,6 +654,10 @@ PHP_MINIT_FUNCTION(wincache)
     WCG(scachesize)  = (WCG(scachesize)  > ZCACHE_SIZE_MAXIMUM) ? ZCACHE_SIZE_MAXIMUM : WCG(scachesize);
     WCG(maxfilesize) = (WCG(maxfilesize) < FILE_SIZE_MINIMUM)   ? FILE_SIZE_MINIMUM   : WCG(maxfilesize);
     WCG(maxfilesize) = (WCG(maxfilesize) > FILE_SIZE_MAXIMUM)   ? FILE_SIZE_MAXIMUM   : WCG(maxfilesize);
+#ifdef ZEND_ENGINE_2_4
+    WCG(internedsize) = (WCG(internedsize) > INTERNED_SIZE_MAXIMUM) ? INTERNED_SIZE_MAXIMUM : WCG(internedsize);
+    WCG(internedsize) = (WCG(internedsize) < INTERNED_SIZE_MINIMUM) ? INTERNED_SIZE_MINIMUM : WCG(internedsize);
+#endif /* ZEND_ENGINE_2_4 */
 
     /* ttlmax can be set to 0 which means scavenger is completely disabled */
     if(WCG(ttlmax) != 0)
@@ -733,7 +744,14 @@ PHP_MINIT_FUNCTION(wincache)
 
     WCG(lfcache) = plcache1;
 
+    /*
+     * For PHP 5.4 and above, we should not directly hook the
+     * zend_stream_open_function, since PHP 5.4 assumes the handle in the
+     * returned stream will be a php_stream.  Our stream handles are our own
+     * fcache_handle objects.
+     */
     original_stream_open_function = zend_stream_open_function;
+#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3
     zend_stream_open_function = wincache_stream_open_function;
 
 #ifndef PHP_VERSION_52
@@ -742,6 +760,16 @@ PHP_MINIT_FUNCTION(wincache)
 #endif
 
     dprintverbose("Installed function hooks for stream_open");
+#endif /* PHP 5.3 and below */
+
+#ifdef ZEND_ENGINE_2_4
+    /* Initialize "interned" strings */
+    result = wincache_interned_strings_init(TSRMLS_C);
+    if (FAILED(result))
+    {
+        goto Finished;
+    }
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Initialize opcode cache */
     resnumber = zend_get_resource_handle(&extension);
@@ -888,6 +916,10 @@ Finished:
             pzcache = NULL;
             WCG(zvucache) = NULL;
         }
+
+#ifdef ZEND_ENGINE_2_4
+        wincache_interned_strings_shutdown(TSRMLS_C);
+#endif /* ZEND_ENGINE_2_4 */
     }
 
     dprintverbose("end php_minit");
@@ -903,14 +935,18 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
     {
         goto Finished;
     }
-    
+
+#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3
+
 #ifndef PHP_VERSION_52
     zend_resolve_path = original_resolve_path;
 #endif
 
     zend_stream_open_function = original_stream_open_function;
     zend_compile_file = original_compile_file;
-    
+
+#endif /* PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3 */
+
     if(WCG(detours) != NULL)
     {
         detours_terminate(WCG(detours));
@@ -979,6 +1015,10 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
 
         WCG(phscache) = NULL;
     }
+
+#ifdef ZEND_ENGINE_2_4
+    wincache_interned_strings_shutdown(TSRMLS_C);
+#endif /* ZEND_ENGINE_2_4 */
 
     filemap_global_terminate(TSRMLS_C);
 
@@ -1189,6 +1229,8 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
     char *         fullpath = NULL;
     unsigned char  cenabled = 0;
 
+    dprintverbose("start wincache_stream_open_function");
+
     cenabled = WCG(fcenabled);
 
     /* If fcenabled is not modified in php code and toggle is set, change cenabled */
@@ -1259,6 +1301,8 @@ Finished:
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
 
+    dprintverbose("end wincache_stream_open_function");
+
     return SUCCESS;
 }
 
@@ -1266,7 +1310,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
 {
     int              result   = NONFATAL;
     int              dummy    = -1;
-    char *           filename = NULL;
+    const char *     filename = NULL;
     char *           fullpath = NULL;
 
     fcache_value *   pfvalue  = NULL;
@@ -1317,12 +1361,12 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     /* try to compile file again if it detects it in included_files list */
     if(file_handle->opened_path != NULL)
     {
-        dprintimportant("wincache_compile_file called for %s", file_handle->opened_path);
+        dprintimportant("wincache_compile_file called for f_h->opened_path %s", file_handle->opened_path);
         zend_hash_add(&EG(included_files), file_handle->opened_path, strlen(file_handle->opened_path) + 1, (void *)&dummy, sizeof(int), NULL);
     }
     else
     {
-        dprintimportant("wincache_compile_file called for %s", fullpath);
+        dprintimportant("wincache_compile_file called for fullpath %s", fullpath);
         zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
 
         /* Set opened_path to fullpath */
@@ -1346,7 +1390,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
             goto Finished;
         }
 
-        /* If everything went file, add the file handle to open_files */
+        /* If everything went fine, add the file handle to open_files */
         /* list for PHP core to call the destructor when done */
         zend_llist_add_element(&CG(open_files), file_handle);
 
@@ -2689,17 +2733,17 @@ WINCACHE_FUNC(wincache_rmdir)
 
             if (lexists)
             {
-                // If listener still exists then wait until it is cleared out by file change notification thread
+                /* If listener still exists then wait until it is cleared out by file change notification thread */
                 dprintimportant("wincache_rmdir: Waiting for file change listener to close");
                 Sleep(50);
             }
             else
             {
-                // If listener does not exist for this directory then stop waiting.
+                /* If listener does not exist for this directory then stop waiting. */
                 break;
             }
 
-            // If it takes more than 1 second then exit to prevent process hangs.
+            /* If it takes more than 1 second then exit to prevent process hangs. */
             if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
             {
                 dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");

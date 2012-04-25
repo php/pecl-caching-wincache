@@ -524,6 +524,7 @@ bool TestWinCache::runinIE(char* fullURL, char* physicalPath)
         OleUninitialize();
         return true;
     }
+    return false;
 }
 
 DWORD TestWinCache::runtest(char* src, char* url)
@@ -572,9 +573,9 @@ DWORD TestWinCache::runtest(char* src, char* url)
         if ((ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             ||(strstr(ffd.cFileName, ".out.txt"))
             ||(strstr(ffd.cFileName, "_base"))
-            ||(!stricmp(ffd.cFileName, "common.inc"))
-            ||(!stricmp(ffd.cFileName, "output.txt"))
-            ||(!stricmp(ffd.cFileName, "result.txt")))
+            ||(!_stricmp(ffd.cFileName, "common.inc"))
+            ||(!_stricmp(ffd.cFileName, "output.txt"))
+            ||(!_stricmp(ffd.cFileName, "result.txt")))
         {
             continue;
         }
@@ -608,7 +609,7 @@ int main(int argc, char* argv[])
 {
     if (argc == 2)
     {
-        if (stricmp(argv[1], "--detailed"))
+        if (_stricmp(argv[1], "--detailed"))
         {
             cout << "Usage: test_wincache folder_path local_url" << endl;
             cout << "       folder_path: path to a webroot containing the PHP files" << endl;

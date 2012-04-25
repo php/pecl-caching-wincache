@@ -135,7 +135,11 @@ PS_OPEN_FUNC(wincache)
             save_path = php_get_temporary_directory();
 
             /* Check if path is accessible as per open_basedir */
-            if((PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) || php_check_open_basedir(save_path TSRMLS_CC))
+            if(
+#ifndef ZEND_ENGINE_2_4
+                (PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) ||
+#endif /* ZEND_ENGINE_2_4 */
+                php_check_open_basedir(save_path TSRMLS_CC))
             {
                 result = FATAL_SESSION_INITIALIZE;
                 goto Finished;

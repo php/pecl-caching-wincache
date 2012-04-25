@@ -104,6 +104,9 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     zend_ini_entry *         inisavepath; /* save_path ini_entry in ini_directives */
     unsigned char            dooctoggle;  /* Do toggle of ocenabled due to filter settigns */
     unsigned char            dofctoggle;  /* Do toggle of fcenabled due to filter settigns */
+#ifdef ZEND_ENGINE_2_4
+    unsigned int             internedsize; /* Bytes for the interned strings cache */
+#endif /* ZEND_ENGINE_2_4 */
 #ifdef WINCACHE_TEST
     zend_bool                olocaltest;  /* Local opcode cache test configuration */
 #endif
