@@ -314,7 +314,11 @@ static void free_zval(opcopy_context * popcopy, zval * pvalue, unsigned char ffr
 
                 case IS_STRING:
                 case IS_CONSTANT:
-                    if(pvalue->value.str.val && !IS_INTERNED(pvalue->value.str.val))
+                    if(pvalue->value.str.val
+#ifdef ZEND_ENGINE_2_4
+                       && !IS_INTERNED(pvalue->value.str.val)
+#endif /* ZEND_ENGINE_2_4 */
+                       )
                     {
                         OFREE(popcopy, pvalue->value.str.val);
                         pvalue->value.str.val = NULL;
@@ -619,7 +623,11 @@ Finished:
         {
             if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
             {
-                if(pnewp->name != NULL && !IS_INTERNED(pnewp->name))
+                if(pnewp->name != NULL
+#ifdef ZEND_ENGINE_2_4
+                   && !IS_INTERNED(pnewp->name)
+#endif /* ZEND_ENGINE_2_4 */
+                   )
                 {
                     OFREE(popcopy, (void *)pnewp->name);
                     pnewp->name = NULL;
@@ -651,7 +659,11 @@ static void free_zend_property_info(opcopy_context * popcopy, zend_property_info
     {
         _ASSERT(popcopy->palloc != NULL);
 
-        if(pvalue->name != NULL && !IS_INTERNED(pvalue->name))
+        if(pvalue->name != NULL
+#ifdef ZEND_ENGINE_2_4
+           && !IS_INTERNED(pvalue->name)
+#endif /* ZEND_ENGINE_2_4 */
+           )
         {
             OFREE(popcopy, (void *)pvalue->name);
             pvalue->name = NULL;
@@ -739,13 +751,21 @@ Finished:
 
         if(pnewarg != NULL)
         {
-            if(pnewarg->name != NULL && !IS_INTERNED(pnewarg->name))
+            if(pnewarg->name != NULL
+#ifdef ZEND_ENGINE_2_4
+               && !IS_INTERNED(pnewarg->name)
+#endif /* ZEND_ENGINE_2_4 */
+               )
             {
                 OFREE(popcopy, (void *)pnewarg->name);
                 pnewarg->name = NULL;
             }
 
-            if(pnewarg->class_name != NULL && !IS_INTERNED(pnewarg->class_name))
+            if(pnewarg->class_name != NULL
+#ifdef ZEND_ENGINE_2_4
+               && !IS_INTERNED(pnewarg->class_name)
+#endif /* ZEND_ENGINE_2_4 */
+               )
             {
                 OFREE(popcopy, (void *)pnewarg->class_name);
                 pnewarg->class_name = NULL;
@@ -770,13 +790,21 @@ static void free_zend_arg_info(opcopy_context * popcopy, zend_arg_info * pvalue,
     {
         _ASSERT(popcopy->palloc != NULL);
 
-        if(pvalue->name != NULL && !IS_INTERNED(pvalue->name))
+        if(pvalue->name != NULL
+#ifdef ZEND_ENGINE_2_4
+           && !IS_INTERNED(pvalue->name)
+#endif /* ZEND_ENGINE_2_4 */
+           )
         {
             OFREE(popcopy, (void *)pvalue->name);
             pvalue->name = NULL;
         }
 
-        if(pvalue->class_name != NULL && !IS_INTERNED(pvalue->class_name))
+        if(pvalue->class_name != NULL
+#ifdef ZEND_ENGINE_2_4
+           && !IS_INTERNED(pvalue->class_name)
+#endif /* ZEND_ENGINE_2_4 */
+           )
         {
             OFREE(popcopy, (void *)pvalue->class_name);
             pvalue->class_name = NULL;
@@ -1473,9 +1501,9 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
                 ((poldop->op1.op_type == IS_CONST &&
                   poldop->op1.u.constant.type == IS_CONSTANT_ARRAY) ||
                 (poldop->op2.op_type == IS_CONST &&
-                  poldop->op2.u.constant.type == IS_CONSTANT_ARRAY))))
+                  poldop->op2.u.constant.type == IS_CONSTANT_ARRAY)))
 #endif /* ZEND_ENGINE_2_4 */
-                  )
+               )
             {
                 result = copy_zend_op(popcopy, poldop, &pnewop);
                 if(FAILED(result))
