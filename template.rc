@@ -39,8 +39,8 @@
 #include "main/php_version.h"
 
 #define WINCACHE_VMAJOR     1
-#define WINCACHE_VMINOR     2
-#define WINCACHE_VMMDD      427
+#define WINCACHE_VMINOR     3
+#define WINCACHE_VMMDD      0
 #define WINCACHE_VREVISION  0
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
@@ -80,7 +80,7 @@ BEGIN
             VALUE "CompanyName", "Microsoft Corp.\0"
             VALUE "FileDescription", "Windows Cache Extension for PHP\0"
             VALUE "FileVersion", STRVER4(WINCACHE_VMAJOR,WINCACHE_VMINOR,WINCACHE_VMMDD,WINCACHE_VREVISION)
-            VALUE "LegalCopyright", "Copyright © 2009 Microsoft Corp. All Rights Reserved.\0"
+            VALUE "LegalCopyright", "Copyright © 2012 Microsoft Corp. All Rights Reserved.\0"
             VALUE "OriginalFilename", FILE_NAME "\0"
             VALUE "ProductName", "Windows Cache Extension " STRVER2(WINCACHE_VMAJOR,WINCACHE_VMINOR) " for PHP " STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION)
             VALUE "ProductVersion", STRVER2(WINCACHE_VMAJOR,WINCACHE_VMINOR)
