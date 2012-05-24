@@ -2693,6 +2693,7 @@ WINCACHE_FUNC(wincache_rmdir)
     aplist_context *   pcache       = NULL;
     unsigned int       sticks       = 0;
     unsigned char      lexists      = 0;
+    char *             fullpath     = NULL;
 
     dprintverbose("start wincache_rmdir");
 
@@ -2706,9 +2707,23 @@ WINCACHE_FUNC(wincache_rmdir)
         goto Finished;
     }
 
+    if(IS_ABSOLUTE_PATH(dirname, dirname_len))
+    {
+        fullpath = dirname;
+    }
+    else
+    {
+        fullpath = utils_fullpath(dirname);
+        if(fullpath == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
+    }
+
     pcache = WCG(lfcache);
 
-    result = aplist_fcache_get(pcache, dirname, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
+    result = aplist_fcache_get(pcache, fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -2753,6 +2768,12 @@ WINCACHE_FUNC(wincache_rmdir)
     }
 
 Finished:
+
+    if(fullpath != NULL && fullpath != dirname)
+    {
+        alloc_efree(fullpath);
+        fullpath = NULL;
+    }
 
     if(respath != NULL)
     {
