@@ -130,7 +130,7 @@
 #define FCACHE_SIZE_MINIMUM        5
 #define FCACHE_SIZE_MAXIMUM        255
 #define ZCACHE_SIZE_MINIMUM        5
-#define ZCACHE_SIZE_MAXIMUM        85
+#define ZCACHE_SIZE_MAXIMUM        1024
 #define FILE_SIZE_MINIMUM          10
 #define FILE_SIZE_MAXIMUM          4096
 #define FCHECK_FREQ_MINIMUM        2
