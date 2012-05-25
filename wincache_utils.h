@@ -40,7 +40,7 @@ extern const char * utils_filepath(zend_file_handle * file_handle);
 extern char *       utils_fullpath(const char * filename);
 extern int          utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
 extern int          utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer, unsigned int length);
-extern int          utils_apoolpid();
+extern int          utils_apoolpid(TSRMLS_D);
 extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
 extern char *       utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC);
 

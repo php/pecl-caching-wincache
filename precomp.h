@@ -35,10 +35,11 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.3.1.0"
+#define PHP_WINCACHE_EXTVER    "1.3.2.0"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
+/* #define DEBUG_DUMP_OPARRAY */
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)
@@ -155,7 +156,9 @@
 #include "wincache_aplist.h"
 #include "wincache_zvcache.h"
 #include "wincache_session.h"
+#ifdef ZEND_ENGINE_2_4
 #include "wincache_string.h"
+#endif /* ZEND_ENGINE_2_4 */
 #include "php_wincache.h"
 
 #endif /* _PRECOMP_H_ */

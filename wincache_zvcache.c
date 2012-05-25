@@ -686,7 +686,7 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
 
     /* bucket key name is copied starting at last element of struct Bucket */
     // BUGBUG: in some cases nKeyLength can be zero.
-    msize = sizeof(zv_Bucket) + poriginal->nKeyLength - sizeof(char);
+    msize = sizeof(zv_Bucket) + poriginal->nKeyLength;
 
     /* Allocate memory if required */
     if(*pcopied == NULL)
@@ -714,8 +714,11 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     pnewb->pListLast  = 0;
     pnewb->pNext      = 0;
     pnewb->pLast      = 0;
-
+#ifdef ZEND_ENGINE_2_4
+    memcpy_s(&pnewb->arKey, poriginal->nKeyLength+1, poriginal->arKey, poriginal->nKeyLength+1);
+#else /* ZEND_ENGINE_2_3 and Below */
     memcpy_s(&pnewb->arKey, poriginal->nKeyLength, &poriginal->arKey, poriginal->nKeyLength);
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Do zval ref copy */
     pbuffer = (size_t *)ZMALLOC(pcopy, sizeof(size_t));
@@ -935,9 +938,16 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     _ASSERT(pcopied   != NULL);
     _ASSERT(poriginal != NULL);
 
+#ifdef ZEND_ENGINE_2_4
+    /*
+     * In Zend 2.4, arKey field is now a pointer, and not necessarily to memory
+     * at the end of the Bucket struct.  We must alloc space for the null-term.
+     */
+    msize = sizeof(Bucket) + pcopied->nKeyLength + sizeof(char);
+#else /* ZEND_ENGINE_2_3 and Below */
     /* bucket key name is copied starting at last element of struct Bucket */
-    // BUGBUG: in some cases nKeyLength can be zero.
-    msize = sizeof(Bucket) + pcopied->nKeyLength - sizeof(char);
+    msize = sizeof(Bucket) + pcopied->nKeyLength;
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Allocate memory if required */
     if(*poriginal == NULL)
@@ -948,7 +958,7 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
             result = pcopy->oomcode;
             goto Finished;
         }
-
+        ZeroMemory(pnewb, msize);
         allocated = 1;
     }
     else
@@ -965,7 +975,18 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     pnewb->pNext      = NULL;
     pnewb->pLast      = NULL;
 
+#ifdef ZEND_ENGINE_2_4
+    if (pnewb->nKeyLength)
+    {
+        pnewb->arKey = (const char *)(pnewb + 1);
+        memcpy_s((char *)pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
+    }
+#else /* ZEND_ENGINE_2_3 and Below */
     memcpy_s((char *)&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
+#endif /* ZEND_ENGINE_2_4 */
+
+    /* NOTE: arKey is null-terminated because we ZeroMem'd the buffer, above */
+    _ASSERT(pnewb->arKey[pnewb->nKeyLength] == '\0');
 
     /* Do zval ref copy */
     pbuffer = (zval **)ZMALLOC(pcopy, sizeof(zval *));

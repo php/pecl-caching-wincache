@@ -2043,6 +2043,38 @@ void aplist_fcache_close(aplist_context * pcache, fcache_value * pfvalue)
     return;
 }
 
+/*++
+
+Routine Description:
+
+    Fetches the cached opcode cache entry for the filename/file_handle, if it
+    exists.
+
+    If the file is not cached, compile the file and create the opcode cache
+    entry with the returned opcode array.
+
+    If this function creates the opcode cache entry, the poparray will contain
+    the original compiled opcode array.  If this function simply found an
+    existing opcode cache entry, the poparray will contain NULL.
+
+Arguments:
+
+    pcache - Cache Context.
+    filename - Name of file to cache.
+    file_handle - File handle of file to cache.
+    type - (???)
+    poparray - receives pointer to opcode array if the file is not found in the
+      opcode cache.  Set to NULL if the file is in the opcode cache, or if the
+      call failed.
+    ppvalue - On successful return, receives the pointer to the opcode cache
+      entry.  Set to NULL if the call failed.
+
+Return Value:
+
+    NONFATAL - successful return.
+    FAILED() - downstream failure.
+
+--*/
 int aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_handle * file_handle, int type, zend_op_array ** poparray, ocache_value ** ppvalue TSRMLS_DC)
 {
     int            result  = NONFATAL;
@@ -2514,3 +2546,4 @@ Finished:
 
     return;
 }
+

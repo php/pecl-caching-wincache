@@ -319,7 +319,7 @@ Finished:
     return result;
 }
 
-int utils_apoolpid()
+int utils_apoolpid(TSRMLS_D)
 {
     int          retval = -1;
     char *       buffer = NULL;
@@ -423,10 +423,21 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
         return NULL;
     }
 
+    /*
+     * if filename starts with: "." or "..\"
+     * --OR--
+     * if filename starts with: "X:" or "\\"
+     * --OR--
+     * if filename starts with: "\" (root on current drive)
+     * --OR--
+     * path is NULL or empty
+     * --THEN--
+     * this is an absolute path.
+     */
     if ((*filename == '.' && 
          (IS_SLASH(filename[1]) || 
           ((filename[1] == '.') && IS_SLASH(filename[2])))) ||
-        IS_ABSOLUTE_PATH(filename, filename_length) ||
+         (IS_ABSOLUTE_PATH(filename, filename_length) || IS_SLASH(filename[0])) ||
         !path ||
         !*path) {
         if (tsrm_realpath(filename, resolved_path TSRMLS_CC)) {

@@ -76,7 +76,7 @@ static unsigned int getppid(TSRMLS_D)
     }
 
     /* Use CRC of user provided apppoolid as ppid if available */
-    poolpid = utils_apoolpid();
+    poolpid = utils_apoolpid(TSRMLS_C);
     if(poolpid != -1)
     {
         WCG(parentpid) = poolpid;
@@ -1342,3 +1342,4 @@ Finished:
 
     return;
 }
+

@@ -102,7 +102,7 @@ static int  copyout_zend_function(opcopy_context * popcopy, zend_function * pold
 static int  copyout_zend_class(opcopy_context * popcopy, zend_class_entry * poldce, zend_class_entry ** ppnewce);
 static int  copyout_zend_constant(opcopy_context * popcopy, zend_constant * poldt, zend_constant ** pnewt);
 
-static int  wincache_string_pmemcopy(opcopy_context * popcopy, const char *str, size_t len, const char **newStr TSRMLS_CC);
+static int  wincache_string_pmemcopy(opcopy_context * popcopy, const char *str, size_t len, const char **newStr);
 
 /* copyin functions are to copy internal data structures to shared memory */
 /* Use offsets where ever pointers types are used */
@@ -115,15 +115,14 @@ static int wincache_string_pmemcopy(
     const char *str,
     size_t len,
     const char **newStr
-    TSRMLS_DC
     )
 {
     int result = NONFATAL;
     char * ret = NULL;
-    int length = 0;
+
+    TSRMLS_FETCH();
 
     *newStr = NULL;
-
 
 #ifdef ZEND_ENGINE_2_4
 #ifndef ZTS
@@ -136,15 +135,14 @@ static int wincache_string_pmemcopy(
     }
 #endif /* !ZTS */
 #endif /* ZEND_ENGINE_2_4 */
-    length = len + 1;
-    ret = OMALLOC(popcopy, length);
+    ret = OMALLOC(popcopy, len);
     if(ret == NULL)
     {
         result = popcopy->oomcode;
         goto Finished;
     }
 
-    memcpy_s(ret, length, str, length);
+    memcpy_s(ret, len, str, len);
     *newStr = ret;
 
 Finished:
@@ -220,7 +218,7 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
             /* Copy string to shared memory */
             if(poldz->value.str.val)
             {
-                result = wincache_string_pmemcopy(popcopy, poldz->value.str.val, poldz->value.str.len + 1, &pnewz->value.str.val TSRMLS_DC);
+                result = wincache_string_pmemcopy(popcopy, poldz->value.str.val, poldz->value.str.len + 1, &pnewz->value.str.val);
                 if(FAILED(result))
                 {
                     goto Finished;
@@ -435,7 +433,6 @@ static int copy_zval_array(opcopy_context * popcopy, zval ** ppoldz, unsigned in
     size_t  size       = 0;
     zval ** prgnewz    = NULL;
 
-    TSRMLS_FETCH();
     dprintdecorate("start copy_zval_array");
 
     _ASSERT(popcopy != NULL);
@@ -578,23 +575,22 @@ static int copy_zend_property_info(opcopy_context * popcopy, zend_property_info 
     /* Do a blind copy before doing deep copy of name and doc_comment */
     memcpy_s(pnewp, sizeof(zend_property_info), poldp, sizeof(zend_property_info));
 
+    pnewp->name        = NULL;
+
+    /* pnewp->ce will be set during fixup */
+    if(poldp->name != NULL)
+    {
+        result = wincache_string_pmemcopy(popcopy, poldp->name, poldp->name_length + 1, &pnewp->name);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+
     /* Do a deep copy for copyin. For copyout, shallow copy is enough */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
     {
-        pnewp->name        = NULL;
         pnewp->doc_comment = NULL;
-
-        /* pnewp->ce will be set during fixup */
-        if(poldp->name != NULL)
-        {
-            result = wincache_string_pmemcopy(popcopy, poldp->name, poldp->name_length + 1, &pnewp->name TSRMLS_DC);
-            if(FAILED(result))
-            {
-                goto Finished;
-            }
-        }
-
-        // REVIEW: Question: Is doc_comment no longer used on ZEND_ENGINE_2_4?
         if(poldp->doc_comment != NULL)
         {
             doclen =poldp->doc_comment_len + 1;
@@ -723,7 +719,7 @@ static int copy_zend_arg_info(opcopy_context * popcopy, zend_arg_info * poldarg,
 
     if(poldarg->name != NULL)
     {
-        result = wincache_string_pmemcopy(popcopy, poldarg->name, poldarg->name_len + 1, &pnewarg->name TSRMLS_DC);
+        result = wincache_string_pmemcopy(popcopy, poldarg->name, poldarg->name_len + 1, &pnewarg->name);
         if(FAILED(result))
         {
             goto Finished;
@@ -732,7 +728,7 @@ static int copy_zend_arg_info(opcopy_context * popcopy, zend_arg_info * poldarg,
 
     if(poldarg->class_name != NULL)
     {
-        result = wincache_string_pmemcopy(popcopy, poldarg->class_name, poldarg->class_name_len + 1, &pnewarg->class_name TSRMLS_DC);
+        result = wincache_string_pmemcopy(popcopy, poldarg->class_name, poldarg->class_name_len + 1, &pnewarg->class_name);
         if(FAILED(result))
         {
             goto Finished;
@@ -1320,7 +1316,9 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
             goto Finished;
         }
 
-        *pnewopa->refcount = *poldopa->refcount;
+        /* We should make this some really large number, so it can never be deref'd. */
+#define BIG_VALUE (64 * 1024)
+        *pnewopa->refcount = BIG_VALUE;
     }
 
     if(poldopa->static_variables != NULL)
@@ -1370,7 +1368,7 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
             {
                 result = popcopy->oomcode;
                 goto Finished;
-        }
+            }
         }
 
         if(poldopa->filename != NULL)
@@ -1431,39 +1429,40 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
 
             memcpy_s(pnewopa->try_catch_array, msize, poldopa->try_catch_array, msize);
         }
+    }
 
-        if(poldopa->vars != NULL)
+    /* For interened strings, we have to copy both in and out */
+    if(poldopa->vars != NULL)
+    {
+        msize = poldopa->last_var * sizeof(zend_compiled_variable);
+        pnewopa->vars = (zend_compiled_variable *)OMALLOC(popcopy, msize);
+        if(pnewopa->vars == NULL)
         {
-            msize = poldopa->last_var * sizeof(zend_compiled_variable);
-            pnewopa->vars = (zend_compiled_variable *)OMALLOC(popcopy, msize);
-            if(pnewopa->vars == NULL)
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        memcpy_s(pnewopa->vars, msize, poldopa->vars, msize);
+
+        for(index = 0; index < poldopa->last_var; index++)
+        {
+            if(poldopa->vars[index].name != NULL)
             {
-                result = popcopy->oomcode;
-                goto Finished;
+                result = wincache_string_pmemcopy(popcopy,
+                                                  poldopa->vars[index].name,
+                                                  poldopa->vars[index].name_len + 1,
+                                                  &pnewopa->vars[index].name);
+                if(FAILED(result))
+                {
+                    goto Finished;
+                }
+
+                pnewopa->vars[index].name_len = poldopa->vars[index].name_len;
             }
-
-            memcpy_s(pnewopa->vars, msize, poldopa->vars, msize);
-
-            for(index = 0; index < poldopa->last_var; index++)
+            else
             {
-                if(poldopa->vars[index].name != NULL)
-                {
-                    result = wincache_string_pmemcopy(popcopy,
-                                                      poldopa->vars[index].name,
-                                                      poldopa->vars[index].name_len + 1,
-                                                      &pnewopa->vars[index].name TSRMLS_DC);
-                    if(FAILED(result))
-                    {
-                        goto Finished;
-                    }
-
-                    pnewopa->vars[index].name_len = poldopa->vars[index].name_len;
-                }
-                else
-                {
-                    pnewopa->vars[index].name = NULL;
-                    pnewopa->vars[index].name_len = 0;
-                }
+                pnewopa->vars[index].name = NULL;
+                pnewopa->vars[index].name_len = 0;
             }
         }
     }
@@ -2062,6 +2061,7 @@ static int copy_hashtable(opcopy_context * popcopy, HashTable * poldh, unsigned 
 
     pnewh->pListTail = ptemp;
 
+    zend_hash_internal_pointer_reset(pnewh);
     *ppnewh = pnewh;
     _ASSERT(SUCCEEDED(result));
 
@@ -2262,22 +2262,22 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     /* In some cases, poldb->nKeyLength can be zero. */
     if (poldb->nKeyLength)
     {
-        const char *arKey = NULL;
-        pnewb->arKey = (char *)OMALLOC(popcopy, poldb->nKeyLength);
-        if (pnewb->arKey == NULL)
+        result  = wincache_string_pmemcopy(popcopy,
+                                           poldb->arKey,
+                                           poldb->nKeyLength+1,
+                                           &pnewb->arKey);
+        if (FAILED(result))
         {
-            result = popcopy->oomcode;
             goto Finished;
         }
-        allocated = 2;
-        memcpy_s((void *)pnewb->arKey, poldb->nKeyLength, poldb->arKey, poldb->nKeyLength);
+
+        allocated &= 2;
     }
 #else /* ZEND_ENGINE_2_3 and below */
     /*
      * NOTE: This assumes the string for arKey is contiguously alloc'd within
      * the poldb Bucket.
      */
-    // REVIEW: what if poldb->nKeyLength is 0?
     msize = sizeof(Bucket) + poldb->nKeyLength - 1;
     if(*ppnewb == NULL)
     {
@@ -2294,8 +2294,6 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     /* Copy hashcode value and set pointers to NULL */
     _ASSERT(pnewb != NULL);
     memcpy_s(pnewb, msize, poldb, msize);
-    // REVIEW: Shouldn't pnewb->arKey get fixed up after copying?
-    // REVIEW: pnewb->arKey = (const char *)(pnewb + 1);
 #endif /* ZEND_ENGINE_2_4 */
 
     pnewb->pData      = NULL;
@@ -2351,7 +2349,10 @@ Finished:
 #ifdef ZEND_ENGINE_2_4
             if (allocated & 2)
             {
-                OFREE(popcopy, (char *)pnewb->arKey);
+                if(!IS_INTERNED(pnewb->arKey))
+                {
+                    OFREE(popcopy, (char *)pnewb->arKey);
+                }
             }
 #endif /* ZEND_ENGINE_2_4 */
             if (allocated & 1)
@@ -2748,7 +2749,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     {
         for(count = 0; poldce->type == ZEND_INTERNAL_CLASS && poldce->info.internal.builtin_functions[count].fname != NULL; count++)
         {
-            /* build up 'count' so we can set the buildin_functions pointer correctly */
+            /* build up 'count' so we can set the builtin_functions pointer correctly */
         }
 
         pnewce->info.internal.builtin_functions = (zend_function_entry *)OMALLOC(popcopy, (count + 1) * sizeof(zend_function_entry));
@@ -2928,21 +2929,22 @@ static int copy_zend_constant_entry(opcopy_context * popcopy, zend_constant * po
     /* Do a blind copy before doing deep copy of zval, name */
     memcpy_s(pnewt, sizeof(zend_constant), poldt, sizeof(zend_constant));
 
+    /* Copy the name */
+    pnewt->name = NULL;
+
+    if(poldt->name != NULL)
+    {
+        result = wincache_string_pmemcopy(popcopy, poldt->name, poldt->name_len + 1, &pnewt->name);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+
     /* Do a deep copy for copyin. For copyout, shallow copy is enough */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
     {
-        pnewt->name = NULL;
-
-        if(poldt->name != NULL)
-        {
-            result = wincache_string_pmemcopy(popcopy, poldt->name, poldt->name_len + 1, &pnewt->name TSRMLS_DC);
-            if(FAILED(result))
-            {
-                goto Finished;
-            }
-        }
-
-        pzval = &poldt->value;
+        pzval = &pnewt->value;
         result = copy_zval(popcopy, &poldt->value, &pzval);
         if(FAILED(result))
         {

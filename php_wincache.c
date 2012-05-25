@@ -379,6 +379,9 @@ static void globals_terminate(zend_wincache_globals * globals TSRMLS_DC);
 static unsigned char isin_ignorelist(const char * ignorelist, const char * filename);
 static unsigned char isin_cseplist(const char * cseplist, const char * szinput);
 static void errmsglist_dtor(void * pvoid);
+#ifdef DEBUG_DUMP_OPARRAY
+static void dump_oparray(zend_op_array *op_array, const char *filename, zend_bool fOriginalCompile);
+#endif /* DEBUG_DUMP_OPARRAY */
 
 /* Initialize globals */
 static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
@@ -630,7 +633,7 @@ PHP_MINIT_FUNCTION(wincache)
     rethash = zend_hash_find(EG(ini_directives), "wincache.fcenabled", sizeof("wincache.fcenabled"), (void **)&pinientry);
     _ASSERT(rethash != FAILURE);
     WCG(inifce) = pinientry;
-    
+
     rethash = zend_hash_find(EG(ini_directives), "wincache.ocenabled", sizeof("wincache.ocenabled"), (void **)&pinientry);
     _ASSERT(rethash != FAILURE);
     WCG(inioce) = pinientry;
@@ -763,12 +766,14 @@ PHP_MINIT_FUNCTION(wincache)
 #endif /* PHP 5.3 and below */
 
 #ifdef ZEND_ENGINE_2_4
+#if !defined(ZTS)
     /* Initialize "interned" strings */
     result = wincache_interned_strings_init(TSRMLS_C);
     if (FAILED(result))
     {
         goto Finished;
     }
+#endif /* !defined(ZTS) */
 #endif /* ZEND_ENGINE_2_4 */
 
     /* Initialize opcode cache */
@@ -918,7 +923,9 @@ Finished:
         }
 
 #ifdef ZEND_ENGINE_2_4
+#if !defined(ZTS)
         wincache_interned_strings_shutdown(TSRMLS_C);
+#endif /* !defined(ZTS) */
 #endif /* ZEND_ENGINE_2_4 */
     }
 
@@ -1017,7 +1024,9 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
     }
 
 #ifdef ZEND_ENGINE_2_4
+#if !defined(ZTS)
     wincache_interned_strings_shutdown(TSRMLS_C);
+#endif /* !defined(ZTS) */
 #endif /* ZEND_ENGINE_2_4 */
 
     filemap_global_terminate(TSRMLS_C);
@@ -1390,6 +1399,11 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
             goto Finished;
         }
 
+#ifdef DEBUG_DUMP_OPARRAY
+        dprintverbose("Dumping Cached Opcode Array:");
+        dump_oparray(oparray, fullpath, FALSE);
+#endif /* DEBUG_DUMP_OPARRAY */
+
         /* If everything went fine, add the file handle to open_files */
         /* list for PHP core to call the destructor when done */
         zend_llist_add_element(&CG(open_files), file_handle);
@@ -1419,6 +1433,13 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
             WCG(oclisttail) = pentry;
         }
     }
+#ifdef DEBUG_DUMP_OPARRAY
+    else
+    {
+        dprintverbose("Dumping ZEND Opcode Array:");
+        dump_oparray(oparray, fullpath, TRUE);
+    }
+#endif /* DEBUG_DUMP_OPARRAY */
 
 Finished:
 
@@ -4432,3 +4453,280 @@ Finished:
     return;
 }
 #endif
+
+#ifdef DEBUG_DUMP_OPARRAY
+HANDLE create_temp_file(const char *filename, zend_bool fOriginalCompile)
+{
+    char temp_path[MAX_PATH];
+    char fixed_filename[MAX_PATH];
+    unsigned int i;
+    unsigned int ret = 0;
+    size_t len = strlen(filename);
+
+    /* copy the filename */
+    memcpy_s(fixed_filename, MAX_PATH, filename, len+1);
+
+    /* convert all '\' & '.' to '_' */
+    for (i = 0; i < len; i++) {
+        if (fixed_filename[i] == '\\' || fixed_filename[i] == '.' || fixed_filename[i] == ':') {
+            fixed_filename[i] = '_';
+        }
+    }
+
+    /* Get the temp directory */
+    ret = GetTempPath(MAX_PATH, temp_path);
+    if (!ret || ret > MAX_PATH)
+    {
+        return NULL;
+    }
+
+    /* TODO: if temp_path '\' { "orig" | "cache" } does not exist, create it. */
+
+    /* Build the complete temp filename string */
+    sprintf_s(&temp_path[ret], MAX_PATH-ret, "%s\\%s",
+        (fOriginalCompile ? "orig" : "cache"),
+        fixed_filename);
+
+    dprintimportant("create_temp_file: %s", temp_path);
+
+    /* try to create if not exists */
+    return CreateFile(temp_path, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+}
+
+const char * get_zval_string(zval *zv)
+{
+    const char *ret = "...";
+    static char number[20];
+    static char string[1024];
+
+    switch(zv->type) {
+    case IS_STRING:
+        sprintf_s(string, 1024, "[%d]%s",
+            zv->value.str.len,
+            zv->value.str.val);
+        ret = string;
+        break;
+    case IS_NULL:
+    case IS_LONG:
+    case IS_BOOL:
+        sprintf_s(number, 20, "%d", zv->value.lval);
+        ret = number;
+        break;
+    case IS_DOUBLE:
+        sprintf_s(number, 20, "%f", zv->value.dval);
+        ret = number;
+        break;
+    case IS_ARRAY:
+        ret = "ARRAY";
+        break;
+    case IS_OBJECT:
+        ret = "OBJ";
+        break;
+    case IS_RESOURCE:
+        ret = "RES";
+        break;
+    case IS_CONSTANT:
+        ret = "CONST";
+        break;
+    case IS_CONSTANT_ARRAY:
+        ret = "C_ARRAY";
+        break;
+    case IS_CALLABLE:
+        ret = "CALL";
+        break;
+    default:
+        ret = "WTF";
+        break;
+    }
+
+    return ret;
+}
+
+const char * get_op_string(zend_uchar op_type, znode_op *op)
+{
+    const char *ret = "...";
+
+/* IS_* #define's are only the lower five bits */
+#define OP_TYPE_MASK 0x1F
+
+    switch (op_type & OP_TYPE_MASK) {
+    case IS_CONST:
+        ret = get_zval_string(op->zv);
+        break;
+
+    case IS_TMP_VAR:
+        ret = "TMP";
+        break;
+
+    case IS_VAR: 
+        ret = "VAR";
+        break;
+
+    case IS_UNUSED:
+    case EXT_TYPE_UNUSED:
+        ret = "UNU";
+        break;
+
+    case IS_CV:
+        ret = "CV";
+        break;
+
+    default:
+        ret = "WTF?!";
+        break;
+    }
+
+    return ret;
+}
+
+/*
+struct _zend_op_array {
+    // Common elements
+x    zend_uchar type;
+x    const char *function_name;
+    zend_class_entry *scope;
+x    zend_uint fn_flags;
+    union _zend_function *prototype;
+x    zend_uint num_args;
+x    zend_uint required_num_args;
+    zend_arg_info *arg_info;
+    // END of common elements
+
+    zend_uint *refcount;
+
+x    zend_op *opcodes;
+x    zend_uint last;
+
+x    zend_compiled_variable *vars;
+x    int last_var;
+
+x    zend_uint T;
+
+    zend_brk_cont_element *brk_cont_array;
+    int last_brk_cont;
+
+    zend_try_catch_element *try_catch_array;
+    int last_try_catch;
+
+    // static variables support
+x    HashTable *static_variables;
+
+    zend_uint this_var;
+
+x    const char *filename;
+x    zend_uint line_start;
+x    zend_uint line_end;
+    const char *doc_comment;
+    zend_uint doc_comment_len;
+    zend_uint early_binding; // the linked list of delayed declarations
+
+x    zend_literal *literals;
+x    int last_literal;
+
+    void **run_time_cache;
+    int  last_cache_slot;
+
+    void *reserved[ZEND_MAX_RESERVED_RESOURCES];
+};
+*/
+void dump_oparray(zend_op_array *op_array, const char *filename, zend_bool fOriginalCompile)
+{
+    HANDLE hFile = INVALID_HANDLE_VALUE;
+    char buffer[4096];
+    unsigned int cbWrite = 0;
+    unsigned int i;
+    DWORD cbBytesWritten = 0;
+
+    /* Create temp file for dumped oparray */
+    hFile = create_temp_file(filename, fOriginalCompile);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        goto Cleanup;
+    }
+
+    /* Dump the common elements */
+    cbWrite = sprintf_s(buffer, 4096, "filename: %s\nline_start: %d, line_end: %d\ntype: %d, fn_flags: %d, num_args: %d, required_num_args: %d, function_name: %s, T: %d\n",
+        op_array->filename,
+        op_array->line_start, op_array->line_end,
+        op_array->type,
+        op_array->fn_flags,
+        op_array->num_args,
+        op_array->required_num_args,
+        (op_array->function_name ? op_array->function_name : "(null)"),
+        op_array->T);
+    WriteFile(hFile, buffer, cbWrite, &cbBytesWritten, NULL);
+
+    /* Walk & dump the Opcodes */
+    if (op_array->opcodes && op_array->last > 0) {
+        for (i = 0; i < op_array->last; i++){
+            /* Dump zend_op */
+            zend_op *op = &(op_array->opcodes[i]);
+            cbWrite = sprintf_s(buffer, 4096, "opcode[%d]: opcode: %d, op1(%d) [%s], op2(%d) [%s], result(%d) [%s]\n",
+                i,
+                op->opcode,
+                op->op1_type, get_op_string(op->op1_type, &op->op1),
+                op->op2_type, get_op_string(op->op2_type, &op->op2),
+                op->result_type, get_op_string(op->result_type, &op->result));
+            WriteFile(hFile, buffer, cbWrite, &cbBytesWritten, NULL);
+        }
+    }
+
+    /* Walk & dump the literals */
+    if (op_array->literals && op_array->last_literal > 0) {
+        for (i = 0; i < (unsigned int)op_array->last_literal; i++)
+        {
+            /* Dump zend_literal */
+            zend_literal *lit = &(op_array->literals[i]);
+            cbWrite = sprintf_s(buffer, 4096, "literal[%d]: zval: (%d)[%s], hash_value: %d, cache_slot: %d\n",
+                i,
+                lit->constant.type,
+                get_zval_string(&lit->constant),
+                lit->hash_value,
+                lit->cache_slot);
+            WriteFile(hFile, buffer, cbWrite, &cbBytesWritten, NULL);
+        }
+    }
+
+    /* Dump the static variable HashTable */
+    if (op_array->static_variables && op_array->static_variables->nNumOfElements > 0) {
+        Bucket *p;
+
+        for (i = 0; i < op_array->static_variables->nTableSize; i++) {
+            p = op_array->static_variables->arBuckets[i];
+            while (p != NULL) {
+                cbWrite = sprintf_s(buffer, 4096, "s_var[i]: arKey: %s, h: 0x%08X\n", i, p->arKey, p->h);
+                WriteFile(hFile, buffer, cbWrite, &cbBytesWritten, NULL);
+                p = p->pNext;
+            }
+        }
+
+        p = op_array->static_variables->pListTail;
+        while (p != NULL) {
+            cbWrite = sprintf_s(buffer, 4096, "s_var[tail]: arKey: %s, h: 0x%08X\n", p->arKey, p->h);
+            WriteFile(hFile, buffer, cbWrite, &cbBytesWritten, NULL);
+            p = p->pListLast;
+        }
+    }
+
+    /* Walk & dump the compiled variables */
+    if (op_array->vars && op_array->last_var > 0) {
+        for (i = 0; i < (unsigned int)op_array->last_var; i++) {
+            zend_compiled_variable *var = &op_array->vars[i];
+            cbWrite = sprintf_s(buffer, 4096, "c_var[%d]: name: %s, hash_value: %d\n",
+                i,
+                var->name,
+                var->hash_value);
+        }
+    }
+
+    /* TODO: Walk and dump the "brk_cont_element" array */
+
+    /* TODO: Walk and dump the "try_catch_element" array */
+Cleanup:
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(hFile);
+    }
+
+    return;
+}
+#endif /* DEBUG_DUMP_OPARRAY */

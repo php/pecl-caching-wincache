@@ -102,15 +102,17 @@ const char *wincache_new_interned_string(const char *arKey, uint nKeyLength TSRM
     while (p != NULL) {
         if ((p->h == h) && (p->nKeyLength == nKeyLength)) {
             if (!memcmp(p->arKey, arKey, nKeyLength)) {
+                /* Woo Hoo!  Found an existing string! */
                 return p->arKey;
             }
         }
         p = p->pNext;
     }
-   
+
     if (WCSG(interned_strings_top) + ZEND_MM_ALIGNED_SIZE(sizeof(Bucket) + nKeyLength) >=
         WCSG(interned_strings_end)) {
         /* no memory */
+        dprintimportant("Out of memory in wincache_new_interned_string");
         return NULL;
     }
 
@@ -143,6 +145,7 @@ const char *wincache_new_interned_string(const char *arKey, uint nKeyLength TSRM
 
     WCSG(interned_strings).nNumOfElements++;
 
+    /* Created new interned string. */
     return p->arKey;
 #else /* ZTS */
     return zend_new_interned_string(arKey, nKeyLength, 0 TSRMLS_CC);
@@ -290,17 +293,6 @@ void wincache_interned_strings_shutdown(TSRMLS_D)
     zend_new_interned_string = old_new_interned_string;
     zend_interned_strings_snapshot = old_interned_strings_snapshot;
     zend_interned_strings_restore = old_interned_strings_restore;
-
-#if 0
-    /* Free up the interned table */
-    if (wincache_interned_strings_data)
-    {
-        zend_hash_destroy(&WCSG(interned_strings));
-        alloc_pefree(wincache_interned_strings_data);
-
-        wincache_interned_strings_data = NULL;
-    }
-#endif // 0
 
     /* Remember that we've shutdown cleanly */
     wincache_string_initialized = 0;
