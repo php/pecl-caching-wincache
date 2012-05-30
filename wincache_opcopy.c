@@ -2436,9 +2436,14 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     memset(&pnewce->properties_info, 0, sizeof(HashTable));
     memset(&pnewce->constants_table, 0, sizeof(HashTable));
 #ifdef ZEND_ENGINE_2_4
-    pnewce->info.user.doc_comment = NULL;
-    pnewce->info.user.filename = NULL;
-    pnewce->info.internal.builtin_functions = NULL;
+    if (poldce->type == ZEND_USER_CLASS) {
+        pnewce->info.user.doc_comment = NULL;
+        pnewce->info.user.filename = NULL;
+    } else {
+        _ASSERT(poldce->type == ZEND_INTERNAL_CLASS);
+        pnewce->info.internal.builtin_functions = NULL;
+        /* NOTE: No clue what we're supposed to do with the info.internal.module */
+    }
     pnewce->static_members_table = NULL;
     pnewce->default_properties_count = 0;
     pnewce->default_properties_table = NULL;
@@ -2472,7 +2477,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     }
 
 #ifdef ZEND_ENGINE_2_4
-    if(poldce->info.user.doc_comment != NULL)
+    if(poldce->type == ZEND_USER_CLASS && poldce->info.user.doc_comment != NULL)
     {
         /* NOTE: The doc_comment is apparently not a candidate for being 'interned' */
         msize = poldce->info.user.doc_comment_len + 1;
@@ -2482,7 +2487,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
             result = popcopy->oomcode;
             goto Finished;
         }
-
+        /* NOTE: info.user.doc_comment_len already copied by struct copy, above */
         memcpy_s((void *)pnewce->info.user.doc_comment, msize, poldce->info.user.doc_comment, msize);
     }
 #else /* ZEND_ENGINE_2_3 and below */
@@ -2501,7 +2506,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 #endif /* ZEND_ENGINE_2_4 */
 
 #ifdef ZEND_ENGINE_2_4
-    if(poldce->info.user.filename != NULL)
+    if(poldce->type == ZEND_USER_CLASS && poldce->info.user.filename != NULL)
     {
         /* NOTE: The filename is apparently not a candidate for being 'interned' */
         pnewce->info.user.filename = OSTRDUP(popcopy, poldce->info.user.filename);
@@ -2514,7 +2519,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 #else /* ZEND_ENGINE_2_3 and below */
     if(poldce->filename != NULL)
     {
-        pnewce->filename = OSTRDUP(popcopy, poldce->filename);
+       pnewce->filename = OSTRDUP(popcopy, poldce->filename);
         if(pnewce->filename == NULL)
         {
             result = popcopy->oomcode;
@@ -2745,31 +2750,33 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 
     /* Copy built_in functions */
 #ifdef ZEND_ENGINE_2_4
-    if(popcopy->optype == OPCOPY_OPERATION_COPYIN && poldce->info.internal.builtin_functions != NULL)
-    {
-        for(count = 0; poldce->type == ZEND_INTERNAL_CLASS && poldce->info.internal.builtin_functions[count].fname != NULL; count++)
+    if (poldce->type == ZEND_INTERNAL_CLASS) {
+        if(popcopy->optype == OPCOPY_OPERATION_COPYIN && poldce->info.internal.builtin_functions != NULL)
         {
-            /* build up 'count' so we can set the builtin_functions pointer correctly */
-        }
-
-        pnewce->info.internal.builtin_functions = (zend_function_entry *)OMALLOC(popcopy, (count + 1) * sizeof(zend_function_entry));
-        if(pnewce->info.internal.builtin_functions == NULL)
-        {
-            result = popcopy->oomcode;
-            goto Finished;
-        }
-
-        for(index = 0; index < count; index++)
-        {
-            pfunc = (zend_function_entry *)&pnewce->info.internal.builtin_functions[index];
-            result = copy_zend_function_entry(popcopy, (zend_function_entry *)&poldce->info.internal.builtin_functions[index], &pfunc);
-            if(FAILED(result))
+            for(count = 0; poldce->info.internal.builtin_functions[count].fname != NULL; count++)
             {
-                 goto Finished;
+                /* build up 'count' so we can set the builtin_functions pointer correctly */
             }
-        }
 
-        *(char **)&(pnewce->info.internal.builtin_functions[count].fname) = NULL;
+            pnewce->info.internal.builtin_functions = (zend_function_entry *)OMALLOC(popcopy, (count + 1) * sizeof(zend_function_entry));
+            if(pnewce->info.internal.builtin_functions == NULL)
+            {
+                result = popcopy->oomcode;
+                goto Finished;
+            }
+
+            for(index = 0; index < count; index++)
+            {
+                pfunc = (zend_function_entry *)&pnewce->info.internal.builtin_functions[index];
+                result = copy_zend_function_entry(popcopy, (zend_function_entry *)&poldce->info.internal.builtin_functions[index], &pfunc);
+                if(FAILED(result))
+                {
+                     goto Finished;
+                }
+            }
+
+            *(char **)&(pnewce->info.internal.builtin_functions[count].fname) = NULL;
+        }
     }
 #else /* ZEND_ENGINE_2_3 and below */
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN && poldce->builtin_functions != NULL)
