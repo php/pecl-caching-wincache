@@ -38,6 +38,9 @@
 static int read_file_security(fcache_context * pfcache, const char * filename, unsigned char ** ppsec);
 static int read_file_content(HANDLE hFile, unsigned int filesize, void ** ppbuffer);
 
+/* internal helper functions */
+void fcache_init_php_handle(fcache_handle *fhandle);
+
 /* Globals */
 unsigned short gfcacheid = 1;
 
@@ -696,13 +699,16 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
 #elif PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 2
     phandle->handle.stream.fteller = (zend_stream_fteller_t)fcache_fsizer;
 #endif
-    
+
     fhandle->pfcache = pcache;
     fhandle->pfvalue = pvalue;
     fhandle->map     = (void *)(pcache->memaddr + pvalue->file_content);
     fhandle->buf     = pcache->memaddr + pvalue->file_content;
     fhandle->len     = pvalue->file_size;
     fhandle->pos     = 0;
+
+    /* Init the php_handle in the fcache_handle object */
+    fcache_init_php_handle(fhandle);
 
     phandle->handle.stream.handle = fhandle;
     phandle->type = ZEND_HANDLE_STREAM;
@@ -955,3 +961,123 @@ Finished:
     return;
 }
 
+/*
+ * php_stream_ops functions
+ */
+
+size_t wincache_stream_write(php_stream *stream, const char *buf, size_t count TSRMLS_DC)
+{
+    /* ignore writes */
+    return 0;
+}
+
+size_t wincache_stream_read(php_stream *stream, char *buf, size_t count TSRMLS_DC)
+{
+    size_t toread = 0;
+
+    toread = stream->writepos - stream->readpos;
+    if (toread > count)
+    {
+        toread = count;
+    }
+
+    if (count == 0)
+    {
+        return 0;
+    }
+
+    memcpy_s(buf, toread, stream->readbuf + stream->readpos, toread);
+    stream->readpos += toread;
+
+    return toread;
+}
+
+int  wincache_stream_close(php_stream *stream, int close_handle TSRMLS_DC)
+{
+    /* ignore close */
+    return 0;
+}
+int  wincache_stream_flush(php_stream *stream TSRMLS_DC)
+{
+    /* ignore flush */
+    return 0;
+}
+
+int  wincache_stream_seek(php_stream *stream, off_t offset, int whence, off_t *newoffset TSRMLS_DC)
+{
+    /* fail to seek */
+    return -1;
+}
+
+int  wincache_stream_cast(php_stream *stream, int castas, void **ret TSRMLS_DC)
+{
+    /* ignore cast */
+    return 0;
+}
+
+int wincache_stream_stat(php_stream *stream, php_stream_statbuf *ssb TSRMLS_DC)
+{
+    /* never return stat info */
+    return -1;
+}
+
+int wincache_stream_set_option(php_stream *stream, int option, int value, void *ptrparam TSRMLS_DC)
+{
+    /* ignore set option */
+    return 0;
+}
+
+/*
+ * php_stream_ops for wincache streams
+ */
+
+php_stream_ops g_fcache_stream_ops = {
+    wincache_stream_write,
+    wincache_stream_read,
+    wincache_stream_close,
+    wincache_stream_flush,
+    "wincache_stream_ops",
+    wincache_stream_seek,
+    wincache_stream_cast,
+    wincache_stream_stat,
+    wincache_stream_set_option
+};
+
+/*
+ * NOTE:
+ * PHP 5.4 performs a '#!' (a.k.a. 'shebang') check on *all* files in
+ * php_cgi!main by default.  This includes our streams.  We can either turn
+ * off the shebang check (cgi.check_shebang_line = Off), or we can add
+ * support for php_stream's to the wincache fcache_handle.  The easiest is
+ * to turn off the shebang check.  However, we can't do it programatically.
+ */
+void fcache_init_php_handle(fcache_handle *fhandle)
+{
+    php_stream *phpHandle = NULL;
+
+    _ASSERT(fhandle);
+
+    phpHandle = &fhandle->wrapper;
+
+    ZeroMemory(phpHandle, sizeof(php_stream));
+
+    /* set up the ops for our internal handle */
+    phpHandle->ops = &g_fcache_stream_ops;
+
+    /* Not sure if we really need to do this */
+    phpHandle->readfilters.stream = phpHandle;
+    phpHandle->writefilters.stream = phpHandle;
+
+    /* set up the internal buffer pointers */
+    phpHandle->writepos = (off_t)fhandle->len;
+    phpHandle->readpos = 0;
+    phpHandle->readbuf = (unsigned char *)fhandle->map;
+
+    /* make sure no one can close this stream */
+    phpHandle->flags = (PHP_STREAM_FLAG_NO_SEEK   |
+                        PHP_STREAM_FLAG_NO_CLOSE  |
+                        PHP_STREAM_FLAG_NO_FCLOSE);
+    phpHandle->fclose_stdiocast = PHP_STREAM_FCLOSE_NONE;
+
+    return;
+}

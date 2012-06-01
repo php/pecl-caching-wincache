@@ -747,14 +747,7 @@ PHP_MINIT_FUNCTION(wincache)
 
     WCG(lfcache) = plcache1;
 
-    /*
-     * For PHP 5.4 and above, we should not directly hook the
-     * zend_stream_open_function, since PHP 5.4 assumes the handle in the
-     * returned stream will be a php_stream.  Our stream handles are our own
-     * fcache_handle objects.
-     */
     original_stream_open_function = zend_stream_open_function;
-#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3
     zend_stream_open_function = wincache_stream_open_function;
 
 #ifndef PHP_VERSION_52
@@ -763,7 +756,6 @@ PHP_MINIT_FUNCTION(wincache)
 #endif
 
     dprintverbose("Installed function hooks for stream_open");
-#endif /* PHP 5.3 and below */
 
 #ifdef ZEND_ENGINE_2_4
 #if !defined(ZTS)
@@ -943,16 +935,12 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         goto Finished;
     }
 
-#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3
-
 #ifndef PHP_VERSION_52
     zend_resolve_path = original_resolve_path;
 #endif
 
     zend_stream_open_function = original_stream_open_function;
     zend_compile_file = original_compile_file;
-
-#endif /* PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION <= 3 */
 
     if(WCG(detours) != NULL)
     {

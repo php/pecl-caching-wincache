@@ -84,6 +84,7 @@ struct fcache_context
 typedef struct fcache_handle fcache_handle;
 struct fcache_handle
 {
+    php_stream        wrapper;      /* Dummy php_stream wrapper, MUST BE FIRST! */
     fcache_context *  pfcache;      /* Cache context for this process */
     fcache_value *    pfvalue;      /* Cache value which has file content */
     size_t            len;          /* Length of file in bytes */
