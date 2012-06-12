@@ -988,6 +988,17 @@ size_t wincache_stream_read(php_stream *stream, char *buf, size_t count TSRMLS_D
 
     memcpy_s(buf, toread, stream->readbuf + stream->readpos, toread);
     stream->readpos += toread;
+    stream->position = stream->readpos;
+
+    /* Check if we're at EOF */
+    if (stream->readpos == stream->writepos)
+    {
+        stream->eof = 1;
+    }
+    else
+    {
+        stream->eof = 0;
+    }
 
     return toread;
 }
@@ -1003,10 +1014,75 @@ int  wincache_stream_flush(php_stream *stream TSRMLS_DC)
     return 0;
 }
 
+/*++
+
+Routine Description:
+
+    Seek on the php_stream wrapper.  Note that for Wincache streams, the entire
+    file is mapped into a single memory buffer.
+
+Arguments:
+
+    stream - php_stream object for this fcache instance.
+    offset - Number of bytes to offset from whence.
+    whence - Location in file from which to calculate the new position.
+    newoffset - Upon success, the new location within the file of the position.
+
+Returns:
+
+    0 - Success
+    -1 - Failure
+ -*/
 int  wincache_stream_seek(php_stream *stream, off_t offset, int whence, off_t *newoffset TSRMLS_DC)
 {
-    /* fail to seek */
-    return -1;
+    int ret = -1;
+    long newPos = 0;
+
+    switch (whence) {
+    case SEEK_CUR: /* Current Position.  Offset may be negative. */
+        newPos = (offset + stream->position);
+        if (newPos >= 0 && newPos <= stream->writepos)
+        {
+            /* offset is within the memory buffer for the file */
+            stream->position = newPos;
+            stream->readpos = newPos;
+            ret = 0;
+        }
+        break;
+    case SEEK_SET: /* Beginning of file */
+        if (offset >= 0 && offset <= stream->writepos)
+        {
+            stream->position = offset;
+            stream->readpos = offset;
+            ret = 0;
+        }
+        break;
+    case SEEK_END: /* End of file */
+        if (offset == 0)
+        {
+            stream->position = stream->writepos;
+            stream->readpos = stream->writepos;
+            ret = 0;
+        }
+        break;
+    }
+
+    /* Check if we're at EOF */
+    if (stream->readpos == stream->writepos)
+    {
+        stream->eof = 1;
+    }
+    else
+    {
+        stream->eof = 0;
+    }
+
+    if (newoffset)
+    {
+        *newoffset = stream->position;
+    }
+
+    return ret;
 }
 
 int  wincache_stream_cast(php_stream *stream, int castas, void **ret TSRMLS_DC)
@@ -1074,8 +1150,7 @@ void fcache_init_php_handle(fcache_handle *fhandle)
     phpHandle->readbuf = (unsigned char *)fhandle->map;
 
     /* make sure no one can close this stream */
-    phpHandle->flags = (PHP_STREAM_FLAG_NO_SEEK   |
-                        PHP_STREAM_FLAG_NO_CLOSE  |
+    phpHandle->flags = (PHP_STREAM_FLAG_NO_CLOSE  |
                         PHP_STREAM_FLAG_NO_FCLOSE);
     phpHandle->fclose_stdiocast = PHP_STREAM_FCLOSE_NONE;
 
