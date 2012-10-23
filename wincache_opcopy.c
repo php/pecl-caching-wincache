@@ -490,18 +490,18 @@ Finished:
         dprintimportant("failure %d in copy_zval_array", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
-        /* First, if we allocated any zval's in the array, free them first */
-        for (index = 0; index < count; index++)
-        {
-            if (prgnewz[index])
-            {
-                free_zval(popcopy, prgnewz[index], DO_FREE);
-            }
-        }
-
-        /* Finally, free the array itself */
         if(prgnewz != NULL)
         {
+            /* First, if we allocated any zval's in the array, free them first */
+            for (index = 0; index < count; index++)
+            {
+                if (prgnewz[index])
+                {
+                    free_zval(popcopy, prgnewz[index], DO_FREE);
+                }
+            }
+
+            /* Finally, free the array itself */
             if(allocated == 1)
             {
                 OFREE(popcopy, prgnewz);
@@ -1338,6 +1338,11 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
 
         src = poldopa->literals;
         dst = pnewopa->literals = (zend_literal*) OMALLOC(popcopy, (sizeof(zend_literal) * poldopa->last_literal));
+        if (NULL == dst)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
         end = src + poldopa->last_literal;
         while (src < end)
         {
@@ -2255,6 +2260,7 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
             result = popcopy->oomcode;
             goto Finished;
         }
+        /* Remember that we've alloc'd the bucket */
         allocated = 1;
     }
     memcpy_s(pnewb, sizeof(Bucket), poldb, sizeof(Bucket));
@@ -2271,7 +2277,8 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
             goto Finished;
         }
 
-        allocated &= 2;
+        /* Remember that we've alloc'd the key string */
+        allocated |= 2;
     }
 #else /* ZEND_ENGINE_2_3 and below */
     /*
@@ -2347,6 +2354,7 @@ Finished:
         if(pnewb != NULL)
         {
 #ifdef ZEND_ENGINE_2_4
+            /* Check if we've alloc'd the key string */
             if (allocated & 2)
             {
                 if(!IS_INTERNED(pnewb->arKey))
@@ -2355,6 +2363,7 @@ Finished:
                 }
             }
 #endif /* ZEND_ENGINE_2_4 */
+            /* Check if we've alloc'd the bucket */
             if (allocated & 1)
             {
                 OFREE(popcopy, pnewb);
