@@ -3316,6 +3316,11 @@ static int copyin_zend_classes(opcopy_context * popcopy, ocache_value * pvalue T
         if(ozendcl->parent != NULL)
         {
             clvalue[index].pcname = OSTRDUP(popcopy, ozendcl->parent->name);
+            if (clvalue[index].pcname == NULL)
+            {
+                result = popcopy->oomcode;
+                goto Finished;
+            }
             zend_str_tolower(clvalue[index].pcname, strlen(clvalue[index].pcname));
         }
         else
