@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_EXTVER    "1.3.4.1"
+#define PHP_WINCACHE_EXTVER    "1.3.5.0"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -69,16 +69,13 @@
 #define ALIGNDWORD(size)   (((size) % 4) ? ((size)+(4-((size) % 4))) : (size))
 #define ALIGNQWORD(size)   (((size) % 8) ? ((size)+(8-((size) % 8))) : (size))
 
-#if PHP_VERSION_ID >= 60000
- #define PHP_VERSION_60
-#elif PHP_VERSION_ID >= 50400
- #define PHP_VERSION_54
-#elif PHP_VERSION_ID >= 50300
- #define PHP_VERSION_53
-#elif PHP_VERSION_ID >= 50200
+#if PHP_VERSION_ID < 50300
  #define PHP_VERSION_52
 #endif
 
+#if ZEND_MODULE_API_NO >= 20121204
+#define ZEND_ENGINE_2_5
+#endif
 #if ZEND_MODULE_API_NO >= 20100409
 #define ZEND_ENGINE_2_4
 #endif

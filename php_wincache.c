@@ -344,7 +344,13 @@ zend_module_entry wincache_module_entry = {
 /* If index of ocenabled is changed, change the define statement at top */
 PHP_INI_BEGIN()
 /* index 0 */  STD_PHP_INI_BOOLEAN("wincache.fcenabled", "1", PHP_INI_ALL, OnUpdateBool, fcenabled, zend_wincache_globals, wincache_globals)
+#if PHP_VERSION_ID >= 50500
+/* PHP 5.5 has Opcode Caching in Core.  Use that instead of Wincache */
+/* index 1 */  STD_PHP_INI_BOOLEAN("wincache.ocenabled", "0", PHP_INI_ALL, OnUpdateBool, ocenabled, zend_wincache_globals, wincache_globals)
+#else
+/* PHP 5.4 and below should use Wincache for Opcode Cache by default */
 /* index 1 */  STD_PHP_INI_BOOLEAN("wincache.ocenabled", "1", PHP_INI_ALL, OnUpdateBool, ocenabled, zend_wincache_globals, wincache_globals)
+#endif // PHP 5.5
 /* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
 /* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
 /* index 4 */  STD_PHP_INI_ENTRY("wincache.ocachesize", "96", PHP_INI_SYSTEM, OnUpdateLong, ocachesize, zend_wincache_globals, wincache_globals)

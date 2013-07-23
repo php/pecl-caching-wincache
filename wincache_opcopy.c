@@ -45,6 +45,9 @@
 #define DO_FREE  1
 #define NO_FREE  0
 
+#define CHECK(p) { if ((p) == NULL){ result = popcopy->oomcode; goto Finished; } }
+#define IS_TAILED(container,member) ((char*)(container)+sizeof(*container) == (char*)(container->member))
+
 /* Static function declarations */
 static int  copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz);
 static int  copy_zval_ref(opcopy_context * popcopy, zval ** ppoldz, zval *** pppnewz);
@@ -103,6 +106,11 @@ static int  copyout_zend_class(opcopy_context * popcopy, zend_class_entry * pold
 static int  copyout_zend_constant(opcopy_context * popcopy, zend_constant * poldt, zend_constant ** pnewt);
 
 static int  wincache_string_pmemcopy(opcopy_context * popcopy, const char *str, size_t len, const char **newStr);
+
+#ifdef ZEND_ENGINE_2_4
+static zend_trait_alias* opcopy_trait_alias(opcopy_context * popcopy, zend_trait_alias *src);
+static zend_trait_precedence* opcopy_trait_precedence(opcopy_context * popcopy, zend_trait_precedence *src);
+#endif // ZEND_ENGINE_2_4
 
 /* copyin functions are to copy internal data structures to shared memory */
 /* Use offsets where ever pointers types are used */
@@ -2385,7 +2393,9 @@ static void free_hashtable_bucket(opcopy_context * popcopy, Bucket * pvalue, uns
         if(ffree == DO_FREE)
         {
 #ifdef ZEND_ENGINE_2_4
-            if (pvalue->nKeyLength && pvalue->arKey && !IS_INTERNED(pvalue->arKey))
+            if (pvalue->nKeyLength && pvalue->arKey &&
+                !IS_INTERNED(pvalue->arKey) &&
+                !IS_TAILED(pvalue, arKey))
             {
                 OFREE(popcopy, (char *)pvalue->arKey);
             }
@@ -2586,12 +2596,54 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     pnewce->__unset          = NULL;
     pnewce->__isset          = NULL;
     pnewce->__call           = NULL;
-#ifndef PHP_VERSION_52
+#ifdef PHP_VERSION_53
     pnewce->__callstatic     = NULL;
 #endif
     pnewce->__tostring       = NULL;
     pnewce->serialize_func   = NULL;
     pnewce->unserialize_func = NULL;
+
+    // If ZEND_ENGINE_2_4, copy the trait_aliases and trait_precedences
+#ifdef ZEND_ENGINE_2_4
+    if (poldce->trait_aliases) {
+        int i = 0;
+        int num_trait_aliases = 0;
+
+        /* get how much trait aliases we've got */
+        while (poldce->trait_aliases[num_trait_aliases]) {num_trait_aliases++;}
+
+        /* copy all the trait aliases */
+        CHECK(pnewce->trait_aliases =
+                (zend_trait_alias **) OMALLOC(popcopy, sizeof(zend_trait_alias *)*(num_trait_aliases+1)));
+
+        i = 0;
+        while (poldce->trait_aliases[i] && i < num_trait_aliases) {
+            pnewce->trait_aliases[i] = opcopy_trait_alias(popcopy, poldce->trait_aliases[i]);
+            CHECK(pnewce->trait_aliases[i]);
+            i++;
+        }
+        pnewce->trait_aliases[i] = NULL;
+    }
+    if (poldce->trait_precedences) {
+        int i = 0;
+        int num_trait_precedences = 0;
+
+        /* get how much trait precedences we've got */
+        while (poldce->trait_precedences[num_trait_precedences]) {num_trait_precedences++;}
+
+        /* copy all the trait precedences */
+        CHECK(pnewce->trait_precedences =
+                (zend_trait_precedence **) OMALLOC(popcopy, sizeof(zend_trait_precedence *)*(num_trait_precedences+1)));
+
+        i = 0;
+        while (poldce->trait_precedences[i] && i < num_trait_precedences) {
+            pnewce->trait_precedences[i] = opcopy_trait_precedence(popcopy, poldce->trait_precedences[i]);
+            CHECK(pnewce->trait_precedences[i]);
+            i++;
+        }
+        pnewce->trait_precedences[i] = NULL;
+    }
+#endif
 
     for (index = 0; index < phasht->nTableSize; index++)
     {
@@ -2900,6 +2952,8 @@ static void free_zend_class_entry(opcopy_context * popcopy, zend_class_entry * p
             pvalue->builtin_functions = NULL;
         }
 #endif /* ZEND_ENGINE_2_4 */
+
+// TODO: free Trait_aliases & Trait_precedences
 
         if(ffree == DO_FREE)
         {
@@ -4051,3 +4105,183 @@ Finished:
 
     return;
 }
+
+/*
+ * Trait Alias & Trait Precedence stuff
+ */
+
+#ifdef ZEND_ENGINE_2_4
+
+#define OPCOPY_TRAIT_METHOD(dst, src) \
+    CHECK(dst = \
+         (zend_trait_method_reference *) OMALLOC(popcopy, sizeof(zend_trait_method_reference))); \
+    memcpy(dst, src, sizeof(zend_trait_method_reference)); \
+\
+    if (src->method_name) { \
+        CHECK((dst->method_name = OSTRDUP(popcopy, src->method_name))); \
+        dst->mname_len = src->mname_len; \
+    } \
+ \
+    if (src->class_name) { \
+        CHECK((dst->class_name = OSTRDUP(popcopy, src->class_name))); \
+        dst->cname_len = src->cname_len; \
+    } \
+    if (src->ce) { \
+        dst->ce = NULL; \
+        copy_zend_class_entry(popcopy, src->ce, &dst->ce); \
+        CHECK(dst->ce); \
+    }
+
+void free_zend_trait_method(opcopy_context * popcopy, zend_trait_method_reference *src)
+{
+    if (src)
+    {
+        if (src->method_name) {
+            OFREE(popcopy, ((void *)src->method_name));
+            src->method_name = NULL;
+        }
+        if (src->class_name) {
+            OFREE(popcopy, ((void *)src->class_name));
+            src->class_name = NULL;
+        }
+        if (src->ce) {
+            free_zend_class_entry(popcopy, src->ce, DO_FREE);
+            src->ce = NULL;
+        }
+    }
+}
+
+/* {{{ opcopy_trait_alias */
+zend_trait_alias* opcopy_trait_alias(opcopy_context * popcopy, zend_trait_alias *src)
+{
+    int               result    = NONFATAL;
+    zend_trait_alias *dst       = NULL;
+
+    CHECK(dst = (zend_trait_alias *) OMALLOC(popcopy, sizeof(zend_trait_alias)));
+    memcpy(dst, src, sizeof(zend_trait_alias));
+
+    if (src->alias) {
+        CHECK((dst->alias = OSTRDUP(popcopy, src->alias)));
+        dst->alias_len = src->alias_len;
+    }
+
+#ifndef ZEND_ENGINE_2_5
+    if (src->function) {
+        /* Always copy the function in this case */
+        dst->function = NULL;
+        copy_zend_function(popcopy, src->function, &dst->function));
+        CHECK(dst->function);
+    }
+#endif
+
+    OPCOPY_TRAIT_METHOD(dst->trait_method, src->trait_method);
+
+Finished:
+    /* If failure, we need to free up the partial stuff we alloc'd. */
+    if (FAILED(result))
+    {
+        dprintimportant("failure %d in opcopy_trait_alias", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if (dst != NULL)
+        {
+            if (dst->alias != NULL)
+            {
+                OFREE(popcopy, ((void *)dst->alias));
+                dst->alias  = NULL;
+            }
+#ifndef ZEND_ENGINE_2_5
+            if (dst->function != NULL)
+            {
+                free_zend_function(popcopy, dst->function);
+                dst->function = NULL;
+            }
+#endif
+            if (dst->trait_method != NULL)
+            {
+                free_zend_trait_method(popcopy, dst->trait_method);
+                dst->trait_method = NULL;
+            }
+            OFREE(popcopy, dst);
+            dst = NULL;
+        }
+    }
+
+    return dst;
+}
+/* }}} */
+
+/* {{{ opcopy_trait_precedence */
+zend_trait_precedence* opcopy_trait_precedence(opcopy_context * popcopy, zend_trait_precedence *src)
+{
+    int                    result    = NONFATAL;
+    zend_trait_precedence *dst       = NULL;
+
+    CHECK(dst = (zend_trait_precedence *) OMALLOC(popcopy, sizeof(zend_trait_precedence)));
+    memcpy(dst, src, sizeof(zend_trait_precedence));
+
+#ifndef ZEND_ENGINE_2_5
+    if (src->function) {
+        /* Always copy the function in this case */
+        dst->function = NULL;
+        result = copy_zend_function(popcopy, src->function, &dst->function);
+        if (FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+#endif
+
+    if (src->exclude_from_classes && *src->exclude_from_classes) {
+        int i = 0, num_classes = 0;
+
+        while (src->exclude_from_classes[num_classes]) { num_classes++; }
+
+        CHECK(dst->exclude_from_classes =
+            (zend_class_entry **) OMALLOC(popcopy, sizeof(zend_class_entry *)*(num_classes+1)));
+
+        while (src->exclude_from_classes[i] && i < num_classes) {
+            char *name = (char *) src->exclude_from_classes[i];
+
+            CHECK(dst->exclude_from_classes[i] = (zend_class_entry *) OSTRDUP(popcopy, name));
+            i++;
+        }
+        dst->exclude_from_classes[i] = NULL;
+    }
+
+    OPCOPY_TRAIT_METHOD(dst->trait_method, src->trait_method);
+
+Finished:
+    /* If failure, we need to free up the partial stuff we alloc'd. */
+    if (FAILED(result))
+    {
+        if (dst != NULL)
+        {
+#ifndef ZEND_ENGINE_2_5
+            if (dst->function != NULL) {
+                free_zend_function(popcopy, dst->function, DO_FREE);
+                dst->function = NULL;
+            }
+#endif
+            if (dst->exclude_from_classes != NULL) {
+                int i = 0;
+                while (dst->exclude_from_classes[i] != NULL) {
+                    OFREE(popcopy, dst->exclude_from_classes[i]);
+                    i++;
+                }
+            }
+            if (dst->trait_method != NULL)
+            {
+                free_zend_trait_method(popcopy, dst->trait_method);
+                dst->trait_method = NULL;
+            }
+            OFREE(popcopy, dst);
+            dst = NULL;
+        }
+    }
+    return dst;
+}
+/* }}} */
+
+#endif
+
