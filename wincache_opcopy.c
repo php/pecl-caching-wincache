@@ -4169,7 +4169,7 @@ zend_trait_alias* opcopy_trait_alias(opcopy_context * popcopy, zend_trait_alias 
     if (src->function) {
         /* Always copy the function in this case */
         dst->function = NULL;
-        copy_zend_function(popcopy, src->function, &dst->function));
+        copy_zend_function(popcopy, src->function, &dst->function);
         CHECK(dst->function);
     }
 #endif
@@ -4193,7 +4193,7 @@ Finished:
 #ifndef ZEND_ENGINE_2_5
             if (dst->function != NULL)
             {
-                free_zend_function(popcopy, dst->function);
+                free_zend_function(popcopy, dst->function, DO_FREE);
                 dst->function = NULL;
             }
 #endif
