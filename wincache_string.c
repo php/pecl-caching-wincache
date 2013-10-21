@@ -175,7 +175,7 @@ static void wincache_copy_internal_strings(TSRMLS_D)
         }
 
         if (ce->name) {
-            _ASSERT(strlen(ce-name) < ce->name_length+1);
+            _ASSERT(strlen(ce->name) < ce->name_length+1);
             ce->name = wincache_new_interned_string(ce->name, ce->name_length+1 TSRMLS_CC);
         }
 
