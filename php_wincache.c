@@ -2743,18 +2743,23 @@ WINCACHE_FUNC(wincache_rmdir)
     pcache = WCG(lfcache);
 
     result = aplist_fcache_get(pcache, fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
+
+    dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
+    WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+
+    /* 
+     * Wait until after calling the "orig_rmdir" to bail out if we couldn't
+     * find the entry in the cache.
+     */
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
-    WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
-
     if (pcache->pnotify != NULL)
     {
         sticks = GetTickCount();
-        
+
         while(1)
         {
             lexists = 1;
