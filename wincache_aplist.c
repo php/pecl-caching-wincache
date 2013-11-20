@@ -543,7 +543,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     {
         _ASSERT(pcache->pocache != NULL);
         povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-        
+
         InterlockedExchange(&povalue->is_deleted, 1);
         pvalue->ocacheval = 0;
 
@@ -672,8 +672,8 @@ static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
         {
             ptemp = pvalue;
             pvalue = APLIST_VALUE(apalloc, pvalue->next_value);
-            
-            /* Remove entry if its marked deleted or is unsed for ttlmax time */
+
+            /* Remove entry if its marked deleted or is unused for ttlmax time */
             if(ptemp->is_deleted || (utils_ticksdiff(ticks, ptemp->use_ticks) > apheader->ttlmax))
             {
                 remove_aplist_entry(pcache, sindex, ptemp);
@@ -970,6 +970,14 @@ Finished:
         dprintimportant("failure %d in aplist_initialize", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
+        /* Must cleanup in exactly reverse order of creation. */
+
+        if(pcache->hinitdone != NULL)
+        {
+            CloseHandle(pcache->hinitdone);
+            pcache->hinitdone = NULL;
+        }
+
         if(pcache->pnotify != NULL)
         {
             fcnotify_terminate(pcache->pnotify);
@@ -986,12 +994,21 @@ Finished:
             pcache->prplist = NULL;
         }
 
-        if(pcache->apfilemap != NULL)
+        if(pcache->aprwlock != NULL)
         {
-            filemap_terminate(pcache->apfilemap);
-            filemap_destroy(pcache->apfilemap);
+            lock_terminate(pcache->aprwlock);
+            lock_destroy(pcache->aprwlock);
 
-            pcache->apfilemap = NULL;
+            pcache->aprwlock = NULL;
+        }
+
+        if (pcache->apheader != NULL)
+        {
+            /*
+             * We don't need to decrement the mapcount, since we never
+             * incremented it.
+             */
+            pcache->apheader = NULL;
         }
 
         if(pcache->apalloc != NULL)
@@ -1002,18 +1019,12 @@ Finished:
             pcache->apalloc = NULL;
         }
 
-        if(pcache->aprwlock != NULL)
+        if(pcache->apfilemap != NULL)
         {
-            lock_terminate(pcache->aprwlock);
-            lock_destroy(pcache->aprwlock);
+            filemap_terminate(pcache->apfilemap);
+            filemap_destroy(pcache->apfilemap);
 
-            pcache->aprwlock = NULL;
-        }
-
-        if(pcache->hinitdone != NULL)
-        {
-            CloseHandle(pcache->hinitdone);
-            pcache->hinitdone = NULL;
+            pcache->apfilemap = NULL;
         }
 
         pcache->apheader = NULL;
@@ -1203,10 +1214,12 @@ void aplist_terminate(aplist_context * pcache)
 
     if(pcache != NULL)
     {
-        if(pcache->apheader != NULL)
+        /* Must cleanup in exactly reverse order of creation. */
+
+        if(pcache->hinitdone != NULL)
         {
-            InterlockedDecrement(&pcache->apheader->mapcount);
-            pcache->apheader = NULL;
+            CloseHandle(pcache->hinitdone);
+            pcache->hinitdone = NULL;
         }
 
         if(pcache->pnotify != NULL)
@@ -1242,6 +1255,20 @@ void aplist_terminate(aplist_context * pcache)
             pcache->resnumber = -1;
         }
 
+        if(pcache->aprwlock != NULL)
+        {
+            lock_terminate(pcache->aprwlock);
+            lock_destroy(pcache->aprwlock);
+
+            pcache->aprwlock = NULL;
+        }
+
+        if(pcache->apheader != NULL)
+        {
+            InterlockedDecrement(&pcache->apheader->mapcount);
+            pcache->apheader = NULL;
+        }
+
         if(pcache->apalloc != NULL)
         {
             alloc_terminate(pcache->apalloc);
@@ -1256,20 +1283,6 @@ void aplist_terminate(aplist_context * pcache)
             filemap_destroy(pcache->apfilemap);
 
             pcache->apfilemap = NULL;
-        }
-
-        if(pcache->aprwlock != NULL)
-        {
-            lock_terminate(pcache->aprwlock);
-            lock_destroy(pcache->aprwlock);
-
-            pcache->aprwlock = NULL;
-        }
-
-        if(pcache->hinitdone != NULL)
-        {
-            CloseHandle(pcache->hinitdone);
-            pcache->hinitdone = NULL;
         }
     }
 

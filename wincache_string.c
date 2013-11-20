@@ -170,12 +170,12 @@ static void wincache_copy_internal_strings(TSRMLS_D)
         zend_class_entry *ce = (zend_class_entry*)(p->pDataPtr);
 
         if (p->nKeyLength) {
-            _ASSERT(strlen(p->arKey) < p->nKeyLength);
+            _ASSERT(strlen(p->arKey) < (size_t)p->nKeyLength);
             p->arKey = wincache_new_interned_string(p->arKey, p->nKeyLength TSRMLS_CC);
         }
 
         if (ce->name) {
-            _ASSERT(strlen(ce->name) < ce->name_length+1);
+            _ASSERT(strlen(ce->name) < (size_t)ce->name_length+1);
             ce->name = wincache_new_interned_string(ce->name, ce->name_length+1 TSRMLS_CC);
         }
 
@@ -188,7 +188,7 @@ static void wincache_copy_internal_strings(TSRMLS_D)
             }
 
             if (info->name) {
-                _ASSERT(strlen(info->name) < info->name_length+1);
+                _ASSERT(strlen(info->name) < (size_t)info->name_length+1);
                 info->name = wincache_new_interned_string(info->name, info->name_length+1 TSRMLS_CC);
             }
 
@@ -198,7 +198,7 @@ static void wincache_copy_internal_strings(TSRMLS_D)
         q = ce->function_table.pListHead;
         while (q) {
             if (q->nKeyLength) {
-                _ASSERT(strlen(q->arKey) < q->nKeyLength);
+                _ASSERT(strlen(q->arKey) < (size_t)q->nKeyLength);
                 q->arKey = wincache_new_interned_string(q->arKey, q->nKeyLength TSRMLS_CC);
             }
             q = q->pListNext;
@@ -207,7 +207,7 @@ static void wincache_copy_internal_strings(TSRMLS_D)
         q = ce->constants_table.pListHead;
         while (q) {
             if (q->nKeyLength) {
-                _ASSERT(strlen(q->arKey) < q->nKeyLength);
+                _ASSERT(strlen(q->arKey) < (size_t)q->nKeyLength);
                 q->arKey = wincache_new_interned_string(q->arKey, q->nKeyLength TSRMLS_CC);
             }
             q = q->pListNext;
@@ -219,7 +219,7 @@ static void wincache_copy_internal_strings(TSRMLS_D)
     p = EG(zend_constants)->pListHead;
     while (p) {
         if (p->nKeyLength) {
-            _ASSERT(strlen(p->arKey) < p->nKeyLength);
+            _ASSERT(strlen(p->arKey) < (size_t)p->nKeyLength);
             p->arKey = wincache_new_interned_string(p->arKey, p->nKeyLength TSRMLS_CC);
        }
         p = p->pListNext;

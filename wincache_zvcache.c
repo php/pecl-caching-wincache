@@ -1066,7 +1066,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
             {
                 /* Check if the entry is not expired and */
                 /* Stop looking only if entry is not stale */
-                tdiff = utils_ticksdiff(0, pvalue->add_ticks) / 1000;
+                tdiff = utils_ticksdiff(0, pvalue->use_ticks) / 1000;
                 if(tdiff <= pvalue->ttlive)
                 {
                     break;
@@ -1366,7 +1366,7 @@ static void run_zvcache_scavenger(zvcache_context * pcache)
             }
 
             /* Remove the entry from cache if its expired */
-            tickdiff = utils_ticksdiff(ticks, ptemp->add_ticks) / 1000;
+            tickdiff = utils_ticksdiff(ticks, ptemp->use_ticks) / 1000;
             if(tickdiff >= ptemp->ttlive)
             {
                 remove_zvcache_entry(pcache, sindex, ptemp);
