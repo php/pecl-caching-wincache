@@ -1046,6 +1046,7 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
     zvcache_header * header = NULL;
     zvcache_value *  pvalue = NULL;
     unsigned int     tdiff  = 0;
+    unsigned int     ticks  = 0;
 
     dprintverbose("start find_zvcache_entry");
 
@@ -1064,9 +1065,14 @@ static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsign
         {
             if(pvalue->ttlive > 0)
             {
+                /* NOTE: Session cache calculates ttl from last use, whereas
+                 * User cache calculates from the time the entry was added
+                 */
+                ticks = (pcache->issession ? pvalue->use_ticks : pvalue->add_ticks);
+
                 /* Check if the entry is not expired and */
                 /* Stop looking only if entry is not stale */
-                tdiff = utils_ticksdiff(0, pvalue->use_ticks) / 1000;
+                tdiff = utils_ticksdiff(0, ticks) / 1000;
                 if(tdiff <= pvalue->ttlive)
                 {
                     break;
