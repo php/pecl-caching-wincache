@@ -1182,7 +1182,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
 
     /* If wincache.fcenabled is set to 0 but some how */
     /* this method is called, use original_resolve_path */
-    if(!cenabled || filename == NULL)
+    if(!cenabled || filename == NULL || WCG(lfcache) == NULL)
     {
         return original_resolve_path(filename, filename_len TSRMLS_CC);
     }
@@ -1250,7 +1250,7 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
 
     /* If wincache.fcenabled is set to 0 but some how */
     /* this method is called, use original_stream_open_function */
-    if(!cenabled || filename == NULL)
+    if(!cenabled || filename == NULL || WCG(lfcache) == NULL)
     {
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
@@ -1349,7 +1349,7 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     }
 
     /* Nothing to cleanup. So original_compile triggering bailout is fine */
-    if(filename == NULL || isin_ignorelist(WCG(ignorelist), filename))
+    if(filename == NULL || isin_ignorelist(WCG(ignorelist), filename) || WCG(lfcache) == NULL)
     {
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
         goto Finished;
@@ -2086,6 +2086,11 @@ PHP_FUNCTION(wincache_file_exists)
     fcache_value * pfvalue  = NULL;
     unsigned char  retval   = 0;
 
+    if(WCG(lfcache) == NULL)
+    {
+        RETURN_FALSE;
+    }
+
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &flength) == FAILURE)
     {
         return;
@@ -2150,6 +2155,12 @@ PHP_FUNCTION(wincache_file_get_contents)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &filename, &filename_len, &use_include_path) == FAILURE)
     {
         return;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
     }
 
     dprintimportant("wincache_file_get_contents - %s", filename);
@@ -2223,6 +2234,12 @@ PHP_FUNCTION(wincache_filesize)
         return;
     }
 
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
     dprintimportant("wincache_filesize - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
@@ -2272,6 +2289,12 @@ PHP_FUNCTION(wincache_readfile)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len, &flags) == FAILURE)
     {
         return;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
     }
 
     dprintimportant("wincache_readfile - %s", filename);
@@ -2334,6 +2357,12 @@ PHP_FUNCTION(wincache_is_readable)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
     {
         return;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
     }
 
     dprintimportant("wincache_is_readable - %s", filename);
@@ -2470,6 +2499,12 @@ PHP_FUNCTION(wincache_is_writable)
         return;
     }
 
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
     dprintimportant("wincache_is_writable - %s", filename);
 
     if(filename_len == 0)
@@ -2593,6 +2628,12 @@ PHP_FUNCTION(wincache_is_file)
         return;
     }
 
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
     dprintimportant("wincache_is_file - %s", filename);
 
     if(filename_len == 0)
@@ -2652,6 +2693,12 @@ PHP_FUNCTION(wincache_is_dir)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
     {
         return;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
     }
 
     dprintimportant("wincache_is_dir - %s", filename);
@@ -2742,7 +2789,14 @@ WINCACHE_FUNC(wincache_rmdir)
 
     pcache = WCG(lfcache);
 
-    result = aplist_fcache_get(pcache, fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
+    if (pcache)
+    {
+        result = aplist_fcache_get(pcache, fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
+    }
+    else
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+    }
 
     dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
     WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
@@ -2833,6 +2887,12 @@ PHP_FUNCTION(wincache_realpath)
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
     {
         return;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
     }
 
     dprintimportant("wincache_realpath - %s", filename);

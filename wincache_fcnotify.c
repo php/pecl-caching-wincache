@@ -1061,7 +1061,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         pvalue = FCNOTIFY_VALUE(pnotify->fcalloc, *poffset);
 
         /* If listener in fcnotify_value is rehooked, force a file change check */
-        if(pvalue->reusecount != *pcount)
+        if(pvalue && pvalue->reusecount != *pcount)
         {
             /* get a write lock and update pcount */
             lock_readunlock(pnotify->fclock);
@@ -1213,7 +1213,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     {
         /* A valid listener is already there. Just return */
         /* offset if this is a first call to fcnotify_check */
-        if(filepath != NULL)
+        if(pvalue != NULL && filepath != NULL)
         {
             lock_writelock(pnotify->fclock);
 
@@ -1287,8 +1287,11 @@ void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigned int *
 
     /* Just decrement the refcount. Scavenger will take care of deleting the entry */
     pvalue = FCNOTIFY_VALUE(pnotify->fcalloc, *poffset);
-    pvalue->refcount--;
-    
+    if (pvalue)
+    {
+        pvalue->refcount--;
+    }
+
     *poffset = 0;
     *pcount  = 0;
 

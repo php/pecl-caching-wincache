@@ -1430,14 +1430,14 @@ Finished:
         _ASSERT(result > WARNING_COMMON_BASE);
     }
 
-    dprintverbose("end zvcache_create");
+    dprintverbose("end zvcache_create %p", pcache);
 
     return result;
 }
 
 void zvcache_destroy(zvcache_context * pcache)
 {
-    dprintverbose("start zvcache_destroy");
+    dprintverbose("start zvcache_destroy %p", pcache);
 
     if(pcache != NULL)
     {
@@ -1464,7 +1464,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     unsigned int    initmemory = 0;
     char            evtname[   MAX_PATH];
 
-    dprintverbose("start zvcache_initialize");
+    dprintverbose("start zvcache_initialize %p", pcache);
 
     _ASSERT(pcache    != NULL);
     _ASSERT(zvcount   >= 128 && zvcount   <= 1024);
@@ -1677,7 +1677,7 @@ Finished:
 
 void zvcache_terminate(zvcache_context * pcache)
 {
-    dprintverbose("start zvcache_terminate");
+    dprintverbose("start zvcache_terminate %p", pcache);
 
     if(pcache != NULL)
     {
@@ -1991,7 +1991,7 @@ int zvcache_clear(zvcache_context * pcache)
     zvcache_value *  pvalue = NULL;
     zvcache_value *  ptemp  = NULL;
 
-    dprintverbose("start zvcache_clear");
+    dprintverbose("start zvcache_clear %p", pcache);
 
     _ASSERT(pcache != NULL);
 

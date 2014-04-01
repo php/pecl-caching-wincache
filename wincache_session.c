@@ -33,6 +33,8 @@
 
 #include "precomp.h"
 
+#define ZVSCACHE_KEY    1
+
 ps_module ps_mod_wincache = { PS_MOD(wincache) };
 
 static void scache_destructor(void * pdestination)
@@ -93,7 +95,7 @@ PS_OPEN_FUNC(wincache)
     if(WCG(inisavepath)->modified == 0 || _stricmp(WCG(inisavepath)->orig_value, WCG(inisavepath)->value) == 0)
     {
         pzcache  = WCG(zvscache);
-        cachekey = 1;
+        cachekey = ZVSCACHE_KEY;
         hashupdate = 1;
     }
     else
@@ -192,7 +194,7 @@ PS_OPEN_FUNC(wincache)
             zend_hash_index_update(WCG(phscache), (ulong)cachekey, (void **)&pzcache, sizeof(zvcache_context *), NULL);
         }
 
-        if(cachekey == 1)
+        if(cachekey == ZVSCACHE_KEY)
         {
             WCG(zvscache) = pzcache;
         }
@@ -236,10 +238,36 @@ Finished:
     return SUCCESS;
 }
 
-/* Called on session close. Nothing to do */
+/*
+ * Called on session close.
+ * Must remove WCG(zvscache) from WCG(phscache), or else we'll get a double-deref
+ * on the WCG(zvscache) when we zend_hash_destroy(WCG(phscache)) during module
+ * cleanup.
+ */
 PS_CLOSE_FUNC(wincache)
 {
+    zvcache_context ** ppcache    = NULL;
+
     dprintverbose("start ps_close_func");
+
+    if (WCG(phscache))
+    {
+        if ((zend_hash_index_find(WCG(phscache),
+                                ZVSCACHE_KEY,
+                                (void **)&ppcache) != FAILURE) &&
+            (WCG(zvscache) == *ppcache))
+        {
+            /*
+             * NOTE: If PS_OPEN_FUNC added WCG(zvscache) to the WCG(phscache)
+             * Zend HashTable, then any attempt to remove it from the table,
+             * or deletion of the table, will result in it getting cleaned up.
+             * Therefore, we must ensure the main cleanup code doesn't try to
+             * free the memory a second time.
+             */
+            WCG(zvscache) = NULL;
+        }
+
+    }
 
     PS_SET_MOD_DATA(NULL);
 
