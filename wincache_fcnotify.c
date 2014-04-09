@@ -494,7 +494,7 @@ static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, f
     _ASSERT(pnotify             != NULL);
     _ASSERT(pvalue              != NULL);
     _ASSERT(pvalue->folder_path != 0);
-    
+
     fcheader = pnotify->fcheader;
     pcheck = FCNOTIFY_VALUE(pnotify->fcalloc, fcheader->values[index]);
 
@@ -549,18 +549,27 @@ static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index
         if(pvalue->next_value != 0)
         {
             ptemp = FCNOTIFY_VALUE(palloc, pvalue->next_value);
-            ptemp->prev_value = 0;
+            if (ptemp != NULL)
+            {
+                ptemp->prev_value = 0;
+            }
         }
     }
     else
     {
         ptemp = FCNOTIFY_VALUE(palloc, pvalue->prev_value);
-        ptemp->next_value = pvalue->next_value;
+        if (ptemp != NULL)
+        {
+            ptemp->next_value = pvalue->next_value;
+        }
 
         if(pvalue->next_value != 0)
         {
             ptemp = FCNOTIFY_VALUE(palloc, pvalue->next_value);
-            ptemp->prev_value = pvalue->prev_value;
+            if (ptemp != NULL)
+            {
+                ptemp->prev_value = pvalue->prev_value;
+            }
         }
     }
 

@@ -924,6 +924,7 @@ __inline
 void * alloc_get_cachevalue(alloc_context * palloc, size_t offset)
 {
     _ASSERT(palloc != NULL);
+    _ASSERT(palloc->memaddr != NULL);
 
     if(offset != 0)
     {
@@ -939,7 +940,8 @@ __inline
 size_t alloc_get_valueoffset(alloc_context * palloc, void * pvalue)
 {
     _ASSERT(palloc != NULL);
-    
+    _ASSERT(palloc->memaddr != NULL);
+
     if(pvalue != NULL)
     {
         return POINTER_OFFSET(palloc->memaddr, pvalue);
