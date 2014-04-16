@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.5.3"
+#define PHP_WINCACHE_VERSION    "1.3.6.0"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -73,6 +73,13 @@
  #define PHP_VERSION_52
 #endif
 
+#if ZEND_MODULE_API_NO >= 20131226
+/* Zend added CG(interened_empty_string) in 20131226 */
+#define ZEND_ENGINE_2_6_1
+#endif
+#if ZEND_MODULE_API_NO >= 20131106
+#define ZEND_ENGINE_2_6
+#endif
 #if ZEND_MODULE_API_NO >= 20121204
 #define ZEND_ENGINE_2_5
 #endif

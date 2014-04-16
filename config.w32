@@ -46,13 +46,18 @@ if (PHP_WINCACHE != "no") {
     AC_DEFINE('HAVE_WINCACHE', 1);
 
     ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
-    ADD_FLAG('LDFLAGS_WINCACHE', '/SAFESEH');
+    if (!X64) {
+        ADD_FLAG('LDFLAGS_WINCACHE', '/SAFESEH');
+    }
     ADD_FLAG('LDFLAGS_WINCACHE', '/DYNAMICBASE:NO');
 
-    //ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
-    //ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
-
     ADD_FLAG('CFLAGS_WINCACHE', '/GS');
-    //ADD_FLAG('CFLAGS_WINCACHE', '/WX');
+
+    if (PHP_DEBUG == "yes") {
+        ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
+        ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
+        ADD_FLAG('CFLAGS_WINCACHE', '/WX');
+    }
+
     CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
 }

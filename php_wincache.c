@@ -471,7 +471,7 @@ static unsigned char isin_ignorelist(const char * ignorelist, const char * filen
     char *        fslash     = NULL;
     char          filestr[     MAX_PATH];
     char          tempchar   = 0;
-    unsigned int  length     = 0;
+    size_t        length     = 0;
 
     dprintverbose("start isin_ignorelist");
 
@@ -2765,6 +2765,7 @@ WINCACHE_FUNC(wincache_rmdir)
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &dirname, &dirname_len) == FAILURE)
     {
+        dprintimportant("wincache_rmdir - failed zend_parse_parameters");
         return;
     }
 

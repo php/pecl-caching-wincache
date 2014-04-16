@@ -110,7 +110,13 @@ static int  wincache_string_pmemcopy(opcopy_context * popcopy, const char *str, 
 #ifdef ZEND_ENGINE_2_4
 static zend_trait_alias* opcopy_trait_alias(opcopy_context * popcopy, zend_trait_alias *src);
 static zend_trait_precedence* opcopy_trait_precedence(opcopy_context * popcopy, zend_trait_precedence *src);
-#endif // ZEND_ENGINE_2_4
+#endif /* ZEND_ENGINE_2_4 */
+
+#ifdef ZEND_ENGINE_2_6
+static void free_zend_ast(opcopy_context * popcopy, zend_ast *ast, unsigned char ffree);
+static int copy_zend_ast(opcopy_context * popcopy, zend_ast *ast, zend_ast **new_ast TSRMLS_DC);
+#endif /* ZEND_ENGINE_2_6 */
+
 
 /* copyin functions are to copy internal data structures to shared memory */
 /* Use offsets where ever pointers types are used */
@@ -156,6 +162,147 @@ static int wincache_string_pmemcopy(
 Finished:
     return result;
 }
+
+#ifdef ZEND_ENGINE_2_6
+static int copy_zend_ast(opcopy_context * popcopy, zend_ast *ast, zend_ast **new_ast TSRMLS_DC)
+{
+    int     result = NONFATAL;
+    int     i;
+    zend_ast *node;
+
+    if (ast->kind == ZEND_CONST)
+    {
+        node = (zend_ast *)OMALLOC(popcopy, sizeof(zend_ast) + sizeof(zval));
+        if(node == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        node->kind = ZEND_CONST;
+        node->children = 0;
+        node->u.val = (zval*)(node + 1);
+        *node->u.val = *ast->u.val;
+        if ((Z_TYPE_P(ast->u.val) & IS_CONSTANT_TYPE_MASK) >= IS_ARRAY) {
+            switch ((Z_TYPE_P(ast->u.val) & IS_CONSTANT_TYPE_MASK)) {
+                case IS_STRING:
+                case IS_CONSTANT:
+                    result = wincache_string_pmemcopy(popcopy, Z_STRVAL_P(ast->u.val), Z_STRLEN_P(ast->u.val) + 1, &Z_STRVAL_P(node->u.val));
+                    if(FAILED(result))
+                    {
+                        goto Finished;
+                    }
+                    break;
+                case IS_ARRAY:
+                case IS_CONSTANT_ARRAY:
+                    if (ast->u.val->value.ht && ast->u.val->value.ht != &EG(symbol_table)) {
+                        /* Copy zval pointers in the hashtable */
+                        node->u.val->value.ht = NULL;
+                        dprintverbose("copy_zend_ast calling copy_hashtable");
+                        result = copy_hashtable(popcopy,
+                                                Z_ARRVAL_P(ast->u.val),
+                                                copy_flag_zval_ref | copy_flag_pDataPtr,
+                                                &(node->u.val->value.ht),
+                                                NULL,
+                                                NULL);
+                        if(FAILED(result))
+                        {
+                            goto Finished;
+                        }
+                    }
+                    break;
+                case IS_CONSTANT_AST:
+                    result = copy_zend_ast(popcopy, Z_AST_P(ast->u.val), &Z_AST_P(node->u.val) TSRMLS_CC);
+                    break;
+            }
+        }
+    } else {
+        node = (zend_ast *)OMALLOC(popcopy, sizeof(zend_ast) + (sizeof(zend_ast*) * (ast->children)));
+        if(node == NULL)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+
+        node->kind = ast->kind;
+        node->children = ast->children;
+        for (i = 0; i < ast->children; i++) {
+            if ((&ast->u.child)[i]) {
+                result = copy_zend_ast(popcopy, (&ast->u.child)[i], &(&node->u.child)[i] TSRMLS_CC);
+                if (FAILED(result))
+                {
+                    goto Finished;
+                }
+            } else {
+                (&node->u.child)[i] = NULL;
+            }
+        }
+    }
+
+    *new_ast = node;
+
+Finished:
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in copy_zval", result);
+        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if (node)
+        {
+            free_zend_ast(popcopy, node, TRUE);
+            node = NULL;
+        }
+    }
+
+    return result;
+}
+
+static void free_zend_ast(opcopy_context * popcopy, zend_ast *ast, unsigned char ffree)
+{
+    int i;
+
+    if (!ast)
+    {
+        return;
+    }
+
+    if (ast->kind == ZEND_CONST)
+    {
+        if ((Z_TYPE_P(ast->u.val) & IS_CONSTANT_TYPE_MASK) >= IS_ARRAY) {
+            switch ((Z_TYPE_P(ast->u.val) & IS_CONSTANT_TYPE_MASK)) {
+                case IS_STRING:
+                case IS_CONSTANT:
+                    if (Z_STRVAL_P(ast->u.val) && !IS_INTERNED(Z_STRVAL_P(ast->u.val)))
+                    {
+                        OFREE(popcopy, Z_STRVAL_P(ast->u.val));
+                        Z_STRVAL_P(ast->u.val) = NULL;
+                    }
+                    break;
+                case IS_ARRAY:
+                case IS_CONSTANT_ARRAY:
+                    if (Z_ARRVAL_P(ast->u.val) && Z_ARRVAL_P(ast->u.val) != &EG(symbol_table)) {
+                        /* Copy zval pointers in the hashtable */
+                        free_hashtable(popcopy, Z_ARRVAL_P(ast->u.val), DO_FREE);
+                        Z_ARRVAL_P(ast->u.val) = NULL;
+                    }
+                    break;
+                case IS_CONSTANT_AST:
+                    free_zend_ast(popcopy, Z_AST_P(ast->u.val), DO_FREE);
+                    break;
+            }
+        }
+    }
+    else
+    {
+        for (i = 0; i < ast->children; i++) {
+            if ((&ast->u.child)[i]) {
+                free_zend_ast(popcopy, (&ast->u.child)[i], DO_FREE);
+            }
+        }
+    }
+
+}
+#endif /* ZEND_ENGINE_2_6 */
 
 static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
 {
@@ -248,6 +395,16 @@ static int copy_zval(opcopy_context * popcopy, zval * poldz, zval ** ppnewz)
             }
             break;
 
+#ifdef ZEND_ENGINE_2_6
+        case IS_CONSTANT_AST:
+            result = copy_zend_ast(popcopy, Z_AST_P(poldz), &Z_AST_P(pnewz) TSRMLS_CC);
+            if (FAILED(result))
+            {
+                goto Finished;
+            }
+            break;
+#endif /* ZEND_ENGINE_2_6 */
+
         case IS_OBJECT:
             /* Copying opcodes is immediately after compile file */
             /* No objects are yet created. Just set to NULL */
@@ -336,8 +493,19 @@ static void free_zval(opcopy_context * popcopy, zval * pvalue, unsigned char ffr
                     if(pvalue->value.ht)
                     {
                         free_hashtable(popcopy, pvalue->value.ht, DO_FREE); /* copy_flag_zval_ref | copy_flag_pDataPtr */
+                        pvalue->value.ht = NULL;
                     }
                     break;
+
+#ifdef ZEND_ENGINE_2_6
+                case IS_CONSTANT_AST:
+                    if (Z_AST_P(pvalue))
+                    {
+                        free_zend_ast(popcopy, Z_AST_P(pvalue), DO_FREE);
+                        Z_AST_P(pvalue) = NULL;
+                    }
+                    break;
+#endif /* ZEND_ENGINE_2_6 */
             }
 
             if(ffree == DO_FREE)

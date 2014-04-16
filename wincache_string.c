@@ -53,6 +53,9 @@ typedef struct _wincache_interned_strings_data_t {
     char *interned_strings_start;
     char *interned_strings_end;
     char *interned_strings_top;
+#ifdef ZEND_ENGINE_2_6_1
+    char *interned_empty_string;
+#endif
     lock_context *lock;
     HashTable interned_strings;
 } wincache_interned_strings_data_t;
@@ -66,6 +69,9 @@ static int wincache_string_initialized = 0;
 
 static char *old_interned_strings_start;
 static char *old_interned_strings_end;
+#ifdef ZEND_ENGINE_2_6_1
+static char *old_interned_empty_string;
+#endif
 static const char *(*old_new_interned_string)(const char *str, int len, int free_src TSRMLS_DC);
 static void (*old_interned_strings_snapshot)(TSRMLS_D);
 static void (*old_interned_strings_restore)(TSRMLS_D);
@@ -257,12 +263,18 @@ int wincache_interned_strings_init(TSRMLS_D)
     old_new_interned_string = zend_new_interned_string;
     old_interned_strings_snapshot = zend_interned_strings_snapshot;
     old_interned_strings_restore = zend_interned_strings_restore;
-
     CG(interned_strings_start) = WCSG(interned_strings_start);
     CG(interned_strings_end) = WCSG(interned_strings_end);
     zend_new_interned_string = wincache_dummy_new_interned_string_for_php;
     zend_interned_strings_snapshot = wincache_dummy_interned_strings_snapshot_for_php;
     zend_interned_strings_restore = wincache_dummy_interned_strings_restore_for_php;
+
+#ifdef ZEND_ENGINE_2_6_1
+    /* empty string */
+    old_interned_empty_string = CG(interned_empty_string);
+    CG(interned_empty_string) = (char *)wincache_new_interned_string("", sizeof("") TSRMLS_CC);
+    WCSG(interned_empty_string) = CG(interned_empty_string);
+#endif
 
     wincache_copy_internal_strings(TSRMLS_C);
 
@@ -293,6 +305,11 @@ void wincache_interned_strings_shutdown(TSRMLS_D)
     zend_new_interned_string = old_new_interned_string;
     zend_interned_strings_snapshot = old_interned_strings_snapshot;
     zend_interned_strings_restore = old_interned_strings_restore;
+
+#ifdef ZEND_ENGINE_2_6_1
+    /* empty string */
+    CG(interned_empty_string) = old_interned_empty_string;
+#endif
 
     /* Remember that we've shutdown cleanly */
     wincache_string_initialized = 0;
