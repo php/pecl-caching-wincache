@@ -111,7 +111,8 @@
     </stability>
     <notes>
 1.3.5.3 beta:
-- Fixed several potential AVs while holding cross-process locks    </notes>
+- Fixed several potential AVs while holding cross-process locks
+    </notes>
   </release>
 
   <changelog>

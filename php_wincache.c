@@ -3694,7 +3694,9 @@ PHP_FUNCTION(wincache_ucache_info)
                 valuetype = "string";
                 break;
             case IS_ARRAY:
+#if !defined(ZEND_ENGINE_2_6)
             case IS_CONSTANT_ARRAY:
+#endif
                 valuetype = "array";
                 break;
             case IS_OBJECT:
@@ -3820,9 +3822,11 @@ PHP_FUNCTION(wincache_scache_info)
                         valuetype = "string";
                         break;
                     case IS_ARRAY:
+#if !defined(ZEND_ENGINE_2_6)
                     case IS_CONSTANT_ARRAY:
                         valuetype = "array";
                         break;
+#endif
                     case IS_OBJECT:
                         valuetype = "object";
                         break;
@@ -4592,9 +4596,11 @@ const char * get_zval_string(zval *zv)
     case IS_CONSTANT:
         ret = "CONST";
         break;
+#if !defined(ZEND_ENGINE_2_6)
     case IS_CONSTANT_ARRAY:
         ret = "C_ARRAY";
         break;
+#endif
     case IS_CALLABLE:
         ret = "CALL";
         break;

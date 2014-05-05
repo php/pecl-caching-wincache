@@ -183,7 +183,9 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             break;
 
         case IS_ARRAY:
+#if !defined(ZEND_ENGINE_2_6)
         case IS_CONSTANT_ARRAY:
+#endif
             /* Initialize zvcopied hashtable for direct call to copyin_zval */
             if(phtable == NULL)
             {
@@ -434,7 +436,9 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             break;
 
         case IS_ARRAY:
+#if !defined(ZEND_ENGINE_2_6)
         case IS_CONSTANT_ARRAY:
+#endif
             /* Initialize zvcopied HashTable for first call to copyout_zval */
             if(phtable == NULL)
             {
@@ -1197,7 +1201,9 @@ static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalu
                     break;
 
                 case IS_ARRAY:
+#if !defined(ZEND_ENGINE_2_6)
                 case IS_CONSTANT_ARRAY:
+#endif
                     alloc_free_mpool(pcache->zvalloc, pzval->value.ht.hoff);
                     pzval->value.ht.val  = 0;
                     pzval->value.ht.hoff = 0;
