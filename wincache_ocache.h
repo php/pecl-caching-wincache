@@ -64,7 +64,7 @@ struct ocache_user_constant
 };
 
 typedef struct ocache_user_aglobal ocache_user_aglobal;
-struct ocache_user_aglobal 
+struct ocache_user_aglobal
 {
     char *             aname;     /* constant name */
     unsigned int       anamelen;  /* constant name length */

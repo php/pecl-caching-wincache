@@ -256,12 +256,12 @@ int utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC)
 
     cwdlen = GetCurrentDirectory(length, buffer);
     *(buffer + cwdlen) = '|';
-    
+
     if(zend_is_executing(TSRMLS_C))
     {
         execname = zend_get_executed_filename(TSRMLS_C);
         execlen = strlen(execname);
-        
+
         if((length - cwdlen - 2) < execlen)
         {
             result = FATAL_NEED_MORE_MEMORY;
@@ -434,8 +434,8 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
      * --THEN--
      * this is an absolute path.
      */
-    if ((*filename == '.' && 
-         (IS_SLASH(filename[1]) || 
+    if ((*filename == '.' &&
+         (IS_SLASH(filename[1]) ||
           ((filename[1] == '.') && IS_SLASH(filename[2])))) ||
          (IS_ABSOLUTE_PATH(filename, filename_length) || IS_SLASH(filename[0])) ||
         !path ||
@@ -552,7 +552,7 @@ int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *form
     va_start(arglist, format);
     retval = ap_php_snprintf(buf, len, format, arglist);
     va_end(arglist);
-    
+
     return retval;
 }
 #endif

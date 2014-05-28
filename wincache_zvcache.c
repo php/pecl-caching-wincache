@@ -165,7 +165,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             if(poriginal->value.str.val)
             {
                 length = poriginal->value.str.len + 1;
-                
+
                 pbuffer = (char *)ZMALLOC(pcopy, length);
                 if(pbuffer == NULL)
                 {
@@ -244,7 +244,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
                 goto Finished;
             }
 
-            /* Keep offset so that freeing shared memory is easy */ 
+            /* Keep offset so that freeing shared memory is easy */
             pnewzv->value.ht.hoff = offset;
             pnewzv->value.ht.val  = ZOFFSET(pcopy, phashtable);
             break;
@@ -446,7 +446,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
                 isfirst = 1;
                 zend_hash_init(WCG(zvcopied), 0, NULL, NULL, 0);
             }
-            
+
             result = copyout_hashtable(pcache, pcopy, phtable, (zv_HashTable *)ZVALUE(pcopy, pcopied->value.ht.val), &phashtable TSRMLS_CC);
 
             if(isfirst)
@@ -645,7 +645,7 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     _ASSERT(SUCCEEDED(result));
 
 Finished:
-    
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_hashtable", result);
@@ -772,7 +772,7 @@ Finished:
             }
         }
     }
-    
+
     dprintverbose("end copyin_bucket");
 
     return result;
@@ -898,7 +898,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     _ASSERT(SUCCEEDED(result));
 
 Finished:
-    
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_hashtable", result);
@@ -1037,7 +1037,7 @@ Finished:
             }
         }
     }
-    
+
     dprintverbose("end copyout_bucket");
 
     return result;
@@ -1219,7 +1219,7 @@ static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalu
         ZFREE(pcache->incopy, pvalue);
         pvalue = NULL;
     }
-    
+
     dprintverbose("end destroy_zvcache_data");
 
     return;
@@ -1235,7 +1235,7 @@ static void add_zvcache_entry(zvcache_context * pcache, unsigned int index, zvca
     _ASSERT(pcache         != NULL);
     _ASSERT(pvalue         != NULL);
     _ASSERT(pvalue->keystr != 0);
-    
+
     header = pcache->zvheader;
     pcheck = ZVCACHE_VALUE(pcache->zvalloc, header->values[index]);
 
@@ -1312,7 +1312,7 @@ static void remove_zvcache_entry(zvcache_context * pcache, unsigned int index, z
     /* Destroy aplist data now that fcache and ocache is deleted */
     destroy_zvcache_data(pcache, pvalue);
     pvalue = NULL;
-    
+
     dprintverbose("end remove_zvcache_entry");
     return;
 }
@@ -1922,7 +1922,7 @@ Finished:
         destroy_zvcache_data(pcache, pnewval);
         pnewval = NULL;
     }
-    
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_set", result);
@@ -2144,7 +2144,7 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
     if(pkey != NULL)
     {
         index = utils_getindex(pkey, header->valuecount);
- 
+
         result = find_zvcache_entry(pcache, pkey, index, &pvalue);
         if(FAILED(result))
         {

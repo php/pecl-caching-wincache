@@ -193,7 +193,7 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_set, 0, 0, 2)
     ZEND_ARG_INFO(0, value)
     ZEND_ARG_INFO(0, ttl)
 ZEND_END_ARG_INFO()
-        
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_add, 0, 0, 2)
     ZEND_ARG_INFO(0, key)
     ZEND_ARG_INFO(0, value)
@@ -1029,7 +1029,7 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
 
     filemap_global_terminate(TSRMLS_C);
 
-Finished: 
+Finished:
 
     /* Unregister ini entries. globals_terminate will get */
     /* called by zend engine after this */
@@ -1186,7 +1186,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     {
         return original_resolve_path(filename, filename_len TSRMLS_CC);
     }
-    
+
     dprintimportant("zend_resolve_path called for %s", filename);
 
     if(isin_ignorelist(WCG(ignorelist), filename))
@@ -1205,7 +1205,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
     _ASSERT(SUCCEEDED(result));
 
 Finished:
-    
+
     if(pfvalue != NULL)
     {
         aplist_fcache_close(WCG(lfcache), pfvalue);
@@ -1504,10 +1504,10 @@ void wincache_error_cb(int type, const char * error_filename, const uint error_l
         {
             goto Finished;
         }
-        
+
         zend_llist_init(WCG(errmsglist), sizeof(ocache_user_message), errmsglist_dtor, 0);
     }
-    
+
     if(WCG(errmsglist) != NULL)
     {
         message.type = type;
@@ -2410,7 +2410,7 @@ PHP_FUNCTION(wincache_is_readable)
             goto Finished;
         }
     }
-    
+
     /* Get the impersonated token which is required for AccessCheck call */
     if(!DuplicateToken(threadtoken, SecurityImpersonation, &impersonationtok))
     {
@@ -2421,7 +2421,7 @@ PHP_FUNCTION(wincache_is_readable)
     desired_access = FILE_GENERIC_READ;
     MapGenericMask(&desired_access, &gen_map);
 
-    AccessCheck((PSECURITY_DESCRIPTOR)(WCG(lfcache)->pfcache->memaddr + pvalue->file_sec), impersonationtok, 
+    AccessCheck((PSECURITY_DESCRIPTOR)(WCG(lfcache)->pfcache->memaddr + pvalue->file_sec), impersonationtok,
                     desired_access, &gen_map, &privilege_set, &priv_set_length, &granted_access, &faccess);
     isreadable = (faccess ? 1 : 0);
 
@@ -2561,7 +2561,7 @@ PHP_FUNCTION(wincache_is_writable)
     desired_access = FILE_GENERIC_WRITE;
     MapGenericMask(&desired_access, &gen_map);
 
-    AccessCheck((PSECURITY_DESCRIPTOR)(WCG(lfcache)->pfcache->memaddr + pvalue->file_sec), impersonationtok, 
+    AccessCheck((PSECURITY_DESCRIPTOR)(WCG(lfcache)->pfcache->memaddr + pvalue->file_sec), impersonationtok,
                     desired_access, &gen_map, &privilege_set, &priv_set_length, &granted_access, &faccess);
     iswritable = (faccess ? 1 : 0);
 
@@ -2802,7 +2802,7 @@ WINCACHE_FUNC(wincache_rmdir)
     dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
     WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 
-    /* 
+    /*
      * Wait until after calling the "orig_rmdir" to bail out if we couldn't
      * find the entry in the cache.
      */
@@ -2841,7 +2841,7 @@ WINCACHE_FUNC(wincache_rmdir)
             if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
             {
                 dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");
-                break; 
+                break;
             }
         }
     }
@@ -3668,7 +3668,7 @@ PHP_FUNCTION(wincache_ucache_info)
 
     MAKE_STD_ZVAL(zfentries);
     array_init(zfentries);
-    
+
     peinfo = (zvcache_info_entry *)zend_llist_get_first(plist);
     while(peinfo != NULL)
     {
@@ -3718,7 +3718,7 @@ PHP_FUNCTION(wincache_ucache_info)
         peinfo = (zvcache_info_entry *)zend_llist_get_next(plist);
     }
 
-    add_assoc_zval(return_value, "ucache_entries", zfentries);    
+    add_assoc_zval(return_value, "ucache_entries", zfentries);
 
     zend_llist_destroy(plist);
     alloc_efree(plist);
@@ -4305,7 +4305,7 @@ PHP_FUNCTION(wincache_runtests)
     ocache_runtest();
     opcopy_runtest();
     fcache_runtest();
-    
+
     dprintverbose("end wincache_runtests");
     return;
 }
@@ -4358,7 +4358,7 @@ Finished:
         RETURN_TRUE;
     }
 
-    RETURN_FALSE;    
+    RETURN_FALSE;
 }
 #endif
 
@@ -4417,7 +4417,7 @@ Finished:
     {
         RETURN_TRUE;
     }
-    
+
     RETURN_FALSE;
 }
 #endif
@@ -4628,7 +4628,7 @@ const char * get_op_string(zend_uchar op_type, znode_op *op)
         ret = "TMP";
         break;
 
-    case IS_VAR: 
+    case IS_VAR:
         ret = "VAR";
         break;
 

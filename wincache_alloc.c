@@ -376,7 +376,7 @@ Finished:
         lock_writeunlock(palloc->rwlock);
         flock = 0;
     }
-    
+
     dprintdecorate("end free_memory");
 
     return;
@@ -473,7 +473,7 @@ static char * alloc_strdup(alloc_context * palloc, unsigned int type, const char
 {
     char * result = NULL;
     int    strl   = 0;
-    
+
     _ASSERT(str != NULL);
     strl = strlen(str) + 1;
 
@@ -519,7 +519,7 @@ static void alloc_free(alloc_context * palloc, unsigned int type, void * addr)
             _ASSERT(FALSE);
             break;
     }
-    
+
     return;
 }
 
@@ -740,7 +740,7 @@ Finished:
 }
 
 void alloc_terminate(alloc_context * palloc)
-{ 
+{
     dprintverbose("start alloc_terminate");
 
     if(palloc != NULL)
@@ -792,7 +792,7 @@ int alloc_create_mpool(alloc_context * palloc, size_t * phoffset)
         result = FATAL_OUT_OF_MEMORY;
         goto Finished;
     }
-    
+
     header->foffset = 0;
     header->loffset = 0;
     header->socurr  = 0;
@@ -825,7 +825,7 @@ void alloc_free_mpool(alloc_context * palloc, size_t hoffset)
 
     _ASSERT(palloc  != NULL);
     _ASSERT(hoffset >  0);
- 
+
     header = (alloc_mpool_header *)((char *)palloc->memaddr + hoffset);
     if(header->foffset > 0)
     {
@@ -1221,7 +1221,7 @@ void * alloc_ommalloc(alloc_context * palloc, size_t hoffset, size_t size)
     }
     else
     {
-        pchunk = (alloc_mpool_segment *)((char *)palloc->memaddr + offset);    
+        pchunk = (alloc_mpool_segment *)((char *)palloc->memaddr + offset);
     }
 
     _ASSERT(pchunk != NULL);
@@ -1295,7 +1295,7 @@ char * alloc_omstrdup(alloc_context * palloc, size_t hoffset, const char * str)
 {
     char * memaddr = NULL;
     int    strl    = 0;
-    
+
     _ASSERT(palloc  != NULL);
     _ASSERT(hoffset >  0);
     _ASSERT(str     != NULL);
@@ -1347,7 +1347,7 @@ void alloc_runtest()
     void *          mem4    = NULL;
 
     size_t          freesiz = 0;
-    
+
     alloc_context *         palloc = NULL;
     alloc_segment_header *  header = NULL;
     alloc_free_header *     freeh  = NULL;

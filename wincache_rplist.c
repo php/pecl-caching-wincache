@@ -108,7 +108,7 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     _ASSERT(ppvalue  != NULL);
 
     *ppvalue = NULL;
-    
+
     flength  = strlen(filename);
     cclength = strlen(cwdcexec);
 
@@ -149,7 +149,7 @@ static int create_rplist_data(rplist_context * pcache, const char * filename, co
     pvalue->same_value  = 0;
     pvalue->prev_value  = 0;
     pvalue->next_value  = 0;
-    
+
     /* Append filepath and keep offset in file_path */
     memlen = ALIGNDWORD(flength + 1);
     memcpy_s(pbaseadr, flength, filename, flength);
@@ -236,7 +236,7 @@ static void add_rplist_entry(rplist_context * pcache, unsigned int index, rplist
     _ASSERT(pvalue            != NULL);
     _ASSERT(pvalue->file_path != 0);
     _ASSERT(pvalue->cwd_cexec != 0);
-    
+
     rpheader = pcache->rpheader;
     pcheck = RPLIST_VALUE(pcache->rpalloc, rpheader->values[index]);
 
@@ -246,7 +246,7 @@ static void add_rplist_entry(rplist_context * pcache, unsigned int index, rplist
         {
             break;
         }
-        
+
         pcheck = RPLIST_VALUE(pcache->rpalloc, pcheck->next_value);
     }
 
@@ -309,7 +309,7 @@ static void remove_rplist_entry(rplist_context * pcache, unsigned int index, rpl
 
     destroy_rplist_data(pcache, pvalue);
     pvalue = NULL;
-    
+
     dprintverbose("end remove_rplist_entry");
     return;
 }
@@ -462,7 +462,7 @@ void rplist_initheader(rplist_context * pcache, unsigned int filecount)
      rplist_header * rpheader = NULL;
 
      dprintverbose("start rplist_initheader");
-     
+
      _ASSERT(pcache           != NULL);
      _ASSERT(pcache->rpheader != NULL);
      _ASSERT(filecount        >  0);
@@ -567,7 +567,7 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
         {
             goto Finished;
         }
-        
+
         lock_writelock(pcache->rprwlock);
         flock = 1;
 
@@ -590,7 +590,7 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
             pvalue = pnewval;
             pnewval = NULL;
 
-            add_rplist_entry(pcache, findex, pvalue);        
+            add_rplist_entry(pcache, findex, pvalue);
         }
 
         lock_writeunlock(pcache->rprwlock);
@@ -708,7 +708,7 @@ void rplist_markdeleted(rplist_context * pcache, size_t valoffset)
     while(pvalue != NULL)
     {
         pvalue->is_deleted = 1;
-        
+
         /* Continue until all entries pointing to same aplist value are marked deleted */
         if(pvalue->same_value == 0)
         {

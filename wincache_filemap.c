@@ -394,7 +394,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     }
 
     ZeroMemory(pinfo->infoname, namelen);
-    
+
     /* Create name as FILE_INFORMATION_PREFIX_<ppid> */
     if(WCG(namesalt) == NULL)
     {
@@ -426,7 +426,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         result = FATAL_FILEMAP_INFOMAP;
         goto Finished;
     }
-    
+
     result = lock_getnewname(pinfo->hrwlock, "FILEMAP_INIT", evtname, MAX_PATH);
     if(FAILED(result))
     {
@@ -446,7 +446,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         isfirst = 0;
         WaitForSingleObject(pinfo->hinitdone, INFINITE);
     }
-   
+
     /* Initialize if its not already initialized */
     if(isfirst)
     {
@@ -474,7 +474,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         lock_writeunlock(pinfo->hrwlock);
     }
     else
-    {    
+    {
         /* Increment the number of times information filemap is mapped */
         InterlockedIncrement(&pinfo->header->mapcount);
     }
@@ -666,7 +666,7 @@ void filemap_global_terminate(TSRMLS_D)
         alloc_pefree(WCG(fmapgdata));
         WCG(fmapgdata) = NULL;
     }
-  
+
     dprintverbose("end filemap_global_terminate");
 
     return;
@@ -796,7 +796,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             {
                 ffree = index;
             }
-        
+
             if(pentry->fmaptype == fmaptype && pentry->cachekey == cachekey)
             {
                 found = 1;
@@ -1148,7 +1148,7 @@ size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC)
     dprintverbose("start filemap_getsize");
 
     _ASSERT(pfilemap != NULL);
-    
+
     lock_readlock(WCG(fmapgdata)->info->hrwlock);
     size = pfilemap->infoentry->size;
     lock_readunlock(WCG(fmapgdata)->info->hrwlock);
@@ -1182,7 +1182,7 @@ void filemap_runtest()
 
     filemap_context *            pfilemap1   = NULL;
     filemap_context *            pfilemap2   = NULL;
-    
+
     filemap_information *        pinfo       = NULL;
     filemap_information_header * pinfoh      = NULL;
     filemap_information_entry *  pentry      = NULL;

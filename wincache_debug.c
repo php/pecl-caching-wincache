@@ -48,7 +48,7 @@ void dprintsetlevel(unsigned int level)
        level == WINCACHE_DEBUG_MTYPE_ALWAYS    ||
        level == WINCACHE_DEBUG_MTYPE_CRITICAL  ||
        level == WINCACHE_DEBUG_MTYPE_IMPORTANT ||
-       level == WINCACHE_DEBUG_MTYPE_VERBOSE   || 
+       level == WINCACHE_DEBUG_MTYPE_VERBOSE   ||
        level == WINCACHE_DEBUG_MTYPE_DECORATE)
     {
         gdebuglevel = level;

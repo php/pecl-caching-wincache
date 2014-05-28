@@ -80,7 +80,7 @@ static unsigned int WINAPI change_notification_thread(void * parg)
 
         /* process change notification if success and key is non termination key */
         dwerror = (retvalue ? ERROR_SUCCESS : GetLastError());
-        
+
         if(compkey == FCNOTIFY_TERMKEY)
         {
             break;
@@ -250,7 +250,7 @@ static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnot
     unsigned int cflags    = 0;
     unsigned int bytecount = 0;
     unsigned int result    = 0;
-    
+
     _ASSERT(plistener                != NULL);
     _ASSERT(plistener->pfcnvalue     != NULL);
     _ASSERT(plistener->folder_handle != INVALID_HANDLE_VALUE);
@@ -372,7 +372,7 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
 
     /* Update the time when the listener was set */
     GetSystemTimeAsFileTime(&pvalue->listen_time);
-    
+
     pvalue->reusecount++;
     *ppvalue = pvalue;
 
@@ -504,7 +504,7 @@ static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, f
         {
             break;
         }
-        
+
         pcheck = FCNOTIFY_VALUE(pnotify->fcalloc, pcheck->next_value);
     }
 
@@ -575,7 +575,7 @@ static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index
 
     destroy_fcnotify_data(pnotify, pvalue);
     pvalue = NULL;
-    
+
     dprintverbose("end remove_fcnotify_entry");
     return;
 }
@@ -590,7 +590,7 @@ int fcnotify_create(fcnotify_context ** ppnotify)
 
     _ASSERT(ppnotify != NULL);
     *ppnotify = NULL;
-    
+
     pcontext = (fcnotify_context *)alloc_pemalloc(sizeof(fcnotify_context));
     if(pcontext == NULL)
     {
@@ -722,7 +722,7 @@ int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void
     }
 
     header = pnotify->fcheader;
- 
+
     /* Create reader writer lock for the file change notification hashtable */
     result = lock_create(&pnotify->fclock);
     if(FAILED(result))
@@ -796,7 +796,7 @@ Finished:
 
             pnotify->pidhandles = NULL;
         }
-        
+
         pnotify->fcaplist = NULL;
         pnotify->fcheader = NULL;
         pnotify->fcalloc  = NULL;
@@ -1241,7 +1241,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     {
         run_fcnotify_scavenger(pnotify);
     }
-    
+
 Finished:
 
     if(flock == 1)

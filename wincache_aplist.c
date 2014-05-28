@@ -176,7 +176,7 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
 
     _ASSERT(pcache != NULL);
     _ASSERT(pvalue != NULL);
-    
+
     /* If fchangefreq is set to 0, dont do the file change check */
     /* last_check value of 0 means that a check must be done */
     if(pvalue->last_check != 0 && pcache->fchangefreq == 0)
@@ -227,7 +227,7 @@ static int is_file_changed(aplist_context * pcache, aplist_value * pvalue)
     {
         retvalue = 0;
     }
-    
+
     pvalue->last_check = tickcount;
 
 Finished:
@@ -300,11 +300,11 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
 
     pvalue = (aplist_value *)pcurrent;
     pvalue->file_path = 0;
-    
+
     /* Open the file in shared read mode */
     openflags |= FILE_ATTRIBUTE_ENCRYPTED;
     openflags |= FILE_FLAG_OVERLAPPED;
-    openflags |= FILE_FLAG_BACKUP_SEMANTICS; 
+    openflags |= FILE_FLAG_BACKUP_SEMANTICS;
     openflags |= FILE_FLAG_SEQUENTIAL_SCAN;
 
     hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, openflags, NULL);
@@ -356,7 +356,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->file_size     = filesizel;
     pvalue->modified_time = finfo.ftLastWriteTime;
     pvalue->attributes    = finfo.dwFileAttributes;
-    
+
     ticks               = GetTickCount();
     pvalue->add_ticks   = ticks;
     pvalue->use_ticks   = ticks;
@@ -448,7 +448,7 @@ static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist
     _ASSERT(pcache            != NULL);
     _ASSERT(pvalue            != NULL);
     _ASSERT(pvalue->file_path != 0);
-    
+
     header = pcache->apheader;
     pcheck = APLIST_VALUE(pcache->apalloc, header->values[index]);
 
@@ -583,7 +583,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     /* Destroy aplist data now that fcache and ocache is deleted */
     destroy_aplist_data(pcache, pvalue);
     pvalue = NULL;
-    
+
 Finished:
 
     dprintverbose("end remove_aplist_entry");
@@ -937,7 +937,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         header->itemcount    = 0;
 
         _ASSERT(filecount > PER_RUN_SCAVENGE_COUNT);
-        
+
         /* Calculate scavenger frequency if ttlmax is not 0 */
         if(ttlmax != 0)
         {
@@ -1093,7 +1093,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
     aplist_value *   pvalue  = NULL;
     unsigned int     index   = 0;
     size_t           offset  = 0;
- 
+
     dprintverbose("start aplist_ocache_initialize");
 
     _ASSERT(plcache != NULL);
@@ -1143,7 +1143,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         /* A new opcode cache is created for global aplist. It is possible that */
         /* global aplist is old with obsolete ocacheval offsets. Set ocachevals to 0 */
         lock_writelock(plcache->aprwlock);
-       
+
         count = plcache->apheader->valuecount;
         for(index = 0; index < count; index++)
         {
@@ -1386,7 +1386,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
         {
             goto Finished;
         }
-        
+
         lock_writelock(pcache->aprwlock);
         flock = 1;
 
@@ -1457,7 +1457,7 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
             remove_aplist_entry(pcache, findex, pdelete);
             pdelete = NULL;
         }
-        
+
         lock_writeunlock(pcache->aprwlock);
         flock = 0;
     }
@@ -1669,7 +1669,7 @@ static int set_lastcheck_time(aplist_context * pcache, const char * filename, un
     {
         goto Finished;
     }
-    
+
     findex = utils_getindex(resolve_path, pcache->apheader->valuecount);
 
     /* failure to find the entry in cache should be ignored */
@@ -1813,9 +1813,9 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
 
         if(pvalue != NULL)
         {
-            fullpath = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);    
+            fullpath = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);
             if(fullpath == NULL)
-            {    
+            {
                 result = FATAL_OUT_OF_LMEMORY;
                 goto Finished;
             }
@@ -1953,7 +1953,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             fcache_destroyval(pcache->pfcache, pfvalue);
             pfvalue = NULL;
         }
-        
+
         lock_writeunlock(pcache->aprwlock);
         lock_readlock(pcache->aprwlock);
         flock = 1;
@@ -1987,7 +1987,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
 
     lock_readunlock(pcache->aprwlock);
     flock = 0;
- 
+
     _ASSERT(SUCCEEDED(result));
 
 Finished:
@@ -2120,7 +2120,7 @@ int aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_
     if(pvalue->ocacheval == 0)
     {
         lock_readunlock(pcache->aprwlock);
-        
+
         /* Create opcode cache entry in shared segment */
         result = ocache_createval(pcache->pocache, filename, file_handle, type, poparray, &povalue TSRMLS_CC);
         if(FAILED(result))
@@ -2140,7 +2140,7 @@ int aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_
             ocache_destroyval(pcache->pocache, povalue);
             povalue = NULL;
         }
-        
+
         lock_writeunlock(pcache->aprwlock);
         lock_readlock(pcache->aprwlock);
     }

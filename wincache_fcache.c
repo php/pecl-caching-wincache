@@ -354,7 +354,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         header->misscount   = 0;
 
         SetEvent(pfcache->hinitdone);
-        
+
         lock_writeunlock(pfcache->prwlock);
     }
     else
@@ -493,7 +493,7 @@ int fcache_createval(fcache_context * pfcache, const char * filename, fcache_val
     /* Open the file in shared read mode */
     openflags |= FILE_ATTRIBUTE_ENCRYPTED;
     openflags |= FILE_FLAG_OVERLAPPED;
-    openflags |= FILE_FLAG_BACKUP_SEMANTICS; 
+    openflags |= FILE_FLAG_BACKUP_SEMANTICS;
     openflags |= FILE_FLAG_SEQUENTIAL_SCAN;
 
     hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, openflags, NULL);
@@ -794,7 +794,7 @@ int fcache_getinfo(fcache_value * pvalue, fcache_entry_info ** ppinfo)
     _ASSERT(ppinfo != NULL);
 
     *ppinfo = NULL;
-    
+
     pinfo = (fcache_entry_info *)alloc_emalloc(sizeof(fcache_entry_info));
     if(pinfo == NULL)
     {
@@ -864,7 +864,7 @@ size_t fcache_reader(void * handle, char * buf, size_t length TSRMLS_DC)
 
     fhandle = (fcache_handle *)handle;
     pvalue = fhandle->pfvalue;
-    
+
     _ASSERT(fhandle->len == pvalue->file_size);
 
     /* Read either length bytes or the number of bytes left */

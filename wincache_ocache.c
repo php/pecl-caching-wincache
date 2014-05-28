@@ -202,7 +202,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
     if(islocal || isfirst)
     {
         lock_writelock(pcache->prwlock);
-    
+
         header->mapcount    = 1;
         header->itemcount   = 0;
         header->hitcount    = 0;
@@ -385,7 +385,7 @@ int ocache_createval(ocache_context * pcache, const char * filename, zend_file_h
     {
         goto Finished;
     }
-    
+
     /* Copy oparray to cache */
     result = opcopy_initialize(popcopy, pcache->palloc, hoffset, pcache->resnumber);
     if(FAILED(result))
@@ -440,7 +440,7 @@ int ocache_createval(ocache_context * pcache, const char * filename, zend_file_h
     }
 
     HANDLE_UNBLOCK_INTERRUPTIONS();
-    
+
     InterlockedIncrement(&pcache->header->itemcount);
     InterlockedIncrement(&pcache->header->misscount);
 
@@ -518,7 +518,7 @@ void ocache_destroyval(ocache_context * pocache, ocache_value * pvalue)
             alloc_free_mpool(pocache->palloc, pvalue->hoffset);
             pvalue->hoffset = 0;
         }
-        
+
         alloc_sfree(pocache->palloc, pvalue);
         pvalue = NULL;
 
@@ -685,7 +685,7 @@ int ocache_getinfo(ocache_value * pvalue, ocache_entry_info ** ppinfo)
     _ASSERT(ppinfo != NULL);
 
     *ppinfo = NULL;
-    
+
     pinfo = (ocache_entry_info *)alloc_emalloc(sizeof(ocache_entry_info));
     if(pinfo == NULL)
     {

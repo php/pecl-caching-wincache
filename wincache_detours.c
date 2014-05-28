@@ -232,7 +232,7 @@ static void fnroutes_destructor(void * pdestination)
     return;
 }
 
- 
+
 int detours_initialize(detours_context * pdetours, char * inifile)
 {
     int    result   = NONFATAL;
@@ -241,7 +241,7 @@ int detours_initialize(detours_context * pdetours, char * inifile)
 
     _ASSERT(pdetours != NULL);
     _ASSERT(inifile  != NULL);
- 
+
     dprintverbose("start detours_initialize");
 
     /* Check if ini file exists */

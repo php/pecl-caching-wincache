@@ -270,9 +270,9 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
 
             break;
         case LOCK_USET_XREAD_XWRITE:
-            
+
             plock->usetype = LOCK_USET_XREAD_XWRITE;
-            
+
             /* Only create one mutex which will be used */
             /* to synchronize access to read and write */
             objname[namelen] = 'X';
@@ -300,7 +300,7 @@ Finished:
         alloc_pefree(objname);
         objname = NULL;
     }
-    
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_initialize", result);
@@ -514,7 +514,7 @@ void lock_writelock(lock_context * plock)
 
             ResetEvent(plock->hcanread);
             ReleaseMutex(plock->haccess);
-            
+
             break;
         case LOCK_USET_XREAD_XWRITE:
             /* Simple case. Just lock hxwrite */
@@ -587,7 +587,7 @@ int lock_getnewname(lock_context * plock, char * suffix, char * newname, unsigne
 
     sufflen = strlen(suffix);
     namelen = plock->namelen + sufflen + 1;
-    
+
     if(length < namelen)
     {
         result = FATAL_LOCK_SHORT_BUFFER;
