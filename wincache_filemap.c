@@ -1049,6 +1049,17 @@ Finished:
 
     if(flock)
     {
+        if(FAILED(result))
+        {
+            /* If we alloc'd a filemap_information_entry in the shared map,
+            /* we MUST clean it up while still under the lock! */
+            if (fmclass != FILEMAP_MAP_LRANDOM && found == 0 && ffree != 0)
+            {
+                _ASSERT(pentry);
+                pentry->fmaptype = FILEMAP_TYPE_UNUSED;
+            }
+        }
+
         lock_writeunlock(pinfo->hrwlock);
         flock = 0;
     }
