@@ -841,11 +841,17 @@ void fcnotify_terminate(fcnotify_context * pnotify)
         {
             if(pnotify->port_handle != NULL)
             {
+                DWORD ret = 0;
                 /* Post termination key to completion port to terminate thread */
                 PostQueuedCompletionStatus(pnotify->port_handle, 0, FCNOTIFY_TERMKEY, NULL);
 
                 /* Wait for thread to finish */
-                WaitForSingleObject(pnotify->listen_thread, INFINITE);
+                WaitForSingleObject(pnotify->listen_thread, FIVE_SECOND_WAIT);
+
+                if (ret == WAIT_TIMEOUT || ret == WAIT_FAILED)
+                {
+                    dprintimportant("Timed out waiting for fcnotify thread to terminate");
+                }
             }
 
             CloseHandle(pnotify->listen_thread);

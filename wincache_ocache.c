@@ -105,6 +105,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
     unsigned short  locktype = LOCK_TYPE_SHARED;
     unsigned char   isfirst  = 1;
     char            evtname[   MAX_PATH];
+    DWORD           ret      = 0;
 
     dprintverbose("start ocache_initialize");
 
@@ -196,7 +197,21 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        WaitForSingleObject(pcache->hinitdone, INFINITE);
+        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_OCACHE_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_OCACHE_INIT_EVENT;
+            goto Finished;
+        }
     }
 
     if(islocal || isfirst)

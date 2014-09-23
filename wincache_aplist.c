@@ -768,6 +768,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     unsigned short  locktype = LOCK_TYPE_SHARED;
     unsigned char   isfirst  = 1;
     char            evtname[   MAX_PATH];
+    DWORD           ret      = 0;
 
     dprintverbose("start aplist_initialize");
 
@@ -907,7 +908,21 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        WaitForSingleObject(pcache->hinitdone, INFINITE);
+        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_APLIST_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_APLIST_INIT_EVENT;
+            goto Finished;
+        }
     }
 
     /* Initialize the aplist_header if this is the first process */
@@ -1093,6 +1108,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
     aplist_value *   pvalue  = NULL;
     unsigned int     index   = 0;
     size_t           offset  = 0;
+    DWORD            ret     = 0;
 
     dprintverbose("start aplist_ocache_initialize");
 
@@ -1120,7 +1136,21 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         if(GetLastError() == ERROR_ALREADY_EXISTS)
         {
             isfirst = 0;
-            WaitForSingleObject(hfirst, INFINITE);
+            ret = WaitForSingleObject(hfirst, FIVE_SECOND_WAIT);
+
+            if (ret == WAIT_TIMEOUT)
+            {
+                dprintimportant("Timed out waiting for other process to release %s", evtname);
+                result = FATAL_APLIST_INIT_EVENT;
+                goto Finished;
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+                result = FATAL_APLIST_INIT_EVENT;
+                goto Finished;
+            }
         }
     }
 

@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.6.1"
+#define PHP_WINCACHE_VERSION    "1.3.6.2"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -144,6 +144,8 @@
 #define TTL_VALUE_MAXIMUM          7200
 #define INTERNED_SIZE_MINIMUM      4
 #define INTERNED_SIZE_MAXIMUM      32
+
+#define FIVE_SECOND_WAIT           5000
 
 #include "wincache_error.h"
 #include "wincache_debug.h"

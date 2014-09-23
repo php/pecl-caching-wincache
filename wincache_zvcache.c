@@ -1469,6 +1469,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     unsigned char   isfirst    = 1;
     unsigned int    initmemory = 0;
     char            evtname[   MAX_PATH];
+    DWORD           ret        = 0;
 
     dprintverbose("start zvcache_initialize %p", pcache);
 
@@ -1563,7 +1564,21 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        WaitForSingleObject(pcache->hinitdone, INFINITE);
+        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_ZVCACHE_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_ZVCACHE_INIT_EVENT;
+            goto Finished;
+        }
     }
 
     /* Initialize the zvcache_header if this is the first process */

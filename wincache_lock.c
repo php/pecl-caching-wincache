@@ -135,6 +135,12 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
         goto Finished;
     }
 
+    /* If shared reader/writer locks are disabled, make everything an exclusive lock */
+    if (WCG(srwlocks) == 0)
+    {
+        usetype = LOCK_USET_XREAD_XWRITE;
+    }
+
     /* Get the initial length of name prefix */
     namelen = strlen(name);
     _ASSERT(namelen > 0);
@@ -401,6 +407,7 @@ void lock_readlock(lock_context * plock)
 {
     long   rcount    = 0;
     HANDLE hArray[2];
+    DWORD  ret       = 0;
 
     dprintverbose("start lock_readlock");
 
@@ -417,7 +424,24 @@ void lock_readlock(lock_context * plock)
 
             hArray[0] = plock->haccess;
             hArray[1] = plock->hcanread;
-            WaitForMultipleObjects(2, hArray, TRUE, INFINITE);
+            ret = WaitForMultipleObjects(2, hArray, TRUE, INFINITE);
+
+            if (ret == WAIT_ABANDONED_0)
+            {
+                dprintcritical("lock_readlock: acquired abandoned mutex %sA. Something bad happend in another process!", 
+                                plock->nameprefix);
+                php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                          plock->nameprefix);
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_readlock: Failure waiting on shared readlock %s* (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on shared readlock %s* (%d). Something bad happened!",
+                          plock->nameprefix);
+
+            }
 
             (*plock->prcount)++;
 
@@ -428,7 +452,24 @@ void lock_readlock(lock_context * plock)
 
         case LOCK_USET_XREAD_XWRITE:
             /* Simple case. Just lock hxwrite */
-            WaitForSingleObject(plock->hxwrite, INFINITE);
+            ret = WaitForSingleObject(plock->hxwrite, INFINITE);
+
+            if (ret == WAIT_ABANDONED)
+            {
+                dprintcritical("lock_readlock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                                plock->nameprefix);
+                php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                          plock->nameprefix);
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_readlock: Failure waiting on readlock %sX (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on readlock %sX (%d). Something bad happened!", 
+                          plock->nameprefix, error_setlasterror());
+            }
+
             break;
 
         default:
@@ -446,6 +487,7 @@ void lock_readlock(lock_context * plock)
 void lock_readunlock(lock_context * plock)
 {
     long rcount = 0;
+    DWORD ret   = 0;
 
     dprintverbose("start lock_readunlock");
 
@@ -455,10 +497,26 @@ void lock_readunlock(lock_context * plock)
     switch(plock->usetype)
     {
         case LOCK_USET_SREAD_XWRITE:
-            /* Decrement reader count. If hits zero */
-            /* Release the mutex for writer to proceed */
+            /* Decrement reader count. If hits zero, set the writer event */
+            /* so the writer can proceed */
             _ASSERT(plock->prcount != NULL);
-            WaitForSingleObject(plock->haccess, INFINITE);
+            ret = WaitForSingleObject(plock->haccess, INFINITE);
+
+            if (ret == WAIT_ABANDONED)
+            {
+                dprintcritical("lock_readunlock: acquired abandoned mutex %sA. Something bad happend in another process!", 
+                                plock->nameprefix);
+                php_error(E_ERROR, "WINCACHE: lock_readunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                          plock->nameprefix);
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_readunlock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_readunlock: Failure waiting on readlock %s* (%d). Something bad happened!", 
+                          plock->nameprefix, error_setlasterror());
+            }
 
             _ASSERT(*plock->prcount > 0);
             (*plock->prcount)--;
@@ -491,6 +549,7 @@ void lock_readunlock(lock_context * plock)
 void lock_writelock(lock_context * plock)
 {
     HANDLE hArray[3] = {0};
+    DWORD  ret       = 0;
 
     dprintverbose("start lock_writelock");
 
@@ -508,7 +567,24 @@ void lock_writelock(lock_context * plock)
             hArray[0] = plock->haccess;
             hArray[1] = plock->hcanwrite;
             hArray[2] = plock->hxwrite;
-            WaitForMultipleObjects(3, hArray, TRUE, INFINITE);
+            ret = WaitForMultipleObjects(3, hArray, TRUE, INFINITE);
+
+            if (ret == WAIT_ABANDONED_0 || ret == (WAIT_ABANDONED_0 + 2))
+            {
+                char whichLock = (ret == WAIT_ABANDONED_0 ? 'A' : 'X');
+                dprintcritical("lock_writelock: acquired abandoned mutex %s%c. Something bad happend in another process!", 
+                                plock->nameprefix, whichLock);
+                php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %s%c. Something bad happend in another process!",
+                          plock->nameprefix, whichLock);
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_writelock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
+                          plock->nameprefix, error_setlasterror());
+            }
 
             _ASSERT(*plock->prcount == 0);
 
@@ -518,7 +594,24 @@ void lock_writelock(lock_context * plock)
             break;
         case LOCK_USET_XREAD_XWRITE:
             /* Simple case. Just lock hxwrite */
-            WaitForSingleObject(plock->hxwrite, INFINITE);
+            ret = WaitForSingleObject(plock->hxwrite, INFINITE);
+
+            if (ret == WAIT_ABANDONED)
+            {
+                dprintcritical("lock_writelock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                                plock->nameprefix);
+                php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                                plock->nameprefix);
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_writelock: Failure waiting on lock %sX (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on lock %sX (%d). Something bad happened!", 
+                          plock->nameprefix, error_setlasterror());
+            }
+
             break;
 
         default:
@@ -535,6 +628,8 @@ void lock_writelock(lock_context * plock)
 /* Release write lock */
 void lock_writeunlock(lock_context * plock)
 {
+    DWORD  ret       = 0;
+
     dprintverbose("start lock_writeunlock");
 
     _ASSERT(plock          != NULL);
@@ -545,7 +640,33 @@ void lock_writeunlock(lock_context * plock)
         case LOCK_USET_SREAD_XWRITE:
             _ASSERT(plock->prcount != NULL);
 
-            WaitForSingleObject(plock->haccess, INFINITE);
+            ret = WaitForSingleObject(plock->haccess, INFINITE);
+
+            if (ret == WAIT_ABANDONED)
+            {
+                dprintcritical("lock_writeunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                                plock->nameprefix);
+                php_error(E_ERROR, "WINCACHE: lock_writeunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                          plock->nameprefix);
+
+                /* At this point, we know the reader count *must* be zero. */
+                /* Let's take this opportunity to fix any problems */
+                if (*plock->prcount != 0)
+                {
+                    dprintimportant("lock_writeunlock: invalid reader count detected (%d). Fixing...",
+                                    *plock->prcount);
+                    *plock->prcount = 0;
+                }
+            }
+
+            if (ret == WAIT_FAILED)
+            {
+                dprintcritical("lock_writeunlock: Failure waiting on lock %sA (%d). Something bad happened!", 
+                                plock->nameprefix, error_setlasterror());
+                php_error(E_ERROR, "WINCACHE: lock_writeunlock: Failure waiting on lock %sA (%d). Something bad happened!", 
+                          plock->nameprefix, error_setlasterror());
+            }
+
             _ASSERT(*plock->prcount == 0);
 
             ReleaseMutex(plock->hxwrite);

@@ -592,6 +592,7 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     alloc_free_header *    freend   = NULL;
     unsigned char          isfirst  = 1;
     char                   evtname[   MAX_PATH];
+    DWORD                  ret      = 0;
 
     dprintverbose("start alloc_initialize");
 
@@ -645,7 +646,21 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        WaitForSingleObject(palloc->hinitdone, INFINITE);
+        ret = WaitForSingleObject(palloc->hinitdone, FIVE_SECOND_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_ALLOC_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_ALLOC_INIT_EVENT;
+            goto Finished;
+        }
     }
 
     /* If the segment is not initialized, set */

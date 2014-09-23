@@ -344,6 +344,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     filemap_information_entry * pentry  = NULL;
     unsigned char               isfirst = 1;
     char                        evtname[  MAX_PATH];
+    DWORD                       ret     = 0;
 
     dprintverbose("start create_information_filemap");
 
@@ -444,7 +445,21 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     {
         /* Wait for other process to initialize completely */
         isfirst = 0;
-        WaitForSingleObject(pinfo->hinitdone, INFINITE);
+        ret = WaitForSingleObject(pinfo->hinitdone, FIVE_SECOND_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_FILEMAP_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_FILEMAP_INIT_EVENT;
+            goto Finished;
+        }
     }
 
     /* Initialize if its not already initialized */
@@ -1198,6 +1213,9 @@ void filemap_runtest()
     filemap_information_header * pinfoh      = NULL;
     filemap_information_entry *  pentry      = NULL;
 
+    unsigned int                 orig_mapcount    = 0;
+    unsigned short               orig_entry_count = 0;
+
     TSRMLS_FETCH();
     dprintverbose("*** STARTING FILEMAP TESTS ***");
 
@@ -1230,8 +1248,8 @@ void filemap_runtest()
     _ASSERT(pinfoh != NULL);
 
     _ASSERT(pinfoh->size        != 0);
-    _ASSERT(pinfoh->mapcount    == 1);
-    _ASSERT(pinfoh->entry_count == 0);
+    orig_mapcount               = pinfoh->mapcount;
+    orig_entry_count            = pinfoh->entry_count;
     _ASSERT(pinfoh->maxcount    >  0);
 
     /* Create two filemap_context. Verify filemap contexts, */
@@ -1242,7 +1260,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_FILECONTENT, 1, FILEMAP_MAP_SRANDOM, 20, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_FILECONTENT, 58, FILEMAP_MAP_SRANDOM, 20, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1255,15 +1273,15 @@ void filemap_runtest()
     pentry = pfilemap1->infoentry;
 
     _ASSERT(pentry->fmaptype == FILEMAP_TYPE_FILECONTENT);
-    _ASSERT(pentry->cachekey == 1);
+    _ASSERT(pentry->cachekey == 58);
     _ASSERT(pentry->size     == 20 * 1024 * 1024);
     _ASSERT(pentry->mapcount == 1);
     _ASSERT(pentry->cpid     == filemap_getpid(TSRMLS_C));
     _ASSERT(pentry->opid     == filemap_getpid(TSRMLS_C));
     _ASSERT(pentry->mapaddr  != NULL);
 
-    _ASSERT(pinfoh->mapcount    == 1);
-    _ASSERT(pinfoh->entry_count == 1);
+    _ASSERT(pinfoh->mapcount    == orig_mapcount);
+    _ASSERT(pinfoh->entry_count == orig_entry_count + 1);
 
     result = filemap_create(&pfilemap2);
     if(FAILED(result))
@@ -1271,7 +1289,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap2, FILEMAP_TYPE_BYTECODES, 1, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap2, FILEMAP_TYPE_BYTECODES, 59, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1284,15 +1302,15 @@ void filemap_runtest()
     pentry = pfilemap2->infoentry;
 
     _ASSERT(pentry->fmaptype == FILEMAP_TYPE_BYTECODES);
-    _ASSERT(pentry->cachekey == 1);
+    _ASSERT(pentry->cachekey == 59);
     _ASSERT(pentry->size     == 10 * 1024 * 1024);
     _ASSERT(pentry->mapcount == 1);
     _ASSERT(pentry->cpid     == filemap_getpid(TSRMLS_C));
     _ASSERT(pentry->opid     == filemap_getpid(TSRMLS_C));
     _ASSERT(pentry->mapaddr  != NULL);
 
-    _ASSERT(pinfoh->mapcount    == 1);
-    _ASSERT(pinfoh->entry_count == 2);
+    _ASSERT(pinfoh->mapcount    == orig_mapcount);
+    _ASSERT(pinfoh->entry_count == orig_entry_count + 2);
 
     /* Delete one of the filemap context and verify everything */
     filemap_terminate(pfilemap1);
@@ -1300,8 +1318,8 @@ void filemap_runtest()
 
     pfilemap1 = NULL;
 
-    _ASSERT(pinfoh->mapcount    == 1);
-    _ASSERT(pinfoh->entry_count == 1);
+    _ASSERT(pinfoh->mapcount    == orig_mapcount);
+    _ASSERT(pinfoh->entry_count == orig_entry_count + 1);
 
     /* Create filemap context for the second filemap again */
     /* Delete second filemap context and verify everything */
@@ -1311,7 +1329,7 @@ void filemap_runtest()
         goto Finished;
     }
 
-    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_BYTECODES, 1, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
+    result = filemap_initialize(pfilemap1, FILEMAP_TYPE_BYTECODES, 58, FILEMAP_MAP_SFIXED, 10, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1337,8 +1355,11 @@ Finished:
         pfilemap2 = NULL;
     }
 
-    pentry = (filemap_information_entry *)((char *)pinfoh + FILEMAP_INFO_HEADER_SIZE);
-    for(index = 0; index < pinfoh->maxcount; index++)
+    /* Validate the two entries we just nuked are actually unused */
+    pentry = (filemap_information_entry *)(((char *)pinfoh) + FILEMAP_INFO_HEADER_SIZE);
+    /* Advance past the already in-use entries */
+    pentry = (filemap_information_entry *)(((char *)pentry) + ((orig_entry_count + 1) * FILEMAP_INFO_ENTRY_SIZE));
+    for(index = orig_entry_count+1; index < pinfoh->maxcount; index++)
     {
         _ASSERT(pentry->fmaptype == FILEMAP_TYPE_UNUSED);
         pentry = (filemap_information_entry *)((char *)pentry + FILEMAP_INFO_ENTRY_SIZE);
