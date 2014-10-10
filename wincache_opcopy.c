@@ -2806,7 +2806,7 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     pnewce->__unset          = NULL;
     pnewce->__isset          = NULL;
     pnewce->__call           = NULL;
-#ifdef PHP_VERSION_53
+#ifdef ZEND_ENGINE_2_3
     pnewce->__callstatic     = NULL;
 #endif
     pnewce->__tostring       = NULL;
@@ -2931,13 +2931,15 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
     }
 
 #ifdef ZEND_ENGINE_2_4
-    /* Copy default properties. */
-    result = copy_zval_array(popcopy, poldce->default_properties_table, poldce->default_properties_count, &pnewce->default_properties_table);
-    if(FAILED(result))
+    if (poldce->default_properties_table)
     {
-        goto Finished;
+        result = copy_zval_array(popcopy, poldce->default_properties_table, poldce->default_properties_count, &pnewce->default_properties_table);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+        pnewce->default_properties_count = poldce->default_properties_count;
     }
-    pnewce->default_properties_count = poldce->default_properties_count;
 #else /* ZEND_ENGINE_2_3 and below */
     /* Copy default properties. pDataPtr is significant */
     phasht = &pnewce->default_properties;
@@ -2978,25 +2980,33 @@ static int copy_zend_class_entry(opcopy_context * popcopy, zend_class_entry * po
 
     /* Copy default_static_members and static_members */
 #ifdef ZEND_ENGINE_2_4
-    result = copy_zval_array(popcopy, poldce->default_static_members_table, poldce->default_static_members_count, &pnewce->default_static_members_table);
-    if(FAILED(result))
+    if (poldce->default_static_members_table)
     {
-        goto Finished;
-    }
-    pnewce->default_static_members_count = poldce->default_static_members_count;
-
-    if(poldce->static_members_table != poldce->default_static_members_table)
-    {
-        result = copy_zval_array(popcopy, poldce->static_members_table, poldce->default_static_members_count, &pnewce->static_members_table);
+        _ASSERT(poldce->default_static_members_count > 0);
+        result = copy_zval_array(popcopy, poldce->default_static_members_table, poldce->default_static_members_count, &pnewce->default_static_members_table);
         if(FAILED(result))
         {
             goto Finished;
         }
+        pnewce->default_static_members_count = poldce->default_static_members_count;
     }
-    else
+
+    if(poldce->static_members_table)
     {
-        pnewce->static_members_table = pnewce->default_static_members_table;
-        /* Note: count of entries is held in default_static_members_count. */
+        _ASSERT(poldce->default_static_members_count > 0);
+        if(poldce->static_members_table != poldce->default_static_members_table)
+        {
+            result = copy_zval_array(popcopy, poldce->static_members_table, poldce->default_static_members_count, &pnewce->static_members_table);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+        }
+        else
+        {
+            pnewce->static_members_table = pnewce->default_static_members_table;
+            /* Note: count of entries is held in default_static_members_count. */
+        }
     }
 #else /* ZEND_ENGINE_2_3 and below */
     phasht = &pnewce->default_static_members;
