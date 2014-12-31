@@ -1341,15 +1341,18 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
             frnlen = strlen(frname);
 
 #ifdef ZEND_ENGINE_2_4
-            Z_STRVAL_P(poldop->op1.zv) = estrndup(frname, frnlen);
-            Z_STRLEN_P(poldop->op1.zv) = frnlen;
 
-            ZVAL_LONG(poldop->op2.zv, zend_hash_func(frname, frnlen + 1));
+            efree(Z_STRVAL_P(poldop->op1.zv));
+            ZVAL_STRINGL(poldop->op1.zv, frname, frnlen, 1);
+            Z_HASH_P(poldop->op1.zv) = str_hash(frname, frnlen);
+
 #else /* ZEND_ENGINE_2_3 and below */
+
             Z_STRVAL(poldop->op1.u.constant) = estrndup(frname, frnlen);
             Z_STRLEN(poldop->op1.u.constant) = frnlen;
 
             ZVAL_LONG(&poldop->op2.u.constant, zend_hash_func(frname, frnlen + 1));
+
 #endif /* ZEND_ENGINE_2_4 */
         }
     }
@@ -1444,6 +1447,7 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
     int             opcount   = 0;
     int             index     = 0;
     unsigned int    msize     = 0;
+    int             bMustFixup = 0;
 
     zend_op *       pnewop    = NULL;
     zend_op *       poldop    = NULL;
@@ -1510,35 +1514,6 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
             goto Finished;
         }
     }
-
-#ifdef ZEND_ENGINE_2_4
-    /* Copy the literals */
-    if (poldopa->literals)
-    {
-        zend_literal *src, *dst, *end;
-
-        src = poldopa->literals;
-        dst = pnewopa->literals = (zend_literal*) OMALLOC(popcopy, (sizeof(zend_literal) * poldopa->last_literal));
-        if (NULL == dst)
-        {
-            result = popcopy->oomcode;
-            goto Finished;
-        }
-        end = src + poldopa->last_literal;
-        while (src < end)
-        {
-            zval *tmp = &dst->constant;
-            *dst = *src; /* struct copy */
-            result = copy_zval(popcopy, &src->constant, &tmp);
-            if (FAILED(result))
-            {
-                goto Finished;
-            }
-            src++;
-            dst++;
-        }
-    }
-#endif /* ZEND_ENGINE_2_4 */
 
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN)
     {
@@ -1687,6 +1662,7 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
     if(popcopy->optype == OPCOPY_OPERATION_COPYIN ||
        (popcopy->optype == OPCOPY_OPERATION_COPYOUT && (*pdata & oparray_has_const)))
     {
+        bMustFixup = 1;
         opcount = poldopa->last;
         pnewopa->opcodes = (zend_op *)OMALLOC(popcopy, sizeof(zend_op) * opcount);
         if(pnewopa->opcodes == NULL)
@@ -1771,7 +1747,44 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
 #endif /* !defined( ZEND_ENGINE_2_6 ) */
             }
         }
+    }
 
+#ifdef ZEND_ENGINE_2_4
+    /* Copy the literals */
+    /*
+     * NOTE: We must copy literals *after* any calls to copy_zend_op(),
+     * since copy_zend_op() can change literals.
+     * New literals are changed to support Detour functionality.
+     */
+    if (poldopa->literals)
+    {
+        zend_literal *src, *dst, *end;
+
+        src = poldopa->literals;
+        dst = pnewopa->literals = (zend_literal*) OMALLOC(popcopy, (sizeof(zend_literal) * poldopa->last_literal));
+        if (NULL == dst)
+        {
+            result = popcopy->oomcode;
+            goto Finished;
+        }
+        end = src + poldopa->last_literal;
+        while (src < end)
+        {
+            zval *tmp = &dst->constant;
+            *dst = *src; /* struct copy */
+            result = copy_zval(popcopy, &src->constant, &tmp);
+            if (FAILED(result))
+            {
+                goto Finished;
+            }
+            src++;
+            dst++;
+        }
+    }
+#endif /* ZEND_ENGINE_2_4 */
+
+    if (bMustFixup)
+    {
         /* Walk the opcode array, fixing up offsets */
         for(index = 0; index < opcount; index++)
         {

@@ -373,8 +373,8 @@ PHP_INI_BEGIN()
 #ifdef ZEND_ENGINE_2_4
 /* index 21 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
 #endif /* ZEND_ENGINE_2_4 */
-#ifdef WINCACHE_TEST
 /* index 22 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
+#ifdef WINCACHE_TEST
 /* index 23 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
@@ -1331,9 +1331,6 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
 
     dprintverbose("start wincache_compile_file");
 
-    _ASSERT(WCG(locache)          != NULL);
-    _ASSERT(WCG(locache)->pocache != NULL);
-
     cenabled = WCG(ocenabled);
 
     /* If ocenabled is not modified in php code and toggle is set, change cenabled */
@@ -1351,12 +1348,20 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
         filename = utils_filepath(file_handle);
     }
 
-    /* Nothing to cleanup. So original_compile triggering bailout is fine */
-    if(filename == NULL || isin_ignorelist(WCG(ignorelist), filename) || WCG(lfcache) == NULL)
+    if(filename == NULL ||
+       WCG(lfcache) == NULL ||
+       WCG(locache) == NULL ||
+       isin_ignorelist(WCG(ignorelist), filename))
     {
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
+
+        /* Nothing to cleanup. So original_compile triggering bailout is fine */
         goto Finished;
     }
+
+    _ASSERT(WCG(lfcache)          != NULL);
+    _ASSERT(WCG(locache)          != NULL);
+    _ASSERT(WCG(locache)->pocache != NULL);
 
     /* Use file cache to expand relative paths and also standardize all paths */
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
