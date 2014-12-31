@@ -1344,7 +1344,7 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
 
             efree(Z_STRVAL_P(poldop->op1.zv));
             ZVAL_STRINGL(poldop->op1.zv, frname, frnlen, 1);
-            Z_HASH_P(poldop->op1.zv) = str_hash(frname, frnlen);
+            Z_HASH_P(poldop->op1.zv) = zend_hash_func(frname, frnlen + 1);
 
 #else /* ZEND_ENGINE_2_3 and below */
 
