@@ -145,11 +145,6 @@
 #define FATAL_FCNOTIFY_COMPPORT             FATAL_FCNOTIFY_BASE + 4
 #define FATAL_FCNOTIFY_RDCFAILURE           FATAL_FCNOTIFY_BASE + 5
 
-/* Error codes used by detours */
-#define FATAL_DETOURS_BASE                  1200
-#define FATAL_DETOURS_INITIALIZE            FATAL_DETOURS_BASE + 1
-#define FATAL_DETOURS_TOOBIG                FATAL_DETOURS_BASE + 2
-
 /* Warning codes */
 #define WARNING_COMMON_BASE                 5000
 #define WARNING_FCACHE_TOOBIG               WARNING_COMMON_BASE + 1

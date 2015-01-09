@@ -69,9 +69,30 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned int             numfiles;    /* Configured number of files to handle */
     unsigned int             fcchkfreq;   /* File change check frequency in seconds */
     unsigned int             ttlmax;      /* Seconds a cache entry can stay dormant */
-    detours_context *        detours;     /* Function and class detours set */
                                           /* Pointer to the original rmdir function */
     void                    (*orig_rmdir)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original file_exists function */
+    void                    (*orig_file_exists)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original file_get_contents function */
+    void                    (*orig_file_get_contents)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original filesize function */
+    void                    (*orig_filesize)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original is_dir function */
+    void                    (*orig_is_dir)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original is_file function */
+    void                    (*orig_is_file)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original is_readable function */
+    void                    (*orig_is_readable)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original is_writable function */
+    void                    (*orig_is_writable)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original is_writeable function */
+    void                    (*orig_is_writeable)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original readfile function */
+    void                    (*orig_readfile)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original realpath function */
+    void                    (*orig_realpath)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original unlink function */
+    void                    (*orig_unlink)(INTERNAL_FUNCTION_PARAMETERS);
     zend_bool                enablecli;   /* Enable wincache for command line sapi */
     zend_bool                fcenabled;   /* File cache enabled or disabled */
     unsigned int             fcachesize;  /* File cache size in MBs */
@@ -86,7 +107,6 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     char *                   ocefilter;   /* Comma-separated sitelist having ocenabled toggled */
     char *                   fcefilter;   /* Comma-separated sitelist having fcenabled toggled */
     char *                   namesalt;    /* Salt to use in all the names */
-    char *                   rerouteini;  /* Ini file containing function/class reroutes */
     zend_bool                fcndetect;   /* File change notication detection enabled */
     zend_bool                localheap;   /* Local heap is enabled or disabled */
 
@@ -105,6 +125,8 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned char            dooctoggle;  /* Do toggle of ocenabled due to filter settigns */
     unsigned char            dofctoggle;  /* Do toggle of fcenabled due to filter settigns */
     zend_bool                srwlocks;    /* Enable shared reader/writer locks */
+                                          /* Enable wrapper functions around standard PHP functions */
+    zend_bool                reroute_enabled;
 #ifdef ZEND_ENGINE_2_4
     unsigned int             internedsize; /* Bytes for the interned strings cache */
 #endif /* ZEND_ENGINE_2_4 */

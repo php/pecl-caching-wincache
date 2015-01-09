@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.6.4"
+#define PHP_WINCACHE_VERSION    "1.3.7.0"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -153,7 +153,6 @@
 #include "wincache_lock.h"
 #include "wincache_filemap.h"
 #include "wincache_alloc.h"
-#include "wincache_detours.h"
 #include "wincache_ocache.h"
 #include "wincache_opcopy.h"
 #include "wincache_fcnotify.h"

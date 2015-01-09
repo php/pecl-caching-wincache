@@ -1321,42 +1321,6 @@ static int copy_zend_op(opcopy_context * popcopy, zend_op * poldop, zend_op ** p
 
     memcpy_s(pnewop, sizeof(zend_op), poldop, sizeof(zend_op));
 
-    /* Detour function call if one is configured */
-    if(popcopy->optype == OPCOPY_OPERATION_COPYIN && WCG(detours) != NULL && poldop->opcode == ZEND_DO_FCALL)
-    {
-#ifdef ZEND_ENGINE_2_4
-        result = detours_check(WCG(detours), Z_STRVAL_P(poldop->op1.zv), poldop->extended_value, &frname);
-#else /* ZEND_ENGINE_2_3 and below */
-        result = detours_check(WCG(detours), Z_STRVAL_P(&poldop->op1.u.constant), poldop->extended_value, &frname);
-#endif /* ZEND_ENGINE_2_4 */
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
-
-        if(frname != NULL)
-        {
-            /* TBD?? Free memory allocated by existing function name string */
-            /* Change the function call to replacement function */
-            frnlen = strlen(frname);
-
-#ifdef ZEND_ENGINE_2_4
-
-            efree(Z_STRVAL_P(poldop->op1.zv));
-            ZVAL_STRINGL(poldop->op1.zv, frname, frnlen, 1);
-            Z_HASH_P(poldop->op1.zv) = zend_hash_func(frname, frnlen + 1);
-
-#else /* ZEND_ENGINE_2_3 and below */
-
-            Z_STRVAL(poldop->op1.u.constant) = estrndup(frname, frnlen);
-            Z_STRLEN(poldop->op1.u.constant) = frnlen;
-
-            ZVAL_LONG(&poldop->op2.u.constant, zend_hash_func(frname, frnlen + 1));
-
-#endif /* ZEND_ENGINE_2_4 */
-        }
-    }
-
     pznode = &pnewop->result;
 #ifdef ZEND_ENGINE_2_4
     result = copy_znode_op(popcopy, poldop->result_type, &poldop->result, &pznode);
@@ -1754,7 +1718,6 @@ static int copy_zend_op_array(opcopy_context * popcopy, zend_op_array * poldopa,
     /*
      * NOTE: We must copy literals *after* any calls to copy_zend_op(),
      * since copy_zend_op() can change literals.
-     * New literals are changed to support Detour functionality.
      */
     if (poldopa->literals)
     {

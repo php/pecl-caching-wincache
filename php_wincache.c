@@ -55,34 +55,9 @@ PHP_FUNCTION(wincache_ocache_fileinfo);
 PHP_FUNCTION(wincache_ocache_meminfo);
 PHP_FUNCTION(wincache_ucache_meminfo);
 PHP_FUNCTION(wincache_scache_meminfo);
-PHP_FUNCTION(wincache_reroute_list);
 
 /* Utility functions exposed by this extension */
 PHP_FUNCTION(wincache_refresh_if_changed);
-
-/* Replacement APIs to increase PHP performance */
-PHP_FUNCTION(wincache_file_exists);
-PHP_FUNCTION(wincache_file_get_contents);
-PHP_FUNCTION(wincache_filesize);
-PHP_FUNCTION(wincache_readfile);
-PHP_FUNCTION(wincache_is_readable);
-PHP_FUNCTION(wincache_is_writable);
-PHP_FUNCTION(wincache_is_file);
-PHP_FUNCTION(wincache_is_dir);
-PHP_FUNCTION(wincache_realpath);
-
-/* Replacement APIs we need but might not implement */
-/*
-PHP_FUNCTION(wincache_mysql_query);
-PHP_FUNCTION(wincache_mysql_connect);
-PHP_FUNCTION(wincache_mysql_pconnect);
-PHP_FUNCTION(wincache_mysql_close);
-PHP_FUNCTION(wincache_mysql_select_db);
-PHP_FUNCTION(wincache_mysql_fetch_array);
-PHP_FUNCTION(wincache_preg_match);
-PHP_FUNCTION(wincache_preg_replace);
-PHP_FUNCTION(wincache_preg_split);
-*/
 
 /* ZVAL cache functions matching other caches */
 PHP_FUNCTION(wincache_ucache_get);
@@ -98,6 +73,18 @@ PHP_FUNCTION(wincache_ucache_dec);
 PHP_FUNCTION(wincache_ucache_cas);
 PHP_FUNCTION(wincache_lock);
 PHP_FUNCTION(wincache_unlock);
+
+/* Wrapper functions for standard PHP functions */
+static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS);
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_ucache_lasterror);
@@ -137,50 +124,8 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_scache_meminfo, 0, 0, 0)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_reroute_list, 0, 0, 0)
-    ZEND_ARG_INFO(0, summaryonly)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_refresh_if_changed, 0, 0, 0)
     ZEND_ARG_INFO(0, file_list)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_exists, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_file_get_contents, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-    ZEND_ARG_INFO(0, use_include_path)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_filesize, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_readfile, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-    ZEND_ARG_INFO(0, use_include_path)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_is_readable, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_is_writable, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_is_file, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_is_dir, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
-ZEND_END_ARG_INFO()
-
-ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_realpath, 0, 0, 1)
-    ZEND_ARG_INFO(0, file_name)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_ucache_get, 0, 0, 1)
@@ -284,17 +229,7 @@ zend_function_entry wincache_functions[] = {
     PHP_FE(wincache_ocache_meminfo, arginfo_wincache_ocache_meminfo)
     PHP_FE(wincache_ucache_meminfo, arginfo_wincache_ucache_meminfo)
     PHP_FE(wincache_scache_meminfo, arginfo_wincache_scache_meminfo)
-    PHP_FE(wincache_reroute_list, arginfo_wincache_reroute_list)
     PHP_FE(wincache_refresh_if_changed, arginfo_wincache_refresh_if_changed)
-    PHP_FE(wincache_file_exists, arginfo_wincache_file_exists)
-    PHP_FE(wincache_file_get_contents, arginfo_wincache_file_get_contents)
-    PHP_FE(wincache_filesize, arginfo_wincache_filesize)
-    PHP_FE(wincache_readfile, arginfo_wincache_readfile)
-    PHP_FE(wincache_is_readable, arginfo_wincache_is_readable)
-    PHP_FE(wincache_is_writable, arginfo_wincache_is_writable)
-    PHP_FE(wincache_is_file, arginfo_wincache_is_file)
-    PHP_FE(wincache_is_dir, arginfo_wincache_is_dir)
-    PHP_FE(wincache_realpath, arginfo_wincache_realpath)
     PHP_FE(wincache_ucache_get, arginfo_wincache_ucache_get)
     PHP_FE(wincache_ucache_set, arginfo_wincache_ucache_set)
     PHP_FE(wincache_ucache_add, arginfo_wincache_ucache_add)
@@ -370,10 +305,10 @@ PHP_INI_BEGIN()
 /* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
 /* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "1", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
+/* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "1", PHP_INI_SYSTEM, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
 #ifdef ZEND_ENGINE_2_4
-/* index 21 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
+/* index 22 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
 #endif /* ZEND_ENGINE_2_4 */
-/* index 22 */ STD_PHP_INI_ENTRY("wincache.rerouteini", NULL, PHP_INI_SYSTEM, OnUpdateString, rerouteini, zend_wincache_globals, wincache_globals)
 #ifdef WINCACHE_TEST
 /* index 23 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
@@ -416,7 +351,6 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(ocefilter)   = NULL; /* List of sites for which ocenabled is toggled */
     WCG(fcefilter)   = NULL; /* List of sites for which fcenabled is toggled */
     WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
-    WCG(rerouteini)  = NULL; /* Ini file containing function and class reroutes */
     WCG(fcndetect)   = 1;    /* File change notification enabled by default */
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
 
@@ -425,7 +359,6 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(lfcache)     = NULL; /* Aplist to use for file/rpath cache */
     WCG(locache)     = NULL; /* Aplist to use for opcode cache */
     WCG(zvucache)    = NULL; /* zvcache_context for user zvals */
-    WCG(detours)     = NULL; /* detours_context containing reroutes */
     WCG(zvscache)    = NULL; /* zvcache_context for session data */
     WCG(phscache)    = NULL; /* Hashtable containing zvcache_contexts */
     WCG(issame)      = 1;    /* Indicates if same aplist is used */
@@ -443,6 +376,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(dofctoggle)  = 0;    /* If set to 1, toggle value of fcenabled */
     WCG(apppoolid)   = NULL; /* Use this application id */
     WCG(srwlocks)    = 1;    /* Enable shared reader/writer locks by default */
+    WCG(reroute_enabled) = 1;/* Enable wrappers around standard PHP functions */
 
 #ifdef ZEND_ENGINE_2_4
     WCG(internedsize) = 4;   /* 4MB for interned strings cache */
@@ -631,7 +565,6 @@ PHP_MINIT_FUNCTION(wincache)
     zvcache_context *  pzcache   = NULL;
     int                resnumber = -1;
     zend_extension     extension = {0};
-    detours_context *  pdetours  = NULL;
     zend_ini_entry *   pinientry = NULL;
     int                rethash   = 0;
 
@@ -716,26 +649,7 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
-    if(WCG(rerouteini) != NULL)
-    {
-        result = detours_create(&pdetours);
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
-
-        result = detours_initialize(pdetours, WCG(rerouteini));
-        if(FAILED(result))
-        {
-            php_error_docref(NULL TSRMLS_CC, E_WARNING, "failure initializing function reroute as per wincache.rerouteini");
-            goto Finished;
-        }
-
-        WCG(detours) = pdetours;
-    }
-
     wincache_intercept_functions_init(TSRMLS_C);
-    wincache_save_orig_functions(TSRMLS_C);
 
     /* Create filelist cache */
     result = aplist_create(&plcache1);
@@ -883,15 +797,6 @@ Finished:
         dprintimportant("failure %d in php_minit", result);
         _ASSERT(result > WARNING_COMMON_BASE);
 
-        if(pdetours != NULL)
-        {
-            detours_terminate(pdetours);
-            detours_destroy(pdetours);
-
-            pdetours = NULL;
-            WCG(detours) = NULL;
-        }
-
         if(plcache1 != NULL)
         {
             aplist_terminate(plcache1);
@@ -954,14 +859,6 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
 
     zend_stream_open_function = original_stream_open_function;
     zend_compile_file = original_compile_file;
-
-    if(WCG(detours) != NULL)
-    {
-        detours_terminate(WCG(detours));
-        detours_destroy(WCG(detours));
-
-        WCG(detours) = NULL;
-    }
 
     wincache_intercept_functions_shutdown(TSRMLS_C);
 
@@ -1969,74 +1866,6 @@ Finished:
     return;
 }
 
-PHP_FUNCTION(wincache_reroute_list)
-{
-    int               result      = NONFATAL;
-    HashTable *       phtable     = NULL;
-    char *            pkey        = NULL;
-    fnroute_element * pvalue      = NULL;
-    zval *            zfentries   = NULL;
-    zval *            zfentry     = NULL;
-    unsigned int      index       = 1;
-    zend_bool         summaryonly = 0;
-
-    if(WCG(detours) == NULL)
-    {
-        goto Finished;
-    }
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "|b", &summaryonly) == FAILURE)
-    {
-        result = FATAL_INVALID_ARGUMENT;
-        goto Finished;
-    }
-
-    result = detours_getinfo(WCG(detours), &phtable);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    array_init(return_value);
-    add_assoc_long(return_value, "total_reroutes", zend_hash_num_elements(phtable));
-
-    MAKE_STD_ZVAL(zfentries);
-    array_init(zfentries);
-
-    if(!summaryonly)
-    {
-        zend_hash_internal_pointer_reset(phtable);
-        while(zend_hash_has_more_elements(phtable) == SUCCESS)
-        {
-            zend_hash_get_current_key(phtable, &pkey, NULL, 0);
-            zend_hash_get_current_data(phtable, (void **)&pvalue);
-
-            MAKE_STD_ZVAL(zfentry);
-            array_init(zfentry);
-
-            add_assoc_string(zfentry, "original", pkey, 1);
-            add_assoc_string(zfentry, "changed", pvalue->rtname, 1);
-            add_assoc_long(zfentry, "argcount", pvalue->acount);
-
-            add_index_zval(zfentries, index, zfentry);
-            zend_hash_move_forward(phtable);
-            index++;
-        }
-    }
-
-    add_assoc_zval(return_value, "reroutes", zfentries);
-
-Finished:
-
-    if(phtable != NULL)
-    {
-        detours_freeinfo(phtable);
-        phtable = NULL;
-    }
-
-    return;
-}
-
 PHP_FUNCTION(wincache_refresh_if_changed)
 {
     int    result   = NONFATAL;
@@ -2085,7 +1914,7 @@ Finished:
     RETURN_TRUE;
 }
 
-PHP_FUNCTION(wincache_file_exists)
+static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result   = NONFATAL;
     char *         filename = NULL;
@@ -2096,28 +1925,28 @@ PHP_FUNCTION(wincache_file_exists)
 
     if(WCG(lfcache) == NULL)
     {
-        RETURN_FALSE;
+        goto Finished;
     }
 
     if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &flength) == FAILURE)
     {
-        return;
+        RETURN_FALSE;
     }
 
-    dprintimportant("wincache_file_exists - %s", filename);
-
-    if(flength != 0)
+    if (flength == 0)
     {
-        result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
-        if(FAILED(result))
-        {
-            retval = 0;
-        }
-        else
-        {
-            retval = 1;
-        }
+        goto Finished;
     }
+
+    dprintverbose("wincache_file_exists - %s", filename);
+
+    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    retval = 1;
 
     if(respath != NULL)
     {
@@ -2131,24 +1960,19 @@ PHP_FUNCTION(wincache_file_exists)
         pfvalue = NULL;
     }
 
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_file_exists failed with error %d", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
-        return;
-    }
-
+Finished:
     if(retval)
     {
         RETURN_TRUE;
     }
-
-    RETURN_FALSE;
+    else
+    {
+        WCG(orig_file_exists)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
 }
 
 /* file_get_contents implemented in ext\standard\file.c */
-PHP_FUNCTION(wincache_file_get_contents)
+static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result           = NONFATAL;
     char *         filename         = NULL;
@@ -2158,12 +1982,7 @@ PHP_FUNCTION(wincache_file_get_contents)
     char *         respath          = NULL;
     fcache_value * pfvalue          = NULL;
     char *         contents         = NULL;
-
-    /* TBD?? Call original function if filename contains "://" */
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &filename, &filename_len, &use_include_path) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached         = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2171,7 +1990,25 @@ PHP_FUNCTION(wincache_file_get_contents)
         goto Finished;
     }
 
-    dprintimportant("wincache_file_get_contents - %s", filename);
+    if (ZEND_NUM_ARGS() > 2)
+    {
+        /* We only handle the first two args.  If caller specifies more, we need
+         * to fall through to the orig_file_get_contents. */
+        goto Finished;
+    }
+
+    /* TBD?? Call original function if filename contains "://" */
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &filename, &filename_len, &use_include_path) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if (filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_file_get_contents - %s", filename);
 
     if(!IS_ABSOLUTE_PATH(filename, filename_len) && (!use_include_path))
     {
@@ -2188,6 +2025,8 @@ PHP_FUNCTION(wincache_file_get_contents)
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     contents = alloc_estrdup(WCG(lfcache)->pfcache->memaddr + pfvalue->file_content);
     if(contents == NULL)
@@ -2218,29 +2057,27 @@ Finished:
         pfvalue = NULL;
     }
 
-    if(FAILED(result))
+    if (!iscached)
+    {
+        WCG(orig_file_get_contents)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else if(FAILED(result))
     {
         dprintimportant("wincache_file_get_contents failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
         RETURN_FALSE;
     }
 
     return;
 }
 
-PHP_FUNCTION(wincache_filesize)
+static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
     int            filename_len = 0;
     char *         respath      = NULL;
     fcache_value * pfvalue      = NULL;
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached     = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2248,13 +2085,25 @@ PHP_FUNCTION(wincache_filesize)
         goto Finished;
     }
 
-    dprintimportant("wincache_filesize - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if (filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_filesize - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     RETVAL_LONG(pfvalue->file_size);
 
@@ -2272,7 +2121,11 @@ Finished:
         pfvalue = NULL;
     }
 
-    if(FAILED(result))
+    if (!iscached)
+    {
+        WCG(orig_filesize)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else if(FAILED(result))
     {
         dprintimportant("wincache_filesize failed with error %u", result);
         _ASSERT(result > WARNING_COMMON_BASE);
@@ -2284,20 +2137,15 @@ Finished:
 }
 
 /* readfile implemented in ext\standard\file.c */
-PHP_FUNCTION(wincache_readfile)
+static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
     int            filename_len = 0;
-    int            flags        = 0;
+    zend_bool      flags        = 0;
     char *         respath      = NULL;
     fcache_value * pfvalue      = NULL;
-
-    /* TBD?? Call original function if filename contains "://" */
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|l", &filename, &filename_len, &flags) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached     = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2305,13 +2153,33 @@ PHP_FUNCTION(wincache_readfile)
         goto Finished;
     }
 
-    dprintimportant("wincache_readfile - %s", filename);
+    if (ZEND_NUM_ARGS() > 2)
+    {
+        /* We only handle the first two args.  If caller specifies more, we need
+         * to fall through to the orig_readfile. */
+        goto Finished;
+    }
+
+    /* TBD?? Call original function if filename contains "://" */
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|b", &filename, &filename_len, &flags) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if (filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_readfile - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, USE_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     PHPWRITE(WCG(lfcache)->pfcache->memaddr + pfvalue->file_content, pfvalue->file_size);
     RETVAL_LONG(pfvalue->file_size);
@@ -2330,25 +2198,29 @@ Finished:
         pfvalue = NULL;
     }
 
+    if (!iscached)
+    {
+        WCG(orig_readfile)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+
     if(FAILED(result))
     {
         dprintimportant("wincache_readfile failed with error %u", result);
         _ASSERT(result > WARNING_COMMON_BASE);
-
-        RETURN_FALSE;
     }
 
     return;
 }
 
 /* is_readable implemented in tsrm\tsrm_win32.c */
-PHP_FUNCTION(wincache_is_readable)
+static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS)
 {
     int             result           = NONFATAL;
     char *          filename         = NULL;
     int             filename_len     = 0;
     char *          respath          = NULL;
     fcache_value *  pvalue           = NULL;
+    unsigned char   iscached         = 0;
 
     HANDLE          threadtoken      = NULL;
     unsigned char   isprocesstoken   = 0;
@@ -2362,29 +2234,32 @@ PHP_FUNCTION(wincache_is_readable)
     BOOL            faccess          = FALSE;
     GENERIC_MAPPING gen_map          = { FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_GENERIC_EXECUTE, FILE_ALL_ACCESS };
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
-
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
         goto Finished;
     }
 
-    dprintimportant("wincache_is_readable - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
 
     if(filename_len == 0)
     {
         goto Finished;
     }
 
+    dprintverbose("wincache_is_readable - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    /* Remember that we fetched something out of the cache */
+    iscached = 1;
 
     /* If access returns -1, just return immediately */
     if(access(respath, 04))
@@ -2465,24 +2340,31 @@ Finished:
         pvalue = NULL;
     }
 
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_is_readable failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
-        RETURN_FALSE;
-    }
-
     if(isreadable)
     {
         RETURN_TRUE;
     }
-
-    RETURN_FALSE;
+    else if (!iscached)
+    {
+        WCG(orig_is_readable)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else
+    {
+        RETURN_FALSE;
+    }
 }
 
 /* is_writable implemented in tsrm\tsrm_win32.c */
-PHP_FUNCTION(wincache_is_writable)
+/*
+ * NOTE: PHP has two versions of the exact same function, with a one-letter
+ * difference between the two: is_writable and is_writeable.
+ * Not sure why they have two; but apparently is_writable came first, and
+ * is_writeable is an alias.
+ * In any* case, we have to hook *both* of them.  To facilitate this, we create
+ * a function pointer variable.
+ */
+static void (*wincache_is_writeable)(INTERNAL_FUNCTION_PARAMETERS) = wincache_is_writable;
+static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS)
 {
     int             result           = NONFATAL;
     char *          filename         = NULL;
@@ -2494,6 +2376,7 @@ PHP_FUNCTION(wincache_is_writable)
     unsigned char   isprocesstoken   = 0;
     HANDLE          impersonationtok = NULL;
     unsigned char   iswritable       = 0;
+    unsigned char   iscached         = 0;
 
     unsigned int    priv_set_length  = sizeof(PRIVILEGE_SET);
     PRIVILEGE_SET   privilege_set    = {0};
@@ -2502,29 +2385,31 @@ PHP_FUNCTION(wincache_is_writable)
     BOOL            faccess          = FALSE;
     GENERIC_MAPPING gen_map          = { FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_GENERIC_EXECUTE, FILE_ALL_ACCESS };
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
-
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
         goto Finished;
     }
 
-    dprintimportant("wincache_is_writable - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
 
     if(filename_len == 0)
     {
         goto Finished;
     }
 
+    dprintverbose("wincache_is_writable - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     /* If access returns -1, just return immediately */
     if(access(respath, 02))
@@ -2605,24 +2490,28 @@ Finished:
         pvalue = NULL;
     }
 
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_is_writable failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
-        RETURN_FALSE;
-    }
-
     if(iswritable)
     {
         RETURN_TRUE;
     }
+    else if (!iscached)
+    {
+        WCG(orig_is_writable)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_is_writable failed with error %u", result);
+            _ASSERT(result > WARNING_COMMON_BASE);
+        }
 
-    RETURN_FALSE;
+        RETURN_FALSE;
+    }
 }
 
 /* is_file implemented in ext\standard\file.c */
-PHP_FUNCTION(wincache_is_file)
+static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -2630,11 +2519,7 @@ PHP_FUNCTION(wincache_is_file)
     char *         respath      = NULL;
     fcache_value * pvalue       = NULL;
     unsigned char  retval       = 0;
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached     = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2642,12 +2527,17 @@ PHP_FUNCTION(wincache_is_file)
         goto Finished;
     }
 
-    dprintimportant("wincache_is_file - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
 
     if(filename_len == 0)
     {
         goto Finished;
     }
+
+    dprintverbose("wincache_is_file - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
@@ -2655,13 +2545,14 @@ PHP_FUNCTION(wincache_is_file)
         goto Finished;
     }
 
+    iscached = 1;
+
     if(pvalue != NULL && (pvalue->file_flags & FILE_IS_FOLDER) == 0)
     {
         retval = 1;
     }
 
 Finished:
-
     if(respath != NULL)
     {
         alloc_efree(respath);
@@ -2674,22 +2565,27 @@ Finished:
         pvalue = NULL;
     }
 
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_is_file failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-    }
-
     if(retval)
     {
         RETURN_TRUE;
     }
+    else if(!iscached)
+    {
+        WCG(orig_is_file)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_is_file failed with error %u", result);
+        }
 
-    RETURN_FALSE;
+        RETURN_FALSE;
+    }
 }
 
 /* is_dir implemented in ext\standard\file.c */
-PHP_FUNCTION(wincache_is_dir)
+static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -2697,11 +2593,7 @@ PHP_FUNCTION(wincache_is_dir)
     char *         respath      = NULL;
     fcache_value * pvalue       = NULL;
     unsigned char  retval       = 0;
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached     = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2709,18 +2601,25 @@ PHP_FUNCTION(wincache_is_dir)
         goto Finished;
     }
 
-    dprintimportant("wincache_is_dir - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
 
     if(filename_len == 0)
     {
         goto Finished;
     }
 
+    dprintverbose("wincache_is_dir - %s", filename);
+
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     if(pvalue != NULL && (pvalue->file_flags & FILE_IS_FOLDER) == 1)
     {
@@ -2741,18 +2640,24 @@ Finished:
         pvalue = NULL;
     }
 
-    if(FAILED(result))
-    {
-        dprintimportant("wincache_is_dir failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-    }
-
     if(retval)
     {
         RETURN_TRUE;
     }
+    else if (!iscached)
+    {
+        WCG(orig_is_dir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_is_dir failed with error %u", result);
+            _ASSERT(result > WARNING_COMMON_BASE);
+        }
 
-    RETURN_FALSE;
+        RETURN_FALSE;
+    }
 }
 
 /* overwriting the rmdir implemented in ext\standard\file.c */
@@ -2764,17 +2669,23 @@ WINCACHE_FUNC(wincache_rmdir)
     char *             respath      = NULL;
     fcache_value *     pvalue       = NULL;
     unsigned char      retval       = 1;
-    aplist_context *   pcache       = NULL;
     unsigned int       sticks       = 0;
     unsigned char      lexists      = 0;
     char *             fullpath     = NULL;
+    unsigned char      directory_removed = 0;
+    zval              *zcontext     = NULL;
 
     dprintverbose("start wincache_rmdir");
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &dirname, &dirname_len) == FAILURE)
+    if(WCG(lfcache) == NULL)
     {
-        dprintimportant("wincache_rmdir - failed zend_parse_parameters");
-        return;
+        result = FATAL_UNEXPECTED_FCALL;
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|r", &dirname, &dirname_len, &zcontext) == FAILURE)
+    {
+        RETURN_FALSE;
     }
 
     if(dirname_len == 0)
@@ -2796,30 +2707,18 @@ WINCACHE_FUNC(wincache_rmdir)
         }
     }
 
-    pcache = WCG(lfcache);
-
-    if (pcache)
-    {
-        result = aplist_fcache_get(pcache, fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    }
-    else
-    {
-        result = FATAL_UNEXPECTED_FCALL;
-    }
-
-    dprintimportant("wincache_rmdir - %s. Calling intercepted function.", dirname);
-    WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
-
-    /*
-     * Wait until after calling the "orig_rmdir" to bail out if we couldn't
-     * find the entry in the cache.
-     */
+    result = aplist_fcache_get(WCG(lfcache), fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    if (pcache->pnotify != NULL)
+    /* remove directory first */
+    dprintverbose("wincache_rmdir - %s. Calling intercepted function.", dirname);
+    WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    directory_removed = 1;
+
+    if (WCG(lfcache)->pnotify != NULL)
     {
         sticks = GetTickCount();
 
@@ -2827,7 +2726,7 @@ WINCACHE_FUNC(wincache_rmdir)
         {
             lexists = 1;
 
-            result = fcnotify_listenerexists(pcache->pnotify, respath, &lexists);
+            result = fcnotify_listenerexists(WCG(lfcache)->pnotify, respath, &lexists);
             if(FAILED(result))
             {
                 goto Finished;
@@ -2874,29 +2773,33 @@ Finished:
         pvalue = NULL;
     }
 
-    if(FAILED(result))
+    if (!directory_removed)
     {
-        dprintimportant("wincache_rmdir failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-        RETURN_FALSE;
+        dprintverbose("wincache_rmdir - %s. Calling intercepted function.", dirname);
+        WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+        directory_removed = 1;
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_rmdir failed with error %u", result);
+            _ASSERT(result > WARNING_COMMON_BASE);
+        }
     }
 
     dprintverbose("end wincache_rmdir");
 }
 
 /* file_get_contents implemented in tsrm\tsrm_win32.c */
-PHP_FUNCTION(wincache_realpath)
+static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS)
 {
     int            result        = NONFATAL;
     char *         filename      = NULL;
     int            filename_len  = 0;
     char *         respath       = NULL;
     fcache_value * pfvalue       = NULL;
-
-    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
-    {
-        return;
-    }
+    unsigned char  iscached      = 0;
 
     if(WCG(lfcache) == NULL)
     {
@@ -2904,13 +2807,25 @@ PHP_FUNCTION(wincache_realpath)
         goto Finished;
     }
 
-    dprintimportant("wincache_realpath - %s", filename);
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s", &filename, &filename_len) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if(filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_realpath - %s", filename);
 
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
     }
+
+    iscached = 1;
 
     RETVAL_STRING(respath, 1);
 
@@ -2928,15 +2843,49 @@ Finished:
         pfvalue = NULL;
     }
 
-    if(FAILED(result))
+    if (!iscached)
     {
-        dprintimportant("wincache_realpath failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
-
-        RETURN_FALSE;
+        WCG(orig_realpath)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
     }
 
     return;
+}
+
+static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
+{
+    int            result        = NONFATAL;
+    char *         filename      = NULL;
+    int            filename_len  = 0;
+    char *         respath       = NULL;
+    fcache_value * pfvalue       = NULL;
+    zval         * zcontext      = NULL;
+
+    if(WCG(lfcache) == NULL || ZEND_NUM_ARGS() > 1)
+    {
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS() TSRMLS_CC, "s|r", &filename, &filename_len, &zcontext) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if (filename_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_unlink - %s", filename);
+
+    result = aplist_fcache_reset_lastcheck_time(WCG(lfcache), filename);
+
+Finished:
+    if(FAILED(result))
+    {
+        dprintimportant("wincache_unlink failed with error %u", result);
+    }
+
+    WCG(orig_unlink)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
 }
 
 /* {{{ void wincache_intercept_functions_init(TSRMLS_D) */
@@ -2952,6 +2901,20 @@ void wincache_intercept_functions_init(TSRMLS_D)
     zend_function * orig;
 
     WINCACHE_INTERCEPT(rmdir);
+    if (WCG(reroute_enabled))
+    {
+        WINCACHE_INTERCEPT(file_exists);
+        WINCACHE_INTERCEPT(file_get_contents);
+        WINCACHE_INTERCEPT(filesize);
+        WINCACHE_INTERCEPT(is_dir);
+        WINCACHE_INTERCEPT(is_file);
+        WINCACHE_INTERCEPT(is_readable);
+        WINCACHE_INTERCEPT(is_writable);
+        WINCACHE_INTERCEPT(is_writeable);
+        WINCACHE_INTERCEPT(readfile);
+        WINCACHE_INTERCEPT(realpath);
+        WINCACHE_INTERCEPT(unlink);
+    }
     dprintverbose("wincache_intercept_functions_init called");
 }
 /* }}} */
@@ -2968,22 +2931,23 @@ void wincache_intercept_functions_shutdown(TSRMLS_D)
     zend_function * orig;
 
     WINCACHE_RELEASE(rmdir);
+    if (WCG(reroute_enabled))
+    {
+        WINCACHE_RELEASE(file_exists);
+        WINCACHE_RELEASE(file_get_contents);
+        WINCACHE_RELEASE(filesize);
+        WINCACHE_RELEASE(is_dir);
+        WINCACHE_RELEASE(is_file);
+        WINCACHE_RELEASE(is_readable);
+        WINCACHE_RELEASE(is_writable);
+        WINCACHE_RELEASE(is_writeable);
+        WINCACHE_RELEASE(readfile);
+        WINCACHE_RELEASE(realpath);
+        WINCACHE_RELEASE(unlink);
+    }
+    dprintverbose("wincache_intercept_functions_shutdown called");
 }
 /* }}} */
-
-static struct _wincache_orig_functions {
-    void (*orig_rmdir)(INTERNAL_FUNCTION_PARAMETERS);
-} wincache_orig_functions = {NULL};
-
-void wincache_save_orig_functions(TSRMLS_D)
-{
-    wincache_orig_functions.orig_rmdir = WCG(orig_rmdir);
-}
-
-void wincache_restore_orig_functions(TSRMLS_D)
-{
-    WCG(orig_rmdir) = wincache_orig_functions.orig_rmdir;
-}
 
 PHP_FUNCTION(wincache_ucache_get)
 {

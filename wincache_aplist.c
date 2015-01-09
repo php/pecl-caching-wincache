@@ -1713,6 +1713,12 @@ static int set_lastcheck_time(aplist_context * pcache, const char * filename, un
 
 Finished:
 
+    if (resolve_path)
+    {
+        alloc_efree(resolve_path);
+        resolve_path = NULL;
+    }
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in set_lastcheck_time", result);
@@ -1722,6 +1728,11 @@ Finished:
     dprintverbose("end set_lastcheck_time");
 
     return result;
+}
+
+int aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename TSRMLS_DC)
+{
+    return set_lastcheck_time(pcache, filename, 0 TSRMLS_CC);
 }
 
 /* Used by wincache_resolve_path and wincache_stream_open_function */
