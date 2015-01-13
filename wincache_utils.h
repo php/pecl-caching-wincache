@@ -37,7 +37,7 @@
 extern unsigned int utils_hashcalc(const char * str, unsigned int strlen);
 extern unsigned int utils_getindex(const char * filename, unsigned int numfiles);
 extern const char * utils_filepath(zend_file_handle * file_handle);
-extern char *       utils_fullpath(const char * filename);
+extern char *       utils_fullpath(const char * filename, int filename_len);
 extern int          utils_cwdcexec(char * buffer, unsigned int length TSRMLS_DC);
 extern int          utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer, unsigned int length);
 extern int          utils_apoolpid(TSRMLS_D);

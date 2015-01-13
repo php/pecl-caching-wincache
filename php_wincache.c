@@ -2012,12 +2012,7 @@ static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
 
     if(!IS_ABSOLUTE_PATH(filename, filename_len) && (!use_include_path))
     {
-        fullpath = utils_fullpath(filename);
-        if(fullpath == NULL)
-        {
-            result = FATAL_OUT_OF_LMEMORY;
-            goto Finished;
-        }
+        fullpath = utils_fullpath(filename, filename_len);
     }
 
     result = aplist_fcache_get(WCG(lfcache), (fullpath == NULL ? filename : fullpath), USE_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
@@ -2699,11 +2694,10 @@ WINCACHE_FUNC(wincache_rmdir)
     }
     else
     {
-        fullpath = utils_fullpath(dirname);
+        fullpath = utils_fullpath(dirname, dirname_len);
         if(fullpath == NULL)
         {
-            result = FATAL_OUT_OF_LMEMORY;
-            goto Finished;
+            fullpath = dirname;
         }
     }
 

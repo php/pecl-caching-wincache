@@ -201,7 +201,7 @@ const char * utils_filepath(zend_file_handle * file_handle)
     return pchar;
 }
 
-char * utils_fullpath(const char * filename)
+char * utils_fullpath(const char * filename, int filename_len)
 {
     char *       filepath = NULL;
     unsigned int fplength = 0;
@@ -209,6 +209,12 @@ char * utils_fullpath(const char * filename)
 
     dprintverbose("start utils_fullpath");
     _ASSERT(filename != NULL);
+
+    /* If the filename is too big, just bail out. */
+    if (filename_len >= MAX_PATH || filename_len < 0)
+    {
+        goto Finished;
+    }
 
     /* Get fullpath in a standardized format */
     filepath = alloc_emalloc(MAX_PATH);
