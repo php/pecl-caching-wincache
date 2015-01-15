@@ -81,6 +81,7 @@
 #define FATAL_ALLOC_BASE                    300
 #define FATAL_ALLOC_NO_MEMORY               FATAL_ALLOC_BASE + 1
 #define FATAL_ALLOC_INIT_EVENT              FATAL_ALLOC_BASE + 2
+#define FATAL_ALLOC_SEGMENT_CORRUPT         FATAL_ALLOC_BASE + 3
 
 /* Error codes used by aplist code */
 #define FATAL_APLIST_BASE                   400

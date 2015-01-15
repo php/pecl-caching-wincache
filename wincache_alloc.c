@@ -125,9 +125,25 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     /* Get pointer to start block and move to next block */
     freeh = FREE_HEADER(segaddr, sizeof(alloc_segment_header));
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FIRST);
+    if (freeh->is_free != BLOCK_ISFREE_FIRST)
+    {
+        php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free block corrupt.\n",
+            GetCurrentProcessId());
+        dprintcritical("allocate_memory: First block is not BLOCK_ISFREE_FIRST");
+        result = FATAL_ALLOC_SEGMENT_CORRUPT;
+        goto Finished;
+    }
 
     freeh = FREE_HEADER(segaddr, freeh->next_free);
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE || freeh->is_free == BLOCK_ISFREE_LAST);
+    if (freeh->is_free != BLOCK_ISFREE_FREE && freeh->is_free != BLOCK_ISFREE_LAST)
+    {
+        php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free list corrupt.\n",
+            GetCurrentProcessId());
+        dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE or BLOCK_ISFREE_LAST");
+        result = FATAL_ALLOC_SEGMENT_CORRUPT;
+        goto Finished;
+    }
 
     /* Find a free block which is large enough to satisfy the request */
     while(freeh->is_free != BLOCK_ISFREE_LAST)
@@ -149,6 +165,14 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     }
 
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE);
+    if (freeh->is_free != BLOCK_ISFREE_FREE)
+    {
+        php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free list corrupt.\n",
+            GetCurrentProcessId());
+        dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE");
+        result = FATAL_ALLOC_SEGMENT_CORRUPT;
+        goto Finished;
+    }
 
     /* Got a free block with sufficient free memory. Now */
     /* see if block size is big enough to be broken into two */
@@ -277,13 +301,34 @@ static void free_memory(alloc_context * palloc, void * paddr)
     header  = palloc->header;
     segaddr = palloc->memaddr;
 
+    /* Get pointer to used_header for the block which is getting freed */
+    usedh = (alloc_used_header *)((char *)paddr - sizeof(alloc_used_header));
+
+    /* Validate the memory being freed is in the heap */
+    if ((void *)usedh < segaddr || (char *)usedh > ((char *)segaddr + palloc->size))
+    {
+        _ASSERT(0);
+        php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Address %p not in segment\n",
+            GetCurrentProcessId(), paddr);
+        dprintcritical("free_memory: Address %p not in segment %p (size %d)",
+            paddr, segaddr, palloc->size);
+        goto Finished;
+    }
+
+    /* Block is in our heap.  Validate it is in use */
+    _ASSERT(usedh->is_free == BLOCK_ISFREE_USED);
+    if (usedh->is_free != BLOCK_ISFREE_USED)
+    {
+        php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Block %p not in use\n",
+            GetCurrentProcessId(), paddr);
+        dprintcritical("free_memory: Address %p not in use in segment %p (size %d)",
+            paddr, segaddr, palloc->size);
+        goto Finished;
+    }
+
     /* Increment freecount and decrement usedcount right away */
     header->usedcount--;
     header->freecount++;
-
-    /* Get pointer to used_header for the block which is getting freed */
-    usedh = (alloc_used_header *)((char *)paddr - sizeof(alloc_used_header));
-    _ASSERT(usedh->is_free == BLOCK_ISFREE_USED);
 
     blocksiz = usedh->size;
     header->free_size += blocksiz;
@@ -311,6 +356,7 @@ static void free_memory(alloc_context * palloc, void * paddr)
         combined = 1;
     }
 
+    /* Check if previous block is free */
     lastsize = *((size_t *)((char *)paddr - sizeof(alloc_used_header) - sizeof(size_t)));
     freeh    = (alloc_free_header *)((char *)paddr - sizeof(alloc_used_header) - ALLOC_FREE_BLOCK_OVERHEAD - lastsize);
 
@@ -356,6 +402,13 @@ static void free_memory(alloc_context * palloc, void * paddr)
         }
 
         _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE || freeh->is_free == BLOCK_ISFREE_LAST);
+        if (freeh->is_free != BLOCK_ISFREE_FREE && freeh->is_free != BLOCK_ISFREE_LAST)
+        {
+            php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Combining with non-free block %p - CORRUPTION IMMINENT\n",
+                GetCurrentProcessId(), freeh);
+            dprintcritical("free_memory: Free block %p is not free in segment %p (size %d) - CORRUPTION IMMINENT",
+                freeh, segaddr, palloc->size);
+        }
 
         pfree = (alloc_free_header *)usedh;
         pfree->is_free = BLOCK_ISFREE_FREE;
