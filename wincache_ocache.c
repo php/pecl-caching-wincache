@@ -73,7 +73,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_create");
@@ -187,6 +186,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
     pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pcache->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_OCACHE_INIT_EVENT;
         goto Finished;
     }
@@ -197,18 +197,18 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_OCACHE_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_OCACHE_INIT_EVENT;
             goto Finished;
         }
@@ -241,7 +241,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcache->pfilemap != NULL)
         {
@@ -485,7 +484,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_createval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pvalue != NULL)
         {
@@ -642,7 +640,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_useval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_useval");
@@ -721,7 +718,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ocache_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end ocache_getinfo");

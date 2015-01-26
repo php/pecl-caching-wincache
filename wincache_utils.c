@@ -282,7 +282,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in utils_cwdcxec", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end utils_cwdcexec");
@@ -319,7 +318,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in utils_filefolder", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     return result;

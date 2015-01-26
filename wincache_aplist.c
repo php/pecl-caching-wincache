@@ -397,7 +397,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_aplist_data", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbaseadr != NULL)
         {
@@ -731,7 +730,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_create");
@@ -898,6 +896,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pcache->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_APLIST_INIT_EVENT;
         goto Finished;
     }
@@ -908,18 +907,18 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_APLIST_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_APLIST_INIT_EVENT;
             goto Finished;
         }
@@ -983,7 +982,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* Must cleanup in exactly reverse order of creation. */
 
@@ -1080,7 +1078,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_fcache_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pfcache != NULL)
         {
@@ -1128,7 +1125,8 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         hfirst = CreateEvent(NULL, TRUE, FALSE, evtname);
         if(hfirst == NULL)
         {
-            result = FATAL_APLIST_INIT_EVENT;
+            dprintcritical("Failed to create event %s", evtname);
+            result = FATAL_APLIST_OCACHE_INIT_EVENT;
             goto Finished;
         }
 
@@ -1136,19 +1134,19 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         if(GetLastError() == ERROR_ALREADY_EXISTS)
         {
             isfirst = 0;
-            ret = WaitForSingleObject(hfirst, FIVE_SECOND_WAIT);
+            ret = WaitForSingleObject(hfirst, MAX_INIT_EVENT_WAIT);
 
             if (ret == WAIT_TIMEOUT)
             {
-                dprintimportant("Timed out waiting for other process to release %s", evtname);
-                result = FATAL_APLIST_INIT_EVENT;
+                dprintcritical("Timed out waiting for other process to release %s", evtname);
+                result = FATAL_APLIST_OCACHE_INIT_EVENT;
                 goto Finished;
             }
 
             if (ret == WAIT_FAILED)
             {
-                dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-                result = FATAL_APLIST_INIT_EVENT;
+                dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+                result = FATAL_APLIST_OCACHE_INIT_EVENT;
                 goto Finished;
             }
         }
@@ -1214,7 +1212,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_ocache_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* Make sure process with local cache doesn't increment */
         /* refcount of named object created above */
@@ -1508,7 +1505,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_getentry", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewval != NULL)
         {
@@ -1637,7 +1633,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_force_fccheck", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_force_fccheck");
@@ -1721,8 +1716,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in set_lastcheck_time", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in set_lastcheck_time", result);
     }
 
     dprintverbose("end set_lastcheck_time");
@@ -1861,7 +1855,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
                 goto Finished;
             }
 
-            dprintimportant("stored fullpath in aplist is %s", fullpath);
+            dprintverbose("stored fullpath in aplist is %s", fullpath);
         }
     }
 
@@ -2046,8 +2040,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in aplist_fcache_get", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in aplist_fcache_get", result);
 
         if(fullpath != NULL)
         {
@@ -2084,7 +2077,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_fcache_use", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_fcache_use");
@@ -2211,7 +2203,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_ocache_get", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_ocache_get");
@@ -2268,7 +2259,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_ocache_get_value", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_ocache_get_value");
@@ -2298,7 +2288,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_ocache_use", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end aplist_ocache_use");
@@ -2459,7 +2448,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcinfo != NULL)
         {
@@ -2556,7 +2544,7 @@ void aplist_runtest()
     aplist_context * pcache    = NULL;
     aplist_value *   pvalue    = NULL;
     unsigned short   islocal   = 0;
-    unsigned int     filecount = 1040;
+    unsigned int     filecount = WCG(numfiles);
     unsigned int     fchfreq   = 5;
     unsigned int     ttlmax    = 0;
     char *           filename  = "testfile.php";
@@ -2583,8 +2571,8 @@ void aplist_runtest()
     _ASSERT(pcache->aprwlock    != NULL);
     _ASSERT(pcache->apalloc     != NULL);
 
-    _ASSERT(pcache->apheader->valuecount == filecount);
-    _ASSERT(pcache->apheader->itemcount  == 0);
+    _ASSERT(pcache->apheader->valuecount == WCG(numfiles));
+    _ASSERT(pcache->apheader->itemcount  == (WCG(fcenabled) ? 1 : 0));
 
 Finished:
 

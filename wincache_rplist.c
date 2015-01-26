@@ -194,8 +194,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in create_rplist_data", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in create_rplist_data", result);
 
         if(pbaseadr != NULL)
         {
@@ -345,7 +344,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in rplist_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end rplist_create");
@@ -447,7 +445,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in rplist_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         rplist_terminate(pcache);
     }
@@ -614,8 +611,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in rplist_getentry", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in rplist_getentry", result);
 
         if(pnewval != NULL)
         {
@@ -822,7 +818,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in rplist_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcinfo != NULL)
         {

@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.0"
+#define PHP_WINCACHE_VERSION    "1.3.7.1"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -102,7 +102,7 @@
 
 #ifdef WINCACHE_DEBUG
 # define WINCACHE_TEST
-# define _ASSERT(x)   if(!(x)) { dprintalways(#x); if(IsDebuggerPresent()) { DebugBreak(); } }
+# define _ASSERT(x)   if(!(x)) { dprintalways("%s(%d): " #x "\n", __FILE__, __LINE__ ); if(IsDebuggerPresent()) { DebugBreak(); } }
 #else
 # define _ASSERT(x)
 #endif
@@ -136,6 +136,8 @@
 #define FCACHE_SIZE_MAXIMUM        255
 #define ZCACHE_SIZE_MINIMUM        5
 #define ZCACHE_SIZE_MAXIMUM        930
+#define SCACHE_SIZE_MINIMUM        5
+#define SCACHE_SIZE_MAXIMUM        85
 #define FILE_SIZE_MINIMUM          10
 #define FILE_SIZE_MAXIMUM          4096
 #define FCHECK_FREQ_MINIMUM        2
@@ -146,6 +148,7 @@
 #define INTERNED_SIZE_MAXIMUM      32
 
 #define FIVE_SECOND_WAIT           5000
+#define MAX_INIT_EVENT_WAIT        10000
 
 #include "wincache_error.h"
 #include "wincache_debug.h"

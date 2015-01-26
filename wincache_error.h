@@ -87,6 +87,7 @@
 #define FATAL_APLIST_BASE                   400
 #define FATAL_APLIST_CREATION               FATAL_APLIST_BASE + 1
 #define FATAL_APLIST_INIT_EVENT             FATAL_APLIST_BASE + 2
+#define FATAL_APLIST_OCACHE_INIT_EVENT      FATAL_APLIST_BASE + 3
 
 /* Error codes used by rplist code */
 #define FATAL_RPLIST_BASE                   500
@@ -132,6 +133,7 @@
 #define FATAL_ZVCACHE_INITIALIZE            FATAL_ZVCACHE_BASE + 1
 #define FATAL_ZVCACHE_INIT_EVENT            FATAL_ZVCACHE_BASE + 2
 #define FATAL_ZVCACHE_INVALID_ZVAL          FATAL_ZVCACHE_BASE + 3
+#define FATAL_ZVCACHE_INVALID_KEY_LENGTH    FATAL_ZVCACHE_BASE + 4
 
 /* Error codes used by session handler */
 #define FATAL_SESSION_BASE                  1000

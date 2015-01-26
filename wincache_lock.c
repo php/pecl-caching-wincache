@@ -82,7 +82,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end lock_create");
@@ -310,7 +309,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plock->haccess != NULL)
         {
@@ -725,7 +723,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in lock_getnewname", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end lock_getnewname");

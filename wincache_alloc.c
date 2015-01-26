@@ -259,8 +259,7 @@ Finished:
     {
         _ASSERT(*ppaddr == NULL);
 
-        dprintimportant("failure %d in allocate_memory", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in allocate_memory", result);
     }
 
     dprintdecorate("end allocate_memory");
@@ -611,7 +610,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end alloc_create");
@@ -689,6 +687,7 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     palloc->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(palloc->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_ALLOC_INIT_EVENT;
         goto Finished;
     }
@@ -699,18 +698,18 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(palloc->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(palloc->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_ALLOC_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_ALLOC_INIT_EVENT;
             goto Finished;
         }
@@ -778,7 +777,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(palloc != NULL)
         {
@@ -874,7 +872,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_create_mpool", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end alloc_create_mpool");
@@ -994,7 +991,7 @@ void * alloc_get_cachevalue(alloc_context * palloc, size_t offset)
     _ASSERT(palloc != NULL);
     _ASSERT(palloc->memaddr != NULL);
 
-    if(offset != 0)
+    if(offset != 0 && offset < palloc->size)
     {
         return (void *)((char *)palloc->memaddr + offset);
     }
@@ -1010,7 +1007,7 @@ size_t alloc_get_valueoffset(alloc_context * palloc, void * pvalue)
     _ASSERT(palloc != NULL);
     _ASSERT(palloc->memaddr != NULL);
 
-    if(pvalue != NULL)
+    if(pvalue != NULL && pvalue >= palloc->memaddr)
     {
         return POINTER_OFFSET(palloc->memaddr, pvalue);
     }
@@ -1057,7 +1054,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in alloc_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pinfo != NULL)
         {

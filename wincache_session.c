@@ -213,7 +213,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ps_open_func", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(phtable != NULL)
         {
@@ -314,7 +313,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ps_read_func", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
 
         return FAILURE;
@@ -360,7 +358,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ps_write_func", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         return FAILURE;
     }
@@ -399,7 +396,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ps_destroy_func", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         return FAILURE;
     }

@@ -163,7 +163,7 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
                 goto Finished;
             }
 
-            dprintalways("received change notification for file = %s\\%s", plistener->folder_path, pfname);
+            dprintverbose("received change notification for file = %s\\%s", plistener->folder_path, pfname);
             aplist_mark_changed(pnotify->fcaplist, plistener->folder_path, pfname);
 
             alloc_pefree(pwchar);
@@ -381,7 +381,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_fcnotify_data", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pvalue != NULL)
         {
@@ -622,7 +621,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcnotify_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end fcnotify_create");
@@ -661,7 +659,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcnotify_listenerexists", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     lock_readunlock(pnotify->fclock);
@@ -767,7 +764,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcnotify_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnotify->listen_thread != NULL)
         {
@@ -1271,7 +1267,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcnotify_check", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(ptemp != NULL)
         {
@@ -1415,7 +1410,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcnotify_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcinfo != NULL)
         {

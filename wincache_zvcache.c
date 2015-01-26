@@ -35,6 +35,10 @@
 
 #define PER_RUN_SCAVENGE_COUNT       16
 
+#ifndef USHORT_MAX
+#define USHORT_MAX                   0xFFFF
+#endif /* USHORT_MAX */
+
 #ifndef IS_CONSTANT_TYPE_MASK
 #define IS_CONSTANT_TYPE_MASK (~IS_CONSTANT_INDEX)
 #endif
@@ -300,7 +304,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_zval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewzv != NULL)
         {
@@ -497,7 +500,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_zval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
         {
@@ -649,7 +651,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_hashtable", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
         {
@@ -755,7 +756,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyin_bucket", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
         {
@@ -902,7 +902,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_hashtable", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pnewh != NULL)
         {
@@ -1020,7 +1019,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in copyout_bucket", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pbuffer != NULL)
         {
@@ -1120,7 +1118,12 @@ static int create_zvcache_data(zvcache_context * pcache, const char * key, zval 
     pcopy = pcache->incopy;
 
     keylen = strlen(key) + 1;
-    _ASSERT(keylen < 4098);
+    _ASSERT(keylen < 4098);  /* NOTE: No clue why 4098 */
+    if (keylen > USHORT_MAX)
+    {
+        result = FATAL_ZVCACHE_INVALID_KEY_LENGTH;
+        goto Finished;
+    }
 
     pvalue = (zvcache_value *)ZMALLOC(pcopy, sizeof(zvcache_value) + keylen);
     if(pvalue == NULL)
@@ -1164,7 +1167,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_zvcache_data", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pvalue != NULL)
         {
@@ -1433,7 +1435,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_create %p", pcache);
@@ -1554,6 +1555,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pcache->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_ZVCACHE_INIT_EVENT;
         goto Finished;
     }
@@ -1564,18 +1566,18 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_ZVCACHE_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_ZVCACHE_INIT_EVENT;
             goto Finished;
         }
@@ -1656,7 +1658,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pcache->zvfilemap != NULL)
         {
@@ -1811,7 +1812,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_get", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_get");
@@ -1904,9 +1904,6 @@ int zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsign
     {
         if(isadd == 1)
         {
-            destroy_zvcache_data(pcache, pnewval);
-            _ASSERT(pentry->zvalue != 0);
-
             result = WARNING_ZVCACHE_EXISTS;
             goto Finished;
         }
@@ -1941,7 +1938,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_set", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_set");
@@ -1995,7 +1991,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_delete", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_delete");
@@ -2098,7 +2093,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_exists", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_exists");
@@ -2232,7 +2226,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_list", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         zend_llist_destroy(plist);
     }
@@ -2299,7 +2292,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_change", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_change");
@@ -2354,8 +2346,8 @@ int zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue,
     }
     else
     {
-	result = WARNING_ZVCACHE_CASNEQ;
-	goto Finished;
+        result = WARNING_ZVCACHE_CASNEQ;
+        goto Finished;
     }
 
     _ASSERT(SUCCEEDED(result));
@@ -2371,7 +2363,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_compswitch", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end zvcache_compswitch");

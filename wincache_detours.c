@@ -87,7 +87,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in ini_readfile", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     return result;
@@ -201,7 +200,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in detours_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     return result;
@@ -290,7 +288,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in detours_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pdetours->inifile != NULL)
         {
@@ -362,7 +359,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in detours_check", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     return result;

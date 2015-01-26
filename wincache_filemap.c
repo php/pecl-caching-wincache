@@ -144,7 +144,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in getppid", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end getppid");
@@ -185,7 +184,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_rwlock", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plock != NULL)
         {
@@ -287,7 +285,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_file_mapping", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(maphandle != NULL)
         {
@@ -313,11 +310,11 @@ static void * map_viewof_file(HANDLE handle, void * baseaddr)
 
     if(baseaddr != NULL)
     {
-        dprintimportant("Mapping file map at address = %p", baseaddr);
+        dprintverbose("Mapping file map at address = %p", baseaddr);
     }
     else
     {
-        dprintimportant("Mapping file map at any random address");
+        dprintverbose("Mapping file map at any random address");
     }
 
     retaddr = MapViewOfFileEx(handle, FILE_MAP_ALL_ACCESS, 0, 0, 0, baseaddr);
@@ -437,6 +434,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     pinfo->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pinfo->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_FILEMAP_INIT_EVENT;
         goto Finished;
     }
@@ -445,18 +443,18 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     {
         /* Wait for other process to initialize completely */
         isfirst = 0;
-        ret = WaitForSingleObject(pinfo->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(pinfo->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_FILEMAP_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_FILEMAP_INIT_EVENT;
             goto Finished;
         }
@@ -502,7 +500,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in create_information_filemap", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pinfo != NULL)
         {
@@ -645,7 +642,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_global_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fgcontext != NULL)
         {
@@ -736,7 +732,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end filemap_create");
@@ -914,7 +909,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
                 }
             }
 
-            dprintimportant("Creating a shared filemap with name %s", pentry->name);
+            dprintverbose("Creating a shared filemap with name %s", pentry->name);
 
             pentry->size     = size;
             pentry->mapcount = 0;
@@ -1082,7 +1077,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in filemap_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* mapcount and entry_count are updated in the last */
         /* so no need to worry about that getting messed up */

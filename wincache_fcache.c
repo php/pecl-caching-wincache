@@ -52,7 +52,7 @@ static int read_file_security(fcache_context * pfcache, const char * filename, u
     unsigned int         desc_length = 0;
     unsigned char *      psec_desc   = NULL;
 
-    dprintverbose("start read_file_security");
+    dprintdecorate("start read_file_security");
 
     _ASSERT(pfcache  != NULL);
     _ASSERT(filename != NULL);
@@ -89,8 +89,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in read_file_security", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in read_file_security", result);
 
         if(psec_desc != NULL)
         {
@@ -99,7 +98,7 @@ Finished:
         }
     }
 
-    dprintverbose("end read_file_security");
+    dprintdecorate("end read_file_security");
 
     return result;
 }
@@ -173,7 +172,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in read_file_content", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end read_file_content");
@@ -217,7 +215,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_create", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end fcache_create");
@@ -331,6 +328,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     pfcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
     if(pfcache->hinitdone == NULL)
     {
+        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_FCACHE_INIT_EVENT;
         goto Finished;
     }
@@ -341,18 +339,18 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         isfirst = 0;
 
         /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pfcache->hinitdone, FIVE_SECOND_WAIT);
+        ret = WaitForSingleObject(pfcache->hinitdone, MAX_INIT_EVENT_WAIT);
 
         if (ret == WAIT_TIMEOUT)
         {
-            dprintimportant("Timed out waiting for other process to release %s", evtname);
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_FCACHE_INIT_EVENT;
             goto Finished;
         }
 
         if (ret == WAIT_FAILED)
         {
-            dprintimportant("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
             result = FATAL_FCACHE_INIT_EVENT;
             goto Finished;
         }
@@ -386,7 +384,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_initialize", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(pfcache->palloc != NULL)
         {
@@ -602,8 +599,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("failure %d in fcache_createval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("failure %d in fcache_createval", result);
 
         if(buffer != NULL)
         {
@@ -737,7 +733,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_useval", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fhandle != NULL)
         {
@@ -829,7 +824,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in fcache_getinfo", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     dprintverbose("end fcache_getinfo");

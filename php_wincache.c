@@ -330,6 +330,16 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
 {
     dprintverbose("start globals_initialize");
 
+    /* Function pointers we will override */
+#ifndef PHP_VERSION_52
+    original_resolve_path           = zend_resolve_path;
+#endif /* PHP_VERSION_52 */
+    original_stream_open_function   = zend_stream_open_function;
+    original_compile_file           = zend_compile_file;
+    /* Also keep zend_error_cb pointer for saving generating messages */
+    original_error_cb               = zend_error_cb;
+
+    /* Initalize the wincache_globals items, before parsing the INI file */
     WCG(fcenabled)   = 1;    /* File cache enabled by default */
 #if PHP_VERSION_ID >= 50500
     WCG(ocenabled)   = 0;    /* Opcode cache disabled by default on PHP 5.5 or later */
@@ -598,8 +608,8 @@ PHP_MINIT_FUNCTION(wincache)
     WCG(fcachesize)  = (WCG(fcachesize)  > FCACHE_SIZE_MAXIMUM) ? FCACHE_SIZE_MAXIMUM : WCG(fcachesize);
     WCG(ucachesize)  = (WCG(ucachesize)  < ZCACHE_SIZE_MINIMUM) ? ZCACHE_SIZE_MINIMUM : WCG(ucachesize);
     WCG(ucachesize)  = (WCG(ucachesize)  > ZCACHE_SIZE_MAXIMUM) ? ZCACHE_SIZE_MAXIMUM : WCG(ucachesize);
-    WCG(scachesize)  = (WCG(scachesize)  < ZCACHE_SIZE_MINIMUM) ? ZCACHE_SIZE_MINIMUM : WCG(scachesize);
-    WCG(scachesize)  = (WCG(scachesize)  > ZCACHE_SIZE_MAXIMUM) ? ZCACHE_SIZE_MAXIMUM : WCG(scachesize);
+    WCG(scachesize)  = (WCG(scachesize)  < SCACHE_SIZE_MINIMUM) ? SCACHE_SIZE_MINIMUM : WCG(scachesize);
+    WCG(scachesize)  = (WCG(scachesize)  > SCACHE_SIZE_MAXIMUM) ? SCACHE_SIZE_MAXIMUM : WCG(scachesize);
     WCG(maxfilesize) = (WCG(maxfilesize) < FILE_SIZE_MINIMUM)   ? FILE_SIZE_MINIMUM   : WCG(maxfilesize);
     WCG(maxfilesize) = (WCG(maxfilesize) > FILE_SIZE_MAXIMUM)   ? FILE_SIZE_MAXIMUM   : WCG(maxfilesize);
 #ifdef ZEND_ENGINE_2_4
@@ -649,7 +659,35 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
-    wincache_intercept_functions_init(TSRMLS_C);
+    /* Always create user cache as ucenabled can be set by script */
+    result = zvcache_create(&pzcache);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* issession = 0, islocal = 0, cachekey = 1, zvcount = 256, shmfilepath = NULL */
+    result = zvcache_initialize(pzcache, 0, 0, 1, 256, WCG(ucachesize), NULL TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* Create hashtable zvcopied */
+    WCG(zvcopied) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
+    if(WCG(zvcopied) == NULL)
+    {
+        result = FATAL_OUT_OF_LMEMORY;
+        goto Finished;
+    }
+
+    WCG(zvucache) = pzcache;
+
+    /* User cache and session cache now operational, even if things below fail */
+    pzcache = NULL;
+
+    /* Register wincache session handler */
+    php_session_register_module(ps_wincache_ptr);
 
     /* Create filelist cache */
     result = aplist_create(&plcache1);
@@ -673,11 +711,11 @@ PHP_MINIT_FUNCTION(wincache)
 
     WCG(lfcache) = plcache1;
 
-    original_stream_open_function = zend_stream_open_function;
+    wincache_intercept_functions_init(TSRMLS_C);
+
     zend_stream_open_function = wincache_stream_open_function;
 
 #ifndef PHP_VERSION_52
-    original_resolve_path = zend_resolve_path;
     zend_resolve_path = wincache_resolve_path;
 #endif
 
@@ -753,39 +791,9 @@ PHP_MINIT_FUNCTION(wincache)
         WCG(locache) = plcache1;
     }
 
-    original_compile_file = zend_compile_file;
     zend_compile_file = wincache_compile_file;
 
-    /* Also keep zend_error_cb pointer for saving generating messages */
-    original_error_cb = zend_error_cb;
     dprintverbose("Installed function hooks for compile_file");
-
-    /* Always create user cache as ucenabled can be set by script */
-    result = zvcache_create(&pzcache);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    /* issession = 0, islocal = 0, cachekey = 1, zvcount = 256, shmfilepath = NULL */
-    result = zvcache_initialize(pzcache, 0, 0, 1, 256, WCG(ucachesize), NULL TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    /* Create hashtable zvcopied */
-    WCG(zvcopied) = (HashTable *)alloc_pemalloc(sizeof(HashTable));
-    if(WCG(zvcopied) == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
-
-    WCG(zvucache) = pzcache;
-
-    /* Register wincache session handler */
-    php_session_register_module(ps_wincache_ptr);
 
     _ASSERT(SUCCEEDED(result));
 
@@ -795,7 +803,17 @@ Finished:
     {
         php_error(E_ERROR, "Failure in PHP_MINIT_FUNCTION(Wincache): %d", result);
         dprintimportant("failure %d in php_minit", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+
+        if(plcache2 != NULL)
+        {
+            aplist_terminate(plcache2);
+            aplist_destroy(plcache2);
+
+            plcache2 = NULL;
+            WCG(locache) = NULL;
+        }
+
+        wincache_intercept_functions_shutdown(TSRMLS_C);
 
         if(plcache1 != NULL)
         {
@@ -808,23 +826,14 @@ Finished:
             WCG(locache) = NULL;
         }
 
-        if(plcache2 != NULL)
-        {
-            aplist_terminate(plcache2);
-            aplist_destroy(plcache2);
-
-            plcache2 = NULL;
-            WCG(locache) = NULL;
-        }
-
-        if(WCG(zvcopied) != NULL)
-        {
-            alloc_pefree(WCG(zvcopied));
-            WCG(zvcopied) = NULL;
-        }
-
         if(pzcache != NULL)
         {
+            if(WCG(zvcopied) != NULL)
+            {
+                alloc_pefree(WCG(zvcopied));
+                WCG(zvcopied) = NULL;
+            }
+
             zvcache_terminate(pzcache);
             zvcache_destroy(pzcache);
 
@@ -979,7 +988,10 @@ PHP_RINIT_FUNCTION(wincache)
     }
 
     /* zend_error_cb needs to be wincache_error_cb only when original_compile_file is used */
-    zend_error_cb = original_error_cb;
+    if (original_error_cb)
+    {
+        zend_error_cb = original_error_cb;
+    }
 
 Finished:
 
@@ -1087,7 +1099,7 @@ char * wincache_resolve_path(const char * filename, int filename_len TSRMLS_DC)
         return original_resolve_path(filename, filename_len TSRMLS_CC);
     }
 
-    dprintimportant("zend_resolve_path called for %s", filename);
+    dprintverbose("zend_resolve_path called for %s", filename);
 
     if(isin_ignorelist(WCG(ignorelist), filename))
     {
@@ -1114,8 +1126,7 @@ Finished:
 
     if(FAILED(result))
     {
-        dprintimportant("wincache_resolve_path failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
+        dprintverbose("wincache_resolve_path failed with error %u", result);
 
         if(resolve_path != NULL)
         {
@@ -1155,11 +1166,11 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
 
-    dprintimportant("zend_stream_open_function called for %s", filename);
+    dprintverbose("zend_stream_open_function called for %s", filename);
 
     if(isin_ignorelist(WCG(ignorelist), filename))
     {
-        dprintimportant("cache is disabled for the file because of ignore list");
+        dprintverbose("cache is disabled for the file because of ignore list");
         return original_stream_open_function(filename, file_handle TSRMLS_CC);
     }
 
@@ -1197,7 +1208,6 @@ Finished:
         /* We can fail for big files or if we are not able to find file */
         /* If we fail, let original stream open function do its job */
         dprintimportant("wincache_stream_open_function failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(fullpath != NULL)
         {
@@ -1273,12 +1283,12 @@ zend_op_array * wincache_compile_file(zend_file_handle * file_handle, int type T
     /* try to compile file again if it detects it in included_files list */
     if(file_handle->opened_path != NULL)
     {
-        dprintimportant("wincache_compile_file called for f_h->opened_path %s", file_handle->opened_path);
+        dprintverbose("wincache_compile_file called for f_h->opened_path %s", file_handle->opened_path);
         zend_hash_add(&EG(included_files), file_handle->opened_path, strlen(file_handle->opened_path) + 1, (void *)&dummy, sizeof(int), NULL);
     }
     else
     {
-        dprintimportant("wincache_compile_file called for fullpath %s", fullpath);
+        dprintverbose("wincache_compile_file called for fullpath %s", fullpath);
         zend_hash_add(&EG(included_files), fullpath, strlen(fullpath) + 1, (void *)&dummy, sizeof(int), NULL);
 
         /* Set opened_path to fullpath */
@@ -1361,7 +1371,6 @@ Finished:
     if(FAILED(result) && result != FATAL_ZEND_BAILOUT)
     {
         dprintimportant("failure %d in wincache_compile_file", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* If we fail to compile file, let PHP core give a try */
         oparray = original_compile_file(file_handle, type TSRMLS_CC);
@@ -1906,7 +1915,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in wincache_refresh_if_changed", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -2123,7 +2131,6 @@ Finished:
     else if(FAILED(result))
     {
         dprintimportant("wincache_filesize failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -2201,7 +2208,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("wincache_readfile failed with error %u", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
     }
 
     return;
@@ -2498,7 +2504,6 @@ Finished:
         if(FAILED(result))
         {
             dprintimportant("wincache_is_writable failed with error %u", result);
-            _ASSERT(result > WARNING_COMMON_BASE);
         }
 
         RETURN_FALSE;
@@ -2648,7 +2653,6 @@ Finished:
         if(FAILED(result))
         {
             dprintimportant("wincache_is_dir failed with error %u", result);
-            _ASSERT(result > WARNING_COMMON_BASE);
         }
 
         RETURN_FALSE;
@@ -2778,7 +2782,6 @@ Finished:
         if(FAILED(result))
         {
             dprintimportant("wincache_rmdir failed with error %u", result);
-            _ASSERT(result > WARNING_COMMON_BASE);
         }
     }
 
@@ -2876,7 +2879,7 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
 Finished:
     if(FAILED(result))
     {
-        dprintimportant("wincache_unlink failed with error %u", result);
+        dprintverbose("wincache_unlink failed with error %u", result);
     }
 
     WCG(orig_unlink)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
@@ -3065,7 +3068,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_get", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -3215,7 +3217,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_set", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -3365,7 +3366,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_add", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(result == WARNING_ZVCACHE_EXISTS)
         {
@@ -3481,7 +3481,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_delete", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -3524,7 +3523,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_clear", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -3572,7 +3570,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_exists", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
@@ -3699,7 +3696,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_info", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plist != NULL)
         {
@@ -3836,7 +3832,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in wincache_scache_info", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(plist != NULL)
         {
@@ -3902,7 +3897,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_inc", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(result == WARNING_ZVCACHE_NOTLONG)
         {
@@ -3970,7 +3964,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_dec", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(result == WARNING_ZVCACHE_NOTLONG)
         {
@@ -4029,7 +4022,6 @@ Finished:
         WCG(uclasterror) = result;
 
         dprintimportant("failure %d in wincache_ucache_cas", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         if(result == WARNING_ZVCACHE_NOTLONG)
         {
@@ -4159,7 +4151,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in wincache_lock", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         /* Delete the lock object in case of fatal errors */
         if(result < WARNING_COMMON_BASE && pplock == NULL)
@@ -4240,7 +4231,6 @@ Finished:
     if(FAILED(result))
     {
         dprintimportant("failure %d in wincache_unlock", result);
-        _ASSERT(result > WARNING_COMMON_BASE);
 
         RETURN_FALSE;
     }
