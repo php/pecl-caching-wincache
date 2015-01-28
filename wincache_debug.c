@@ -127,3 +127,16 @@ void dprintdecorate(char * format, ...)
         va_end(args);
     }
 }
+
+ZEND_INI_MH(wincache_modify_debuglevel)
+{
+    if (new_value_length == 0)
+    {
+        dprintsetlevel(WINCACHE_DEBUG_MTYPE_DISABLED);
+    }
+    else
+    {
+        dprintsetlevel(atoi(new_value));
+    }
+    return SUCCESS;
+}

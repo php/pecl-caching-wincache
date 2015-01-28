@@ -42,4 +42,6 @@ extern void dprintimportant(char * format, ...);
 extern void dprintverbose(char * format, ...);
 extern void dprintdecorate(char * format, ...);
 
+ZEND_INI_MH(wincache_modify_debuglevel);
+
 #endif /* _WINCACHE_DEBUG_H_ */

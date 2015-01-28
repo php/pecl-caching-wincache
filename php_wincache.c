@@ -293,7 +293,7 @@ PHP_INI_BEGIN()
 /* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
 /* index 7 */  STD_PHP_INI_ENTRY("wincache.chkinterval", "30", PHP_INI_SYSTEM, OnUpdateLong, fcchkfreq, zend_wincache_globals, wincache_globals)
 /* index 8 */  STD_PHP_INI_ENTRY("wincache.ttlmax", "1200", PHP_INI_SYSTEM, OnUpdateLong, ttlmax, zend_wincache_globals, wincache_globals)
-/* index 9 */  STD_PHP_INI_ENTRY("wincache.debuglevel", "0", PHP_INI_SYSTEM, OnUpdateLong, debuglevel, zend_wincache_globals, wincache_globals)
+/* index 9 */  STD_PHP_INI_ENTRY("wincache.debuglevel", "0", PHP_INI_SYSTEM | PHP_INI_PERDIR, wincache_modify_debuglevel, debuglevel, zend_wincache_globals, wincache_globals)
 /* index 10 */ STD_PHP_INI_ENTRY("wincache.ignorelist", NULL, PHP_INI_ALL, OnUpdateString, ignorelist, zend_wincache_globals, wincache_globals)
 /* index 11 */ STD_PHP_INI_ENTRY("wincache.ocenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, ocefilter, zend_wincache_globals, wincache_globals)
 /* index 12 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
@@ -305,7 +305,7 @@ PHP_INI_BEGIN()
 /* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
 /* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "1", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
-/* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "1", PHP_INI_SYSTEM, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
+/* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "1", PHP_INI_SYSTEM | PHP_INI_PERDIR, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
 #ifdef ZEND_ENGINE_2_4
 /* index 22 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
 #endif /* ZEND_ENGINE_2_4 */
@@ -1931,6 +1931,11 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
     fcache_value * pfvalue  = NULL;
     unsigned char  retval   = 0;
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL)
     {
         goto Finished;
@@ -1992,6 +1997,11 @@ static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
     char *         contents         = NULL;
     unsigned char  iscached         = 0;
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
@@ -2031,14 +2041,25 @@ static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
 
     iscached = 1;
 
-    contents = alloc_estrdup(WCG(lfcache)->pfcache->memaddr + pfvalue->file_content);
-    if(contents == NULL)
+    if (pfvalue && pfvalue->file_size)
     {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
+        /* allocate enough space to return the file, plus a terminating null */
+        contents = pemalloc(pfvalue->file_size + 1, 0);
+        if(contents == NULL)
+        {
+            result = FATAL_OUT_OF_LMEMORY;
+            goto Finished;
+        }
 
-    RETVAL_STRINGL(contents, pfvalue->file_size, 0);
+        memcpy(contents, WCG(lfcache)->pfcache->memaddr + pfvalue->file_content, pfvalue->file_size);
+        contents[pfvalue->file_size] = '\0';
+
+        RETVAL_STRINGL(contents, pfvalue->file_size, 0);
+    }
+    else
+    {
+        RETVAL_EMPTY_STRING();
+    }
 
 Finished:
 
@@ -2081,6 +2102,11 @@ static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
     char *         respath      = NULL;
     fcache_value * pfvalue      = NULL;
     unsigned char  iscached     = 0;
+
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
 
     if(WCG(lfcache) == NULL)
     {
@@ -2148,6 +2174,11 @@ static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS)
     char *         respath      = NULL;
     fcache_value * pfvalue      = NULL;
     unsigned char  iscached     = 0;
+
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
 
     if(WCG(lfcache) == NULL)
     {
@@ -2234,6 +2265,11 @@ static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS)
     unsigned int    granted_access   = 0;
     BOOL            faccess          = FALSE;
     GENERIC_MAPPING gen_map          = { FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_GENERIC_EXECUTE, FILE_ALL_ACCESS };
+
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
 
     if(WCG(lfcache) == NULL)
     {
@@ -2386,6 +2422,11 @@ static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS)
     BOOL            faccess          = FALSE;
     GENERIC_MAPPING gen_map          = { FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_GENERIC_EXECUTE, FILE_ALL_ACCESS };
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
@@ -2521,6 +2562,11 @@ static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
     unsigned char  retval       = 0;
     unsigned char  iscached     = 0;
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
@@ -2594,6 +2640,11 @@ static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
     fcache_value * pvalue       = NULL;
     unsigned char  retval       = 0;
     unsigned char  iscached     = 0;
+
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
 
     if(WCG(lfcache) == NULL)
     {
@@ -2798,6 +2849,11 @@ static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS)
     fcache_value * pfvalue       = NULL;
     unsigned char  iscached      = 0;
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL)
     {
         result = FATAL_UNEXPECTED_FCALL;
@@ -2857,6 +2913,11 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
     fcache_value * pfvalue       = NULL;
     zval         * zcontext      = NULL;
 
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
     if(WCG(lfcache) == NULL || ZEND_NUM_ARGS() > 1)
     {
         goto Finished;
@@ -2898,20 +2959,17 @@ void wincache_intercept_functions_init(TSRMLS_D)
     zend_function * orig;
 
     WINCACHE_INTERCEPT(rmdir);
-    if (WCG(reroute_enabled))
-    {
-        WINCACHE_INTERCEPT(file_exists);
-        WINCACHE_INTERCEPT(file_get_contents);
-        WINCACHE_INTERCEPT(filesize);
-        WINCACHE_INTERCEPT(is_dir);
-        WINCACHE_INTERCEPT(is_file);
-        WINCACHE_INTERCEPT(is_readable);
-        WINCACHE_INTERCEPT(is_writable);
-        WINCACHE_INTERCEPT(is_writeable);
-        WINCACHE_INTERCEPT(readfile);
-        WINCACHE_INTERCEPT(realpath);
-        WINCACHE_INTERCEPT(unlink);
-    }
+    WINCACHE_INTERCEPT(file_exists);
+    WINCACHE_INTERCEPT(file_get_contents);
+    WINCACHE_INTERCEPT(filesize);
+    WINCACHE_INTERCEPT(is_dir);
+    WINCACHE_INTERCEPT(is_file);
+    WINCACHE_INTERCEPT(is_readable);
+    WINCACHE_INTERCEPT(is_writable);
+    WINCACHE_INTERCEPT(is_writeable);
+    WINCACHE_INTERCEPT(readfile);
+    WINCACHE_INTERCEPT(realpath);
+    WINCACHE_INTERCEPT(unlink);
     dprintverbose("wincache_intercept_functions_init called");
 }
 /* }}} */
@@ -2928,20 +2986,17 @@ void wincache_intercept_functions_shutdown(TSRMLS_D)
     zend_function * orig;
 
     WINCACHE_RELEASE(rmdir);
-    if (WCG(reroute_enabled))
-    {
-        WINCACHE_RELEASE(file_exists);
-        WINCACHE_RELEASE(file_get_contents);
-        WINCACHE_RELEASE(filesize);
-        WINCACHE_RELEASE(is_dir);
-        WINCACHE_RELEASE(is_file);
-        WINCACHE_RELEASE(is_readable);
-        WINCACHE_RELEASE(is_writable);
-        WINCACHE_RELEASE(is_writeable);
-        WINCACHE_RELEASE(readfile);
-        WINCACHE_RELEASE(realpath);
-        WINCACHE_RELEASE(unlink);
-    }
+    WINCACHE_RELEASE(file_exists);
+    WINCACHE_RELEASE(file_get_contents);
+    WINCACHE_RELEASE(filesize);
+    WINCACHE_RELEASE(is_dir);
+    WINCACHE_RELEASE(is_file);
+    WINCACHE_RELEASE(is_readable);
+    WINCACHE_RELEASE(is_writable);
+    WINCACHE_RELEASE(is_writeable);
+    WINCACHE_RELEASE(readfile);
+    WINCACHE_RELEASE(realpath);
+    WINCACHE_RELEASE(unlink);
     dprintverbose("wincache_intercept_functions_shutdown called");
 }
 /* }}} */
