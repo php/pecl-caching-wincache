@@ -145,6 +145,7 @@ static int read_file_content(HANDLE hFile, unsigned int filesize, void ** ppbuff
             hr = HRESULT_FROM_WIN32(GetLastError());
             if(hr != HRESULT_FROM_WIN32(ERROR_IO_PENDING))
             {
+                error_setlasterror();
                 result = FATAL_FCACHE_READFILE;
                 goto Finished;
             }
@@ -343,6 +344,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
 
         if (ret == WAIT_TIMEOUT)
         {
+            error_setlasterror();
             dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_FCACHE_INIT_EVENT;
             goto Finished;

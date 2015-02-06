@@ -201,6 +201,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
 
         if (ret == WAIT_TIMEOUT)
         {
+            error_setlasterror();
             dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_OCACHE_INIT_EVENT;
             goto Finished;

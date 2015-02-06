@@ -447,6 +447,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
 
         if (ret == WAIT_TIMEOUT)
         {
+            error_setlasterror();
             dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_FILEMAP_INIT_EVENT;
             goto Finished;

@@ -71,6 +71,7 @@ unsigned int error_getlasterror()
 unsigned int error_setlasterror()
 {
     error_glerror = GetLastError();
+    WCG(lasterror) = error_glerror;
     return error_glerror;
 }
 

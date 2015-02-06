@@ -1570,6 +1570,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
 
         if (ret == WAIT_TIMEOUT)
         {
+            error_setlasterror();
             dprintcritical("Timed out waiting for other process to release %s", evtname);
             result = FATAL_ZVCACHE_INIT_EVENT;
             goto Finished;
