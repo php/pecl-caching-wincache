@@ -754,19 +754,21 @@ void aplist_destroy(aplist_context * pcache)
 
 int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
 {
-    int             result   = NONFATAL;
-    size_t          mapsize  = 0;
-    size_t          segsize  = 0;
-    aplist_header * header   = NULL;
-    unsigned int    msize    = 0;
-    unsigned short  cachekey = 1;
+    int             result      = NONFATAL;
+    size_t          mapsize     = 0;
+    size_t          segsize     = 0;
+    aplist_header * header      = NULL;
+    unsigned int    msize       = 0;
+    unsigned short  cachekey    = 1;
 
-    unsigned int    cticks   = 0;
-    unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
-    unsigned short  locktype = LOCK_TYPE_SHARED;
-    unsigned char   isfirst  = 1;
-    char            evtname[   MAX_PATH];
-    DWORD           ret      = 0;
+    unsigned int    cticks      = 0;
+    unsigned short  mapclass    = FILEMAP_MAP_SRANDOM;
+    unsigned short  locktype    = LOCK_TYPE_SHARED;
+    unsigned char   isfirst     = 1;
+    unsigned int    initmemory  = 0;
+    char          * prefix      = NULL;
+    size_t          cchprefix   = 0;
+    DWORD           ret         = 0;
 
     dprintverbose("start aplist_initialize");
 
@@ -803,8 +805,22 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         locktype = LOCK_TYPE_LOCAL;
     }
 
+    /* get object name prefix */
+    result = lock_get_nameprefix("FILELIST_CACHE", cachekey, locktype, &prefix, &cchprefix);
+    if (FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = utils_create_init_event(prefix, "APLIST_INIT", &pcache->hinitdone, &isfirst);
+    if (FAILED(result))
+    {
+        result = FATAL_APLIST_INIT_EVENT;
+        goto Finished;
+    }
+
     /* shmfilepath = NULL to make it use page file */
-    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, isfirst, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -812,6 +828,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
 
     pcache->apmemaddr = (char *)pcache->apfilemap->mapaddr;
     segsize = filemap_getsize(pcache->apfilemap TSRMLS_CC);
+    initmemory = (pcache->apfilemap->existing == 0);
 
     /* Create allocator for file list segment */
     result = alloc_create(&pcache->apalloc);
@@ -851,13 +868,6 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    /* Initialize both aplist_header and rplist_header */
-    result = lock_getnewname(pcache->aprwlock, "APLIST_INIT", evtname, MAX_PATH);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
     /* Create resolve path cache for global aplist cache */
     if(apctype == APLIST_TYPE_GLOBAL)
     {
@@ -867,7 +877,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
             goto Finished;
         }
 
-        result = rplist_initialize(pcache->prplist, pcache->islocal, cachekey, filecount TSRMLS_CC);
+        result = rplist_initialize(pcache->prplist, pcache->islocal, isfirst, cachekey, filecount TSRMLS_CC);
         if(FAILED(result))
         {
             goto Finished;
@@ -892,40 +902,8 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         }
     }
 
-    /* Even with manual reset and initial state not set */
-    pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
-    if(pcache->hinitdone == NULL)
-    {
-        dprintcritical("Failed to create event %s", evtname);
-        result = FATAL_APLIST_INIT_EVENT;
-        goto Finished;
-    }
-
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
-    {
-        _ASSERT(pcache->islocal == 0);
-        isfirst = 0;
-
-        /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
-
-        if (ret == WAIT_TIMEOUT)
-        {
-            dprintcritical("Timed out waiting for other process to release %s", evtname);
-            result = FATAL_APLIST_INIT_EVENT;
-            goto Finished;
-        }
-
-        if (ret == WAIT_FAILED)
-        {
-            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-            result = FATAL_APLIST_INIT_EVENT;
-            goto Finished;
-        }
-    }
-
     /* Initialize the aplist_header if this is the first process */
-    if(pcache->islocal || isfirst)
+    if(pcache->islocal || isfirst || initmemory)
     {
         /* No need to get a write lock as other processes */
         /* are blocked waiting for hinitdone event */
@@ -979,6 +957,12 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
 
 Finished:
 
+    if (prefix != NULL)
+    {
+        alloc_pefree(prefix);
+        prefix = NULL;
+    }
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_initialize", result);
@@ -987,6 +971,11 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
+            if (isfirst)
+            {
+                SetEvent(pcache->hinitdone);
+            }
+
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }
@@ -1099,7 +1088,6 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
     ocache_context * pocache = NULL;
     HANDLE           hfirst  = NULL;
     unsigned char    isfirst = 1;
-    char             evtname[  MAX_PATH];
 
     unsigned int     count   = 0;
     aplist_value *   pvalue  = NULL;
@@ -1113,42 +1101,11 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
 
     if(!plcache->islocal)
     {
-        /* Create a new eventname using aplist lockname */
-        result = lock_getnewname(plcache->aprwlock, "GLOBAL_OCACHE_FINIT", evtname, MAX_PATH);
-        if(FAILED(result))
+        result = utils_create_init_event(plcache->aprwlock->nameprefix, "GLOBAL_OCACHE_FINIT", &hfirst, &isfirst);
+        if (FAILED(result))
         {
-            goto Finished;
-        }
-
-        /* First process reaching here will set all ocacheval to 0 if required */
-        /* Even with manual reset and initial state not set */
-        hfirst = CreateEvent(NULL, TRUE, FALSE, evtname);
-        if(hfirst == NULL)
-        {
-            dprintcritical("Failed to create event %s", evtname);
             result = FATAL_APLIST_OCACHE_INIT_EVENT;
             goto Finished;
-        }
-
-        /* If this is not first process, wait for first process to be done with ocache init */
-        if(GetLastError() == ERROR_ALREADY_EXISTS)
-        {
-            isfirst = 0;
-            ret = WaitForSingleObject(hfirst, MAX_INIT_EVENT_WAIT);
-
-            if (ret == WAIT_TIMEOUT)
-            {
-                dprintcritical("Timed out waiting for other process to release %s", evtname);
-                result = FATAL_APLIST_OCACHE_INIT_EVENT;
-                goto Finished;
-            }
-
-            if (ret == WAIT_FAILED)
-            {
-                dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-                result = FATAL_APLIST_OCACHE_INIT_EVENT;
-                goto Finished;
-            }
         }
     }
 
@@ -1217,6 +1174,11 @@ Finished:
         /* refcount of named object created above */
         if(hfirst != NULL)
         {
+            if (isfirst)
+            {
+                SetEvent(hfirst);
+            }
+
             CloseHandle(hfirst);
             hfirst = NULL;
         }
@@ -1229,6 +1191,13 @@ Finished:
             pocache = NULL;
         }
     }
+
+    /*
+     * TODO: We're leaking the hfirst handle if we succeed.  Must Fix!
+     * TODO: We MUST keep the hfirst handle alive for the lifetime of the
+     * process, otherwise other instances might erroneously believe they're
+     * 'first', and wipe out the cache.
+     */
 
     dprintverbose("end aplist_ocache_initialize");
 

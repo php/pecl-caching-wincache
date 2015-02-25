@@ -366,7 +366,7 @@ void rplist_destroy(rplist_context * pcache)
     return;
 }
 
-int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned short cachekey, unsigned int filecount TSRMLS_DC)
+int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned char isfirst, unsigned short cachekey, unsigned int filecount TSRMLS_DC)
 {
     int             result   = NONFATAL;
     size_t          mapsize  = 0;
@@ -395,7 +395,7 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* shmfilepath = NULL to create filemap on page file */
-    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, cachekey, mapclass, mapsize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->rpfilemap, FILEMAP_TYPE_RESPATHS, cachekey, mapclass, mapsize, isfirst, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;

@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.1"
+#define PHP_WINCACHE_VERSION    "1.3.7.2"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -148,7 +148,7 @@
 #define INTERNED_SIZE_MAXIMUM      32
 
 #define FIVE_SECOND_WAIT           5000
-#define MAX_INIT_EVENT_WAIT        10000
+#define MAX_INIT_EVENT_WAIT        30000
 
 #include "wincache_error.h"
 #include "wincache_debug.h"

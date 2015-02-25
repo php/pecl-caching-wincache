@@ -1467,10 +1467,12 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     unsigned int    cticks     = 0;
     unsigned short  mapclass   = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype   = LOCK_TYPE_SHARED;
-    unsigned char   isfirst    = 1;
+    unsigned char   isfirst    = 0;
     unsigned int    initmemory = 0;
-    char            evtname[   MAX_PATH];
     DWORD           ret        = 0;
+    char *          lockname   = ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE");
+    char *          prefix     = NULL;
+    size_t          cchprefix  = 0;
 
     dprintverbose("start zvcache_initialize %p", pcache);
 
@@ -1497,8 +1499,22 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         pcache->islocal = islocal;
     }
 
+    /* get object name prefix */
+    result = lock_get_nameprefix(lockname, cachekey, locktype, &prefix, &cchprefix);
+    if (FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = utils_create_init_event(prefix, "ZVCACHE_INIT", &pcache->hinitdone, &isfirst);
+    if (FAILED(result))
+    {
+        result = FATAL_ZVCACHE_INIT_EVENT;
+        goto Finished;
+    }
+
     /* If a shmfilepath is passed, use that to create filemap */
-    result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), cachekey, mapclass, cachesize, shmfilepath TSRMLS_CC);
+    result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), cachekey, mapclass, cachesize, isfirst, shmfilepath TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -1539,49 +1555,10 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         goto Finished;
     }
 
-    result = lock_initialize(pcache->zvrwlock, ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE"), cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->zvrwlock, lockname, cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
-    }
-
-    /* Initialize zvcache_header */
-    result = lock_getnewname(pcache->zvrwlock, "ZVCACHE_INIT", evtname, MAX_PATH);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
-    if(pcache->hinitdone == NULL)
-    {
-        dprintcritical("Failed to create event %s", evtname);
-        result = FATAL_ZVCACHE_INIT_EVENT;
-        goto Finished;
-    }
-
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
-    {
-        _ASSERT(islocal == 0);
-        isfirst = 0;
-
-        /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
-
-        if (ret == WAIT_TIMEOUT)
-        {
-            error_setlasterror();
-            dprintcritical("Timed out waiting for other process to release %s", evtname);
-            result = FATAL_ZVCACHE_INIT_EVENT;
-            goto Finished;
-        }
-
-        if (ret == WAIT_FAILED)
-        {
-            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-            result = FATAL_ZVCACHE_INIT_EVENT;
-            goto Finished;
-        }
     }
 
     /* Initialize the zvcache_header if this is the first process */
@@ -1656,6 +1633,12 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
 
 Finished:
 
+    if (prefix != NULL)
+    {
+        alloc_pefree(prefix);
+        prefix = NULL;
+    }
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in zvcache_initialize", result);
@@ -1686,6 +1669,11 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
+            if (isfirst)
+            {
+                SetEvent(pcache->hinitdone);
+            }
+
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }

@@ -97,14 +97,14 @@ void ocache_destroy(ocache_context * pcache)
 
 int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned short cachekey, int resnumber, unsigned int cachesize TSRMLS_DC)
 {
-    int             result   = NONFATAL;
-    size_t          size     = 0;
-    ocache_header * header   = NULL;
-    unsigned short  mapclass = FILEMAP_MAP_SFIXED;
-    unsigned short  locktype = LOCK_TYPE_SHARED;
-    unsigned char   isfirst  = 1;
-    char            evtname[   MAX_PATH];
-    DWORD           ret      = 0;
+    int             result      = NONFATAL;
+    size_t          size        = 0;
+    ocache_header * header      = NULL;
+    unsigned short  mapclass    = FILEMAP_MAP_SFIXED;
+    unsigned short  locktype    = LOCK_TYPE_SHARED;
+    unsigned char   isfirst     = 1;
+    unsigned int    initmemory  = 0;
+    DWORD           ret         = 0;
 
     dprintverbose("start ocache_initialize");
 
@@ -130,8 +130,29 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         pcache->islocal = islocal;
     }
 
+    /* Create xread xwrite lock for the cache */
+    /* Okay do create before mapping, since this is XREAD_XWRITE */
+    result = lock_create(&pcache->prwlock);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = lock_initialize(pcache->prwlock, "BYTECODE_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = utils_create_init_event(pcache->prwlock->nameprefix, "OCACHE_INIT", &pcache->hinitdone, &isfirst);
+    if (FAILED(result))
+    {
+        result = FATAL_OCACHE_INIT_EVENT;
+        goto Finished;
+    }
+
     /* shmfilepath = NULL */
-    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, cachekey, mapclass, cachesize, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -139,6 +160,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
 
     pcache->memaddr = (char *)pcache->pfilemap->mapaddr;
     size = filemap_getsize(pcache->pfilemap TSRMLS_CC);
+    initmemory = (pcache->pfilemap->existing == 0);
 
     /* Create allocator for opcode memory map */
     result = alloc_create(&pcache->palloc);
@@ -164,60 +186,10 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
 
     header = pcache->header;
 
-    /* Create xread xwrite lock for the cache */
-    result = lock_create(&pcache->prwlock);
-    if(FAILED(result))
+    if(islocal || isfirst || initmemory)
     {
-        goto Finished;
-    }
-
-    result = lock_initialize(pcache->prwlock, "BYTECODE_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    result = lock_getnewname(pcache->prwlock, "OCACHE_INIT", evtname, MAX_PATH);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    pcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
-    if(pcache->hinitdone == NULL)
-    {
-        dprintcritical("Failed to create event %s", evtname);
-        result = FATAL_OCACHE_INIT_EVENT;
-        goto Finished;
-    }
-
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
-    {
-        _ASSERT(islocal == 0);
-        isfirst = 0;
-
-        /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pcache->hinitdone, MAX_INIT_EVENT_WAIT);
-
-        if (ret == WAIT_TIMEOUT)
-        {
-            error_setlasterror();
-            dprintcritical("Timed out waiting for other process to release %s", evtname);
-            result = FATAL_OCACHE_INIT_EVENT;
-            goto Finished;
-        }
-
-        if (ret == WAIT_FAILED)
-        {
-            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-            result = FATAL_OCACHE_INIT_EVENT;
-            goto Finished;
-        }
-    }
-
-    if(islocal || isfirst)
-    {
-        lock_writelock(pcache->prwlock);
+        /* No need to get a write lock as other processes */
+        /* are blocked waiting for hinitdone event */
 
         header->mapcount    = 1;
         header->itemcount   = 0;
@@ -225,8 +197,6 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         header->misscount   = 0;
 
         SetEvent(pcache->hinitdone);
-
-        lock_writeunlock(pcache->prwlock);
     }
     else
     {
@@ -269,6 +239,11 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
+            if (isfirst)
+            {
+                SetEvent(pcache->hinitdone);
+            }
+
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }

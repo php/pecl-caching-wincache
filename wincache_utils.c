@@ -35,6 +35,11 @@
 
 #define DWORD_MAX    0xFFFFFFFF
 
+/* Temp files are in the format of "wincache_" + suffix + ".tmp" */
+#define TEMP_FILE_PREFIX_CHARS 13
+
+static const char * g_temp_dir = NULL;
+
 static unsigned int crc32_generate(int n);
 static unsigned int utils_crc32(const char * str, unsigned int strlen);
 
@@ -545,6 +550,119 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
     }
 
     return NULL;
+}
+
+const char * utils_get_temp_dir()
+{
+    /* if we've already got it, return it */
+    if (g_temp_dir)
+    {
+        goto Finished;
+    }
+
+    /* if there's an upload temp directory in the .ini, use that */
+    if(PG(upload_tmp_dir) && PG(upload_tmp_dir)[0] != '\0')
+    {
+        g_temp_dir = PG(upload_tmp_dir);
+        goto Finished;
+    }
+
+    /* if there isn't an upload temp dir, fall back to the system temp dir. */
+    g_temp_dir = php_get_temporary_directory();
+
+Finished:
+    return g_temp_dir;
+}
+
+/*
+ * Caller must free returned string using pefree( ptr, 0 ).
+ */
+char * utils_build_temp_filename(char * suffix)
+{
+    char *       temp_file = NULL;
+    const char * temp_dir = utils_get_temp_dir();
+    size_t       filename_len = strlen(temp_dir);
+
+    // TODO: make sure trailing char is not IS_SLASH()
+
+    filename_len += strlen(suffix);
+    filename_len++;     /* DEFAULT_SLASH separator */
+    filename_len += TEMP_FILE_PREFIX_CHARS;
+    filename_len++;     /* terminating NULL */
+
+    temp_file = pemalloc(filename_len, 0);
+    if (!temp_file)
+    {
+        error_setlasterror();
+        goto Finished;
+    }
+
+    _snprintf_s(temp_file, filename_len, filename_len -1, "%s\\wincache_%s.tmp", temp_dir, suffix);
+
+Finished:
+    return temp_file;
+}
+
+/*
+ * If this succeeds, and pisfirst == 1, then caller must SetEvent on the
+ * returned pinit_event handle.
+ */
+int utils_create_init_event(
+    char * prefix,
+    char * name,
+    HANDLE *pinit_event,
+    unsigned char *pisfirst
+    )
+{
+    int                    result       = NONFATAL;
+    int                    len          = 0;
+    char                   evtname[     MAX_PATH];
+    DWORD                  ret          = 0;
+    HANDLE                 hinitdone    = NULL;
+    unsigned char          isfirst      = 1;
+
+    len = _snprintf_s(evtname, MAX_PATH, MAX_PATH - 1, "%s%s", prefix, name);
+    if (len == -1)
+    {
+        result = FATAL_ALLOC_INIT_EVENT;
+        goto Finished;
+    }
+
+    hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
+    if (hinitdone == NULL)
+    {
+        dprintcritical("Failed to create event %s", evtname);
+        result = FATAL_ALLOC_INIT_EVENT;
+        goto Finished;
+    }
+
+    if(GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+        isfirst = 0;
+
+        /* Wait for other process to initialize completely */
+        ret = WaitForSingleObject(hinitdone, MAX_INIT_EVENT_WAIT);
+
+        if (ret == WAIT_TIMEOUT)
+        {
+            dprintcritical("Timed out waiting for other process to release %s", evtname);
+            result = FATAL_ALLOC_INIT_EVENT;
+            goto Finished;
+        }
+
+        if (ret == WAIT_FAILED)
+        {
+            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            result = FATAL_ALLOC_INIT_EVENT;
+            goto Finished;
+        }
+    }
+
+    *pinit_event = hinitdone;
+    *pisfirst = isfirst;
+
+Finished:
+    return result;
 }
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))

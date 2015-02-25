@@ -78,6 +78,13 @@ struct lock_context
 
 extern int  lock_create(lock_context ** pplock);
 extern void lock_destroy(lock_context * plock);
+extern int lock_get_nameprefix(
+    char * name,
+    unsigned short cachekey,
+    unsigned short type,
+    char **ppnew_prefix,
+    size_t * pcchnew_prefix
+    );
 extern int  lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC);
 extern void lock_terminate(lock_context * plock);
 

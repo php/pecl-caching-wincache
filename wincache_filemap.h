@@ -159,7 +159,7 @@ extern unsigned int filemap_getppid(TSRMLS_D);
 
 extern int    filemap_create(filemap_context ** ppfilemap);
 extern void   filemap_destroy(filemap_context * pfilemap);
-extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short cachekey, unsigned short fmclass, unsigned int size_mb, char * shmfilepath TSRMLS_DC);
+extern int    filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsigned short cachekey, unsigned short fmclass, unsigned int size_mb, unsigned char isfirst, char * shmfilepath TSRMLS_DC);
 extern void   filemap_terminate(filemap_context * pfilemap);
 
 extern size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC);

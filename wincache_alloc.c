@@ -684,42 +684,19 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         goto Finished;
     }
 
-    palloc->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
-    if(palloc->hinitdone == NULL)
+    result = utils_create_init_event(palloc->rwlock->nameprefix, "ALLOC_INIT", &palloc->hinitdone, &isfirst);
+    if (FAILED(result))
     {
-        dprintcritical("Failed to create event %s", evtname);
         result = FATAL_ALLOC_INIT_EVENT;
         goto Finished;
-    }
-
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
-    {
-        _ASSERT(islocal == 0);
-        isfirst = 0;
-
-        /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(palloc->hinitdone, MAX_INIT_EVENT_WAIT);
-
-        if (ret == WAIT_TIMEOUT)
-        {
-            dprintcritical("Timed out waiting for other process to release %s", evtname);
-            result = FATAL_ALLOC_INIT_EVENT;
-            goto Finished;
-        }
-
-        if (ret == WAIT_FAILED)
-        {
-            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-            result = FATAL_ALLOC_INIT_EVENT;
-            goto Finished;
-        }
     }
 
     /* If the segment is not initialized, set */
     /* header on the shared memory segment start */
     if(islocal || isfirst)
     {
-        lock_writelock(palloc->rwlock);
+        /* No need to get a write lock as other processes */
+        /* are blocked waiting for hinitdone event */
 
         if(initmemory)
         {
@@ -762,11 +739,10 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
 
         header->mapcount = 1;
         SetEvent(palloc->hinitdone);
-
-        lock_writeunlock(palloc->rwlock);
     }
     else
     {
+        /* TODO: perform integrity check of segment.  If it fails, re-init. */
         InterlockedIncrement(&header->mapcount);
     }
 

@@ -43,6 +43,15 @@ extern int          utils_filefolder(const char * filepath, unsigned int flength
 extern int          utils_apoolpid(TSRMLS_D);
 extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
 extern char *       utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC);
+extern char *       utils_build_temp_filename(char * suffix);
+
+extern int
+utils_create_init_event(
+    char * prefix,
+    char * name,
+    HANDLE *pinit_event,
+    unsigned char *pisfirst
+    );
 
 #if (defined(_MSC_VER) && (_MSC_VER < 1500))
 extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);

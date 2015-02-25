@@ -61,6 +61,7 @@
 #define FATAL_LOCK_LONGNAME                 FATAL_LOCK_BASE + 3
 #define FATAL_LOCK_SHORT_BUFFER             FATAL_LOCK_BASE + 4
 #define FATAL_LOCK_NUMBER_LARGE             FATAL_LOCK_BASE + 5
+#define FATAL_LOCK_INVALID_TYPE             FATAL_LOCK_BASE + 6
 
 /* Error codes used in filemap functionality */
 #define FATAL_FILEMAP_BASE                  200
@@ -76,6 +77,7 @@
 #define FATAL_FILEMAP_GETFILETIME           FATAL_FILEMAP_BASE + 10
 #define FATAL_FILEMAP_SYSTOFILE             FATAL_FILEMAP_BASE + 11
 #define FATAL_FILEMAP_CREATEFILEMAP         FATAL_FILEMAP_BASE + 12
+#define FATAL_FILEMAP_ALLOC_LOCALFILEMAP    FATAL_FILEMAP_BASE + 13
 
 /* Error codes used by shared memory allocator */
 #define FATAL_ALLOC_BASE                    300

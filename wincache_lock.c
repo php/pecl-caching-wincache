@@ -109,13 +109,104 @@ void lock_destroy(lock_context * plock)
     dprintverbose("end lock_destroy");
 }
 
+/* Caller must free ppnew_prefix using alloc_pefree() */
+int lock_get_nameprefix(
+    char * name,
+    unsigned short cachekey,
+    unsigned short type,
+    char **ppnew_prefix,
+    size_t * pcchnew_prefix
+    )
+{
+    int    result  = NONFATAL;
+    char * objname = 0;
+    int    namelen = 0;
+    int    pid     = 0;
+    int    ppid    = 0;
+
+    /* Get the initial length of name prefix */
+    namelen = strlen(name);
+    _ASSERT(namelen > 0);
+
+    /* If a namesalt is specified, put _<salt> in the name */
+    if(WCG(namesalt) != NULL)
+    {
+        namelen += strlen(WCG(namesalt)) + 1;
+    }
+
+    /* Depending on what type of lock to create, get pid and ppid */
+    switch(type)
+    {
+        case LOCK_TYPE_SHARED:
+            ppid = WCG(fmapgdata)->ppid;
+            namelen += PID_MAX_LENGTH;
+            break;
+        case LOCK_TYPE_LOCAL:
+            pid = WCG(fmapgdata)->pid;
+            namelen += PID_MAX_LENGTH;
+            break;
+        case LOCK_TYPE_GLOBAL:
+            break;
+        default:
+            result = FATAL_LOCK_INVALID_TYPE;
+            goto Finished;
+    }
+
+    /* Add 4 for underscores, 1 for null termination, */
+    /* LOCK_NUMBER_MAX_STRLEN for adding cachekey, 2 for 0 (for global) */
+    namelen = namelen + LOCK_NUMBER_MAX_STRLEN + 7;
+
+    /* Add 2 for lock-type padding.  The buffer will be used to tack on
+     * an extra char for the lock type by the caller. */
+    namelen += 2;
+
+    /* Synchronization object names are limited to MAX_PATH characters */
+    if(namelen >= MAX_PATH - 1)
+    {
+        result = FATAL_LOCK_LONGNAME;
+        goto Finished;
+    }
+
+    objname = (char *)alloc_pemalloc(namelen + 1);
+    if(objname == NULL)
+    {
+        result = FATAL_OUT_OF_LMEMORY;
+        goto Finished;
+    }
+
+    ZeroMemory(objname, namelen + 1);
+
+    /* Create nameprefix as name_pid_ppid_ */
+    if(WCG(namesalt) == NULL)
+    {
+        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s_%u_%u_%u_", name, cachekey, pid, ppid);
+    }
+    else
+    {
+        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s_%u_%s_%u_%u_", name, cachekey, WCG(namesalt), pid, ppid);
+    }
+
+    if (-1 == namelen)
+    {
+        error_setlasterror();
+        result = FATAL_LOCK_LONGNAME;
+        goto Finished;
+    }
+
+    *ppnew_prefix   = objname;
+    *pcchnew_prefix = namelen;
+
+Finished:
+    return result;
+}
+
 /* Initialize the lock context with valid information */
 /* lock is not ready to use unless initialize is called */
 int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC)
 {
     int    result  = NONFATAL;
     char * objname = 0;
-    int    namelen = 0;
+    size_t namelen = 0;
     int    pid     = 0;
     int    ppid    = 0;
 
@@ -140,80 +231,27 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
         usetype = LOCK_USET_XREAD_XWRITE;
     }
 
-    /* Get the initial length of name prefix */
-    namelen = strlen(name);
-    _ASSERT(namelen > 0);
-
-    /* If a namesalt is specified, put _<salt> in the name */
-    if(WCG(namesalt) != NULL)
+    result = lock_get_nameprefix(name, cachekey, type, &objname, &namelen);
+    if (FAILED(result))
     {
-        namelen += strlen(WCG(namesalt)) + 1;
-    }
-
-    /* Depending on what type of lock to create, get pid and ppid */
-    switch(type)
-    {
-        case LOCK_TYPE_SHARED:
-            plock->type  = LOCK_TYPE_SHARED;
-            ppid = filemap_getppid(TSRMLS_C);
-            namelen += PID_MAX_LENGTH;
-            break;
-        case LOCK_TYPE_LOCAL:
-            plock->type = LOCK_TYPE_LOCAL;
-            pid = filemap_getpid(TSRMLS_C);
-            namelen += PID_MAX_LENGTH;
-            break;
-        case LOCK_TYPE_GLOBAL:
-            plock->type = LOCK_TYPE_GLOBAL;
-            break;
-        default:
-            _ASSERT(FALSE);
-            break;
-    }
-
-    /* Add 4 for underscores, 1 for null termination, */
-    /* LOCK_NUMBER_MAX_STRLEN for adding cachekey, 2 for 0 (for global) */
-    namelen = namelen + LOCK_NUMBER_MAX_STRLEN + 7;
-
-    /* Most synchronization object names are limited to MAX_PATH characters */
-    if(namelen >= MAX_PATH - 1)
-    {
-        result = FATAL_LOCK_LONGNAME;
         goto Finished;
     }
 
+    /* lock_get_nameprefix validates that 'type' is a valid lock type */
+    plock->type = type;
+
     /* Allocate memory for name prefix */
-    plock->nameprefix = (char *)alloc_pemalloc(namelen);
+    plock->nameprefix = (char *)alloc_pemalloc(namelen + 1);
     if(plock->nameprefix == NULL)
     {
         result = FATAL_OUT_OF_LMEMORY;
         goto Finished;
     }
 
-    objname = (char *)alloc_pemalloc(namelen + 1);
-    if(objname == NULL)
-    {
-        result = FATAL_OUT_OF_LMEMORY;
-        goto Finished;
-    }
+    ZeroMemory(plock->nameprefix, namelen + 1);
 
-    ZeroMemory(plock->nameprefix, namelen);
-    ZeroMemory(objname, namelen + 1);
-
-    /* Create nameprefix as name_pid_ppid_ */
-    if(WCG(namesalt) == NULL)
-    {
-        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%u_%u_%u_", name, cachekey, pid, ppid);
-    }
-    else
-    {
-        _snprintf_s(plock->nameprefix, namelen, namelen - 1, "%s_%u_%s_%u_%u_", name, cachekey, WCG(namesalt), pid, ppid);
-    }
-
-    plock->namelen = strlen(plock->nameprefix);
-
-    strcpy_s(objname, namelen - 1, plock->nameprefix);
-    namelen = plock->namelen;
+    strcpy_s(plock->nameprefix, namelen + 1, objname);
+    plock->namelen = namelen;
 
     /* Depending on what type of lock this needs */
     /* to be, create one or two handles */

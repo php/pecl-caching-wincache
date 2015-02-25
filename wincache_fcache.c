@@ -240,14 +240,14 @@ void fcache_destroy(fcache_context * pfcache)
 
 int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC)
 {
-    int             result   = NONFATAL;
-    size_t          size     = 0;
-    fcache_header * header   = NULL;
-    unsigned short  mapclass = FILEMAP_MAP_SRANDOM;
-    unsigned short  locktype = LOCK_TYPE_SHARED;
-    unsigned char   isfirst  = 1;
-    char            evtname[   MAX_PATH];
-    DWORD           ret      = 0;
+    int             result      = NONFATAL;
+    size_t          size        = 0;
+    fcache_header * header      = NULL;
+    unsigned short  mapclass    = FILEMAP_MAP_SRANDOM;
+    unsigned short  locktype    = LOCK_TYPE_SHARED;
+    unsigned char   isfirst     = 1;
+    unsigned int    initmemory  = 0;
+    DWORD           ret         = 0;
 
     dprintverbose("start fcache_initialize");
 
@@ -273,8 +273,28 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         pfcache->islocal = islocal;
     }
 
+    /* Create xread xwrite lock for the filecache */
+    result = lock_create(&pfcache->prwlock);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    result = utils_create_init_event(pfcache->prwlock->nameprefix, "FCACHE_INIT", &pfcache->hinitdone, &isfirst);
+    if (FAILED(result))
+    {
+        result = FATAL_FCACHE_INIT_EVENT;
+        goto Finished;
+    }
+
     /* shmfilepath = NULL to use page file for shared memory */
-    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, NULL TSRMLS_CC);
+    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
     if(FAILED(result))
     {
         goto Finished;
@@ -282,6 +302,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
 
     pfcache->memaddr = (char *)pfcache->pfilemap->mapaddr;
     size = filemap_getsize(pfcache->pfilemap TSRMLS_CC);
+    initmemory = (pfcache->pfilemap->existing == 0);
 
     /* Create allocator for filecache segment */
     result = alloc_create(&pfcache->palloc);
@@ -307,61 +328,11 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
 
     header = pfcache->header;
 
-    /* Create xread xwrite lock for the filecache */
-    result = lock_create(&pfcache->prwlock);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    result = lock_getnewname(pfcache->prwlock, "FCACHE_INIT", evtname, MAX_PATH);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    pfcache->hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
-    if(pfcache->hinitdone == NULL)
-    {
-        dprintcritical("Failed to create event %s", evtname);
-        result = FATAL_FCACHE_INIT_EVENT;
-        goto Finished;
-    }
-
-    if(GetLastError() == ERROR_ALREADY_EXISTS)
-    {
-        _ASSERT(islocal == 0);
-        isfirst = 0;
-
-        /* Wait for other process to initialize completely */
-        ret = WaitForSingleObject(pfcache->hinitdone, MAX_INIT_EVENT_WAIT);
-
-        if (ret == WAIT_TIMEOUT)
-        {
-            error_setlasterror();
-            dprintcritical("Timed out waiting for other process to release %s", evtname);
-            result = FATAL_FCACHE_INIT_EVENT;
-            goto Finished;
-        }
-
-        if (ret == WAIT_FAILED)
-        {
-            dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
-            result = FATAL_FCACHE_INIT_EVENT;
-            goto Finished;
-        }
-    }
-
     /* Initialize the fcache_header if its not initialized already */
-    if(islocal || isfirst)
+    if(islocal || isfirst || initmemory)
     {
-        lock_writelock(pfcache->prwlock);
+        /* No need to get a write lock as other processes */
+        /* are blocked waiting for hinitdone event */
 
         header->mapcount    = 1;
         header->itemcount   = 0;
@@ -369,8 +340,6 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         header->misscount   = 0;
 
         SetEvent(pfcache->hinitdone);
-
-        lock_writeunlock(pfcache->prwlock);
     }
     else
     {
@@ -413,6 +382,11 @@ Finished:
 
         if(pfcache->hinitdone != NULL)
         {
+            if (isfirst)
+            {
+                SetEvent(pfcache->hinitdone);
+            }
+
             CloseHandle(pfcache->hinitdone);
             pfcache->hinitdone = NULL;
         }

@@ -137,6 +137,7 @@ ZEND_INI_MH(wincache_modify_debuglevel)
     else
     {
         dprintsetlevel(atoi(new_value));
+        WCG(debuglevel) = gdebuglevel;
     }
     return SUCCESS;
 }
