@@ -246,6 +246,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     unsigned short  mapclass    = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype    = LOCK_TYPE_SHARED;
     unsigned char   isfirst     = 1;
+    unsigned char   islocked    = 0;
     unsigned int    initmemory  = 0;
     DWORD           ret         = 0;
 
@@ -291,6 +292,11 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     {
         result = FATAL_FCACHE_INIT_EVENT;
         goto Finished;
+    }
+
+    if (isfirst)
+    {
+        islocked = 1;
     }
 
     /* shmfilepath = NULL to use page file for shared memory */
@@ -340,6 +346,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         header->misscount   = 0;
 
         SetEvent(pfcache->hinitdone);
+        islocked = 0;
     }
     else
     {
@@ -382,9 +389,10 @@ Finished:
 
         if(pfcache->hinitdone != NULL)
         {
-            if (isfirst)
+            if (islocked)
             {
                 SetEvent(pfcache->hinitdone);
+                islocked = 0;
             }
 
             CloseHandle(pfcache->hinitdone);

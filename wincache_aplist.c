@@ -765,6 +765,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     unsigned short  mapclass    = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype    = LOCK_TYPE_SHARED;
     unsigned char   isfirst     = 1;
+    unsigned char   islocked    = 0;
     unsigned int    initmemory  = 0;
     char          * prefix      = NULL;
     size_t          cchprefix   = 0;
@@ -817,6 +818,11 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     {
         result = FATAL_APLIST_INIT_EVENT;
         goto Finished;
+    }
+
+    if (isfirst)
+    {
+        islocked = 1;
     }
 
     /* shmfilepath = NULL to make it use page file */
@@ -945,6 +951,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         memset((void *)header->values, 0, sizeof(size_t) * filecount);
 
         SetEvent(pcache->hinitdone);
+        islocked = 0;
     }
     else
     {
@@ -971,9 +978,10 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (isfirst)
+            if (islocked)
             {
                 SetEvent(pcache->hinitdone);
+                islocked = 0;
             }
 
             CloseHandle(pcache->hinitdone);
@@ -1088,6 +1096,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
     ocache_context * pocache = NULL;
     HANDLE           hfirst  = NULL;
     unsigned char    isfirst = 1;
+    unsigned char    islocked = 0;
 
     unsigned int     count   = 0;
     aplist_value *   pvalue  = NULL;
@@ -1107,6 +1116,11 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
             result = FATAL_APLIST_OCACHE_INIT_EVENT;
             goto Finished;
         }
+    }
+
+    if (isfirst)
+    {
+        islocked = 1;
     }
 
     result = ocache_create(&pocache);
@@ -1157,6 +1171,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
 
         /* Set the event now that ocacheval is set to 0 */
         SetEvent(hfirst);
+        islocked = 0;
     }
 
     plcache->resnumber = resnumber;
@@ -1174,9 +1189,10 @@ Finished:
         /* refcount of named object created above */
         if(hfirst != NULL)
         {
-            if (isfirst)
+            if (islocked)
             {
                 SetEvent(hfirst);
+                islocked = 0;
             }
 
             CloseHandle(hfirst);

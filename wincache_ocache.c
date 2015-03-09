@@ -103,6 +103,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
     unsigned short  mapclass    = FILEMAP_MAP_SFIXED;
     unsigned short  locktype    = LOCK_TYPE_SHARED;
     unsigned char   isfirst     = 1;
+    unsigned char   islocked    = 0;
     unsigned int    initmemory  = 0;
     DWORD           ret         = 0;
 
@@ -151,6 +152,11 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
+    if (isfirst)
+    {
+        islocked = 1;
+    }
+
     /* shmfilepath = NULL */
     result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
     if(FAILED(result))
@@ -197,6 +203,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         header->misscount   = 0;
 
         SetEvent(pcache->hinitdone);
+        islocked = 0;
     }
     else
     {
@@ -239,7 +246,7 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (isfirst)
+            if (islocked)
             {
                 SetEvent(pcache->hinitdone);
             }

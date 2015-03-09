@@ -38,7 +38,7 @@
 /* Temp files are in the format of "wincache_" + suffix + ".tmp" */
 #define TEMP_FILE_PREFIX_CHARS 13
 
-static const char * g_temp_dir = NULL;
+/* CRC 32 functions */
 
 static unsigned int crc32_generate(int n);
 static unsigned int utils_crc32(const char * str, unsigned int strlen);
@@ -552,36 +552,21 @@ char * utils_resolve_path(const char *filename, int filename_length, const char 
     return NULL;
 }
 
-const char * utils_get_temp_dir()
-{
-    /* if we've already got it, return it */
-    if (g_temp_dir)
-    {
-        goto Finished;
-    }
-
-    /* if there's an upload temp directory in the .ini, use that */
-    if(PG(upload_tmp_dir) && PG(upload_tmp_dir)[0] != '\0')
-    {
-        g_temp_dir = PG(upload_tmp_dir);
-        goto Finished;
-    }
-
-    /* if there isn't an upload temp dir, fall back to the system temp dir. */
-    g_temp_dir = php_get_temporary_directory();
-
-Finished:
-    return g_temp_dir;
-}
-
 /*
- * Caller must free returned string using pefree( ptr, 0 ).
+ * Caller must free returned string using alloc_pefree( ptr ).
  */
 char * utils_build_temp_filename(char * suffix)
 {
     char *       temp_file = NULL;
-    const char * temp_dir = utils_get_temp_dir();
-    size_t       filename_len = strlen(temp_dir);
+    const char * temp_dir = WCG(filemapdir);
+    size_t       filename_len;
+
+    if (!temp_dir)
+    {
+        goto Finished;
+    }
+
+    filename_len = strlen(temp_dir);
 
     // TODO: make sure trailing char is not IS_SLASH()
 
@@ -590,7 +575,7 @@ char * utils_build_temp_filename(char * suffix)
     filename_len += TEMP_FILE_PREFIX_CHARS;
     filename_len++;     /* terminating NULL */
 
-    temp_file = pemalloc(filename_len, 0);
+    temp_file = alloc_pemalloc(filename_len);
     if (!temp_file)
     {
         error_setlasterror();
@@ -604,7 +589,7 @@ Finished:
 }
 
 /*
- * If this succeeds, and pisfirst == 1, then caller must SetEvent on the
+ * If this succeeds, and *pisfirst == 1, then caller must SetEvent on the
  * returned pinit_event handle.
  */
 int utils_create_init_event(
@@ -678,3 +663,58 @@ int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *form
     return retval;
 }
 #endif
+
+/*
+ * IIS App Pool utils
+ */
+
+/* Caller must NOT free the returned string */
+const char *
+utils_get_apppool_name()
+{
+    unsigned int buflen;
+    PSTR szAppPoolName = NULL;
+    int ret = 0;
+
+    if ( WCG(apppoolid) )
+    {
+        return WCG(apppoolid);
+    }
+
+    /* Get app pool ID (as unicode) */
+    buflen = GetEnvironmentVariableA( "APP_POOL_ID", NULL, 0 );
+    if (buflen == 0)
+    {
+        /* No app pool.  Don't do anything */
+        goto Finished;
+    }
+
+    szAppPoolName = (PSTR)alloc_pemalloc(buflen + 1);
+    if (szAppPoolName == NULL)
+    {
+        ret = FATAL_OUT_OF_MEMORY;
+        goto Finished;
+    }
+
+    buflen = GetEnvironmentVariable( "APP_POOL_ID", szAppPoolName, buflen + 1 );
+    if (buflen == 0)
+    {
+        ret = FATAL_UNEXPECTED_DATA;
+        goto Finished;
+    }
+
+    WCG(apppoolid) = szAppPoolName;
+
+Finished:
+    if ( FAILED( ret ) )
+    {
+        if ( szAppPoolName )
+        {
+            alloc_pefree( szAppPoolName );
+            szAppPoolName = NULL;
+        }
+    }
+
+    return szAppPoolName;
+}
+

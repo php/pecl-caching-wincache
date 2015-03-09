@@ -49,6 +49,8 @@
 #define FATAL_NEED_MORE_MEMORY              16
 #define FATAL_UNEXPECTED_DATA               17
 #define FATAL_UNEXPECTED_FCALL              18
+#define FATAL_CRYPTO_FAILED                 19
+#define FATAL_ACL_FAILED                    20
 
 #define FATAL_OPEN_TOKEN                    97
 #define FATAL_ZEND_BAILOUT                  98

@@ -306,11 +306,12 @@ PHP_INI_BEGIN()
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
 /* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "1", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
 /* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "1", PHP_INI_SYSTEM | PHP_INI_PERDIR, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
+/* index 22 */ STD_PHP_INI_ENTRY("wincache.filemapdir", NULL, PHP_INI_SYSTEM, OnUpdateString, filemapdir, zend_wincache_globals, wincache_globals)
 #ifdef ZEND_ENGINE_2_4
-/* index 22 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
+/* index 23 */ STD_PHP_INI_ENTRY("wincache.internedsize", "4", PHP_INI_SYSTEM, OnUpdateLong, internedsize, zend_wincache_globals, wincache_globals)
 #endif /* ZEND_ENGINE_2_4 */
 #ifdef WINCACHE_TEST
-/* index 23 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
+/* index 24 */ STD_PHP_INI_ENTRY("wincache.olocaltest", "0", PHP_INI_SYSTEM, OnUpdateBool, olocaltest, zend_wincache_globals, wincache_globals)
 #endif
 PHP_INI_END()
 
@@ -386,6 +387,7 @@ static void globals_initialize(zend_wincache_globals * globals TSRMLS_DC)
     WCG(apppoolid)   = NULL; /* Use this application id */
     WCG(srwlocks)    = 1;    /* Enable shared reader/writer locks by default */
     WCG(reroute_enabled) = 1;/* Enable wrappers around standard PHP functions */
+    WCG(filemapdir)  = NULL; /* Directory where temp filemap files should be created */
 
 #ifdef ZEND_ENGINE_2_4
     WCG(internedsize) = 4;   /* 4MB for interned strings cache */
@@ -591,6 +593,9 @@ PHP_MINIT_FUNCTION(wincache)
     {
         goto Finished;
     }
+
+    /* set up the app pool ID */
+    WCG(apppoolid) = utils_get_apppool_name();
 
     /* Compare value of globals with minimum and maximum allowed */
     WCG(numfiles)    = (WCG(numfiles)    < NUM_FILES_MINIMUM)   ? NUM_FILES_MINIMUM   : WCG(numfiles);

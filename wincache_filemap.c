@@ -394,17 +394,101 @@ Finished:
     return retaddr;
 }
 
+inline size_t ALIGN_UP( size_t size, size_t page_size )
+{
+    size_t pad = size % page_size;
+
+    if (pad)
+    {
+        size += (page_size - pad);
+    }
+    return size;
+}
+
+/*++
+
+Routine Description:
+
+    Private method to find an open chunk of virtual memory, large enough to
+    accomodate an allocation of the requested size.
+
+Arguments:
+
+    size - requested allocation size.
+
+Return Value:
+
+    pointer to base address which should accomodate an allocation of the
+    requested size.
+
+ --*/
+void * get_free_vm_base_address(size_t size)
+{
+    SYSTEM_INFO  SystemInfo;
+    MEMORY_BASIC_INFORMATION MemInfo;
+    unsigned char fDone = FALSE;
+    size_t cbUpSize;
+    size_t cbRet;
+    unsigned char *pBaseTemp;
+
+    GetSystemInfo( &SystemInfo );
+
+    /* Round up to a page-size aligned allocation */
+    cbUpSize = ALIGN_UP( size, SystemInfo.dwPageSize );
+
+    /* Pick the first candidate base address */
+    pBaseTemp = ((unsigned char *)SystemInfo.lpMaximumApplicationAddress - cbUpSize);
+    pBaseTemp++; /* address should now be page-size aligned */
+
+    while (!fDone)
+    {
+        cbRet = VirtualQuery( pBaseTemp, &MemInfo, sizeof(MEMORY_BASIC_INFORMATION) );
+        if (!cbRet)
+        {
+            pBaseTemp = NULL;
+            goto Finished;
+        }
+
+        if (MemInfo.State == MEM_FREE)
+        {
+            if (MemInfo.RegionSize >= cbUpSize)
+            {
+                fDone = TRUE;
+            }
+            else
+            {
+                pBaseTemp -= ALIGN_UP(cbUpSize - MemInfo.RegionSize, SystemInfo.dwPageSize);
+            }
+        }
+        else
+        {
+            pBaseTemp -= cbUpSize;
+        }
+
+        /* Did we run out of candidates? */
+        if (pBaseTemp <= (unsigned char *)SystemInfo.lpMinimumApplicationAddress)
+        {
+            pBaseTemp = NULL;
+            fDone = TRUE;
+        }
+    }
+
+Finished:
+    return pBaseTemp;
+}
+
 static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
 {
-    int                         result  = NONFATAL;
-    int                         index   = 0;
-    int                         size    = 0;
-    int                         namelen = 0;
-    filemap_information *       pinfo   = NULL;
-    filemap_information_entry * pentry  = NULL;
-    unsigned char               isfirst = 1;
-    unsigned int                isexisting = 0;
-    DWORD                       ret     = 0;
+    int                         result      = NONFATAL;
+    int                         index       = 0;
+    int                         size        = 0;
+    int                         namelen     = 0;
+    filemap_information *       pinfo       = NULL;
+    filemap_information_entry * pentry      = NULL;
+    unsigned char               isfirst     = 1;
+    unsigned char               islocked    = 0;
+    unsigned int                isexisting  = 0;
+    DWORD                       ret         = 0;
 
     dprintverbose("start create_information_filemap");
 
@@ -475,6 +559,11 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         goto Finished;
     }
 
+    if (isfirst)
+    {
+        islocked = 1;
+    }
+
     /* Calculate size and try to get the filemap handle */
     /* Adding two aligned qwords sizes will produce qword */
     size = FILEMAP_INFO_HEADER_SIZE + (FILEMAP_MAX_COUNT * FILEMAP_INFO_ENTRY_SIZE);
@@ -523,6 +612,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         }
 
         SetEvent(pinfo->hinitdone);
+        islocked = 0;
 
         lock_writeunlock(pinfo->hrwlock);
     }
@@ -573,7 +663,7 @@ Finished:
 
             if(pinfo->hinitdone != NULL)
             {
-                if(isfirst)
+                if(islocked)
                 {
                     SetEvent(pinfo->hinitdone);
                 }
@@ -903,6 +993,11 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
             pentry->cpid     = filemap_getpid(TSRMLS_C);
             pentry->opid     = filemap_getpid(TSRMLS_C);
             pentry->mapaddr  = NULL;
+
+            if (fmclass == FILEMAP_MAP_SFIXED)
+            {
+                mapaddr = get_free_vm_base_address( size );
+            }
         }
 
         /* If we should have a temp file for shared memory, but we don't have a
@@ -1024,7 +1119,7 @@ Finished:
 
     if (sm_file_path && sm_file_path != shmfilepath)
     {
-        pefree(sm_file_path, 0);
+        alloc_pefree(sm_file_path);
         sm_file_path = NULL;
     }
 
@@ -1140,7 +1235,7 @@ void filemap_terminate(filemap_context * pfilemap)
             if (sm_file_path)
             {
                 (void)DeleteFile(sm_file_path);
-                pefree(sm_file_path, 0);
+                alloc_pefree(sm_file_path);
                 sm_file_path = NULL;
             }
         }

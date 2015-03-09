@@ -132,7 +132,8 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
 #ifdef WINCACHE_TEST
     zend_bool                olocaltest;  /* Local opcode cache test configuration */
 #endif
-    char *                   apppoolid;   /* The application id. */
+    const char *             apppoolid;   /* The application id. */
+    char *                   filemapdir;  /* Directory where temp filemap files should be created */
 ZEND_END_MODULE_GLOBALS(wincache)
 
 ZEND_EXTERN_MODULE_GLOBALS(wincache)

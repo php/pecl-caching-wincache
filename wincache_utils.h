@@ -57,4 +57,7 @@ utils_create_init_event(
 extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const char *format,...);
 #endif
 
+extern const char *
+utils_get_apppool_name();
+
 #endif /* _WINCACHE_UTILS_H_ */

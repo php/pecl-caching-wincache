@@ -1468,6 +1468,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     unsigned short  mapclass   = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype   = LOCK_TYPE_SHARED;
     unsigned char   isfirst    = 0;
+    unsigned char   islocked   = 0;
     unsigned int    initmemory = 0;
     DWORD           ret        = 0;
     char *          lockname   = ((issession) ? "SESSZVALS_CACHE" : "USERZVALS_CACHE");
@@ -1511,6 +1512,11 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     {
         result = FATAL_ZVCACHE_INIT_EVENT;
         goto Finished;
+    }
+
+    if (isfirst)
+    {
+        islocked = 1;
     }
 
     /* If a shmfilepath is passed, use that to create filemap */
@@ -1589,6 +1595,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         header->mapcount   = 1;
 
         SetEvent(pcache->hinitdone);
+        islocked = 0;
     }
     else
     {
@@ -1669,7 +1676,7 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (isfirst)
+            if (islocked)
             {
                 SetEvent(pcache->hinitdone);
             }

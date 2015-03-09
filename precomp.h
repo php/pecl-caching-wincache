@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.2"
+#define PHP_WINCACHE_VERSION    "1.3.7.3"
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
