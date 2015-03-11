@@ -32,11 +32,41 @@
 */
 
 #include "precomp.h"
+#include <Sddl.h>
+#include <Aclapi.h>
 
 #define DWORD_MAX    0xFFFFFFFF
 
 /* Temp files are in the format of "wincache_" + suffix + ".tmp" */
 #define TEMP_FILE_PREFIX_CHARS 13
+
+/* IIS App Pool defines */
+
+#define SC_APP_POOL_DOMAIN_NAME       "IIS APPPOOL"
+#define SC_APP_POOL_DOMAIN_NAME_LEN   11
+
+/* 1st param == app pool, 2nd param == current user */
+static const char g_sddlTemplate[] = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GA;;;%s)(A;OICI;GA;;;%s)";
+static const size_t g_cchSddlTemplate = ARRAYSIZE(g_sddlTemplate);
+
+/* IIS App Pool Prototypes */
+
+int
+GetAppPoolSid(
+    PCSTR  szAppPoolName,
+    PSID * ppSid
+    );
+
+int
+GetUserSid(
+    PSID *ppSid
+    );
+
+int
+SetFileDacl(
+    PSTR pszSddl,
+    PSTR pszFilePath
+    );
 
 /* CRC 32 functions */
 
@@ -718,3 +748,451 @@ Finished:
     return szAppPoolName;
 }
 
+/* IIS App Pool Functions */
+
+int
+utils_set_apppool_acl(
+    char * filename
+    )
+{
+    int ret = 0;
+    PCSTR szAppPoolName = NULL;
+    PSTR  szNewSddlAcl = NULL;
+    PSID  pAppPoolSid = NULL;
+    PSID  pUserSid = NULL;
+    PSTR  szAppPoolSid = NULL;
+    PSTR  szUserSid = NULL;
+    size_t sddlLen = 0;
+
+    /* Get app pool name */
+    szAppPoolName = utils_get_apppool_name();
+    if ( !szAppPoolName )
+    {
+        /* No app pool.  Don't do anything */
+        goto Finished;
+    }
+
+    /* Get app pool SID */
+    ret = GetAppPoolSid( szAppPoolName, &pAppPoolSid );
+    if ( FAILED( ret ) )
+    {
+        goto Finished;
+    }
+
+    /* Convert SID to String */
+    if ( !ConvertSidToStringSidA( pAppPoolSid, &szAppPoolSid ) )
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    /*
+     * Get Token for the current user.
+     * Free the token user with the FreeTokenUserSid API when done.
+     */
+
+    ret = GetUserSid(&pUserSid);
+    if ( FAILED( ret ) )
+    {
+        goto Finished;
+    }
+
+    /* Convert SID to String */
+    if ( !ConvertSidToStringSidA( pUserSid, &szUserSid ) )
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+
+    /* Construct SDDL string for file ACL */
+    /* ACL: SYSTEM:Full, ADMINISTRATORS:Full, AppPool:Full */
+    sddlLen  = g_cchSddlTemplate;  /* includes terminating NULL */
+    sddlLen += strlen( szAppPoolSid );
+    sddlLen += strlen( szUserSid );
+    szNewSddlAcl = (PSTR)alloc_pemalloc(sddlLen);
+    if ( !szNewSddlAcl )
+    {
+        ret = FATAL_OUT_OF_MEMORY;
+        goto Finished;
+    }
+
+    sprintf_s( szNewSddlAcl, sddlLen, g_sddlTemplate, szAppPoolSid, szUserSid );
+
+    /* set on filename */
+    ret = SetFileDacl( szNewSddlAcl, filename );
+
+Finished:
+
+    if ( szNewSddlAcl )
+    {
+        alloc_pefree( szNewSddlAcl );
+        szNewSddlAcl = NULL;
+    }
+
+    if ( szAppPoolSid )
+    {
+        LocalFree( szAppPoolSid );
+        szAppPoolSid = NULL;
+    }
+
+    if ( szUserSid )
+    {
+        LocalFree( szUserSid );
+        szUserSid = NULL;
+    }
+
+    if ( pAppPoolSid )
+    {
+        alloc_pefree( pAppPoolSid );
+        pAppPoolSid = NULL;
+    }
+
+    if ( pUserSid )
+    {
+        alloc_pefree( pUserSid );
+        pUserSid = NULL;
+    }
+
+    return ret;
+}
+
+/*****************************************************************************
+ 
+ Routine Description:
+
+    Sets the DACL on the specified file.
+
+ Arguments:
+
+    pszSddl - SDDL representation of DACL
+    pszFilePath - complete file path
+
+ Returns:
+
+    HRESULT
+
+*****************************************************************************/
+int
+SetFileDacl(
+    PSTR pszSddl,
+    PSTR pszFilePath
+    )
+{
+    int ret = S_OK;
+    SECURITY_ATTRIBUTES secAttr;
+    BOOL fDaclPresent = FALSE;
+    BOOL fDaclDefaulted = FALSE;
+    PACL pAcl = NULL;
+    DWORD dwStatus = 0;
+
+    SecureZeroMemory( &secAttr, sizeof(secAttr) );
+
+    if ( ! ConvertStringSecurityDescriptorToSecurityDescriptorA(
+            pszSddl,
+            SDDL_REVISION_1,
+            &(secAttr.lpSecurityDescriptor),
+            NULL ) )
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    secAttr.nLength = sizeof(secAttr);
+    secAttr.bInheritHandle = FALSE;
+
+    if ( ! GetSecurityDescriptorDacl( secAttr.lpSecurityDescriptor,
+                                      &fDaclPresent,
+                                      &pAcl,
+                                      &fDaclDefaulted ) )
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    if ( fDaclPresent )
+    {
+        dwStatus =  SetNamedSecurityInfoA( pszFilePath,
+                                           SE_FILE_OBJECT,
+                                           DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+                                           NULL,
+                                           NULL,
+                                           pAcl,
+                                           NULL);
+
+        if ( dwStatus != ERROR_SUCCESS )
+        {
+            error_setlasterror();
+            ret = FATAL_ACL_FAILED;
+            goto Finished;
+        }
+    }
+
+Finished:
+
+    if ( secAttr.lpSecurityDescriptor != NULL )
+    {
+        LocalFree( secAttr.lpSecurityDescriptor );
+        secAttr.lpSecurityDescriptor = NULL;
+    }
+
+    return ret;
+}
+
+/* callers must free returned PSID with alloc_pefree() */
+int
+GetAppPoolSid(
+    PCSTR szAppPoolName,
+    PSID *ppSid
+    )
+{
+    int ret = 0;
+    char * szAccountName = NULL;
+    char * szDomainName = NULL;
+    size_t cchAccountName = 0;
+    DWORD sidLength = 0;
+    DWORD domainNameLength = 0;
+    SID_NAME_USE sidNameUse;
+    PSID pSid = NULL;
+
+    /* build the app pool account name */
+    /* "IIS APPPOOL\<AppPoolName>" */
+    cchAccountName = strlen(szAppPoolName) + 1 + SC_APP_POOL_DOMAIN_NAME_LEN;
+    szAccountName = alloc_pemalloc(cchAccountName + 1);
+    if (!szAccountName)
+    {
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    sprintf_s( szAccountName, cchAccountName + 1, "%s\\%s", SC_APP_POOL_DOMAIN_NAME, szAppPoolName );
+
+    if ( !LookupAccountName(
+             NULL,                              // lpSystemName
+             szAccountName,                     // lpAccountName
+             NULL,                              // Sid
+             &sidLength,                        // cbSid
+             NULL,                              // ReferencedDomainName
+             &domainNameLength,                 // cchReferencedDomainName
+             &sidNameUse                        // peUse
+             ))
+    {
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+        {
+            error_setlasterror();
+            ret = FATAL_ACL_FAILED;
+            goto Finished;
+        }
+
+        pSid = (PSID)alloc_pemalloc(sidLength);
+        if (!pSid)
+        {
+            ret = FATAL_OUT_OF_MEMORY;
+            goto Finished;
+        }
+
+        szDomainName = (char *)alloc_pemalloc(domainNameLength);
+        if (!szDomainName)
+        {
+            ret = FATAL_OUT_OF_MEMORY;
+            goto Finished;
+        }
+
+        if ( !LookupAccountName(
+                     NULL,                              // lpSystemName
+                     szAccountName,                     // lpAccountName
+                     pSid,                              // Sid
+                     &sidLength,                        // cbSid
+                     szDomainName,                      // ReferencedDomainName
+                     &domainNameLength,                 // cchReferencedDomainName
+                     &sidNameUse                        // peUse
+                     ))
+        {
+            error_setlasterror();
+            ret = FATAL_ACL_FAILED;
+            goto Finished;
+        }
+    }
+
+    *ppSid = pSid;
+
+Finished:
+
+    if (szAccountName)
+    {
+        alloc_pefree(szAccountName);
+        szAccountName = NULL;
+    }
+
+    if (szDomainName)
+    {
+        alloc_pefree(szDomainName);
+        szDomainName = NULL;
+    }
+
+    return ret;
+}
+
+/* callers must free returned PSID with alloc_pefree() */
+int
+GetUserSid(
+    PSID *ppSid
+    )
+{
+    int                  ret                    = SUCCESS;
+    BOOL                 fRet                   = FALSE;
+    HANDLE               hProcessToken          = NULL;
+    TOKEN_USER *         pTokenUser             = NULL;
+    PSID                 pSid                   = NULL;
+    DWORD                cbSid                  = 0;
+    DWORD                cbSize                 = 0;
+
+    /*
+     * Get Current User SID
+     */
+
+    if (!OpenProcessToken(GetCurrentProcess(), GENERIC_READ, &hProcessToken))
+    {
+        error_setlasterror();
+        ret = FATAL_ACCESS_DENIED;
+        goto Finished;
+    }
+
+    /*
+     * Get Token for the current user.
+     * Free the token user with the FreeTokenUserSid API when done.
+     */
+
+    fRet = GetTokenInformation(hProcessToken,
+                               TokenUser,
+                               NULL,
+                               0,
+                               &cbSize);
+    if (FALSE == fRet)
+    {
+        if (ERROR_INSUFFICIENT_BUFFER != GetLastError())
+        {
+            error_setlasterror();
+            ret = FATAL_ACL_FAILED;
+            goto Finished;
+        }
+    }
+
+    pTokenUser = (TOKEN_USER*)alloc_pemalloc(cbSize);
+    if (NULL == pTokenUser)
+    {
+        ret = FATAL_OUT_OF_MEMORY;
+        goto Finished;
+    }
+    
+    fRet = GetTokenInformation(hProcessToken,
+                               TokenUser,
+                               pTokenUser,
+                               cbSize,
+                               &cbSize);
+    if (FALSE == fRet)
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+
+    cbSid = GetLengthSid(pTokenUser->User.Sid);
+    pSid = (PSID)alloc_pemalloc(cbSid);
+    if (!pSid)
+    {
+        ret = FATAL_OUT_OF_MEMORY;
+        goto Finished;
+    }
+
+    if (!CopySid(cbSid, pSid, pTokenUser->User.Sid))
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    /* Transfer ownership of memory to caller */
+    *ppSid = pSid;
+    pSid = NULL;
+
+Finished:
+
+    if (pTokenUser)
+    {
+        alloc_pefree(pTokenUser);
+        pTokenUser = NULL;
+    }
+
+    if (pSid)
+    {
+        alloc_pefree(pSid);
+        pSid = NULL;
+    }
+
+    return ret;
+}
+
+/*
+ * Impersonation utils
+ */
+
+int utils_revert_if_necessary(HANDLE *phOriginalToken)
+{
+    int result = NONFATAL;
+    HANDLE hOriginalToken = NULL;
+
+    /*
+     * RevertToSelf if needed
+     */
+    if( OpenThreadToken( GetCurrentThread(),   /* thread handle whose access token is opened */
+                         TOKEN_IMPERSONATE,    /* desired access */
+                         TRUE,                 /* open as self (access check made against process) */
+                         &hOriginalToken ) )   /* out token handle */
+    {
+        _ASSERT( hOriginalToken != NULL );
+        if( !RevertToSelf() )
+        {
+            error_setlasterror();
+            result = FATAL_FILEMAP_REVERT_FAILED;
+            goto Finished;
+        }
+    }
+    else
+    {
+        error_setlasterror();
+        if( ERROR_NO_TOKEN == error_getlasterror() )
+        {
+            hOriginalToken = NULL;
+        }
+        else
+        {
+            result = FATAL_FILEMAP_REVERT_FAILED;
+            goto Finished;
+        }
+    }
+
+Finished:
+
+    *phOriginalToken = hOriginalToken;
+
+    return result;
+}
+
+void utils_reimpersonate_if_necessary(HANDLE hOriginalToken)
+{
+    if ( hOriginalToken != NULL )
+    {
+        if( !SetThreadToken( NULL, hOriginalToken ) )
+        {
+            error_setlasterror();
+        }
+
+        CloseHandle( hOriginalToken );
+    }
+}

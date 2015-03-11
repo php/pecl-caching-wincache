@@ -35,7 +35,11 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.3"
+#define PHP_WINCACHE_VERSION    "1.3.7.4"
+#define PHP_WINCACHE_VERSION_LEN (sizeof(PHP_WINCACHE_VERSION)-1)
+
+#define GLOBAL_SCOPE_PREFIX     "Global\\"
+#define GLOBAL_SCOPE_PREFIX_LEN (sizeof(GLOBAL_SCOPE_PREFIX)-1)
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
@@ -68,6 +72,9 @@
 
 #define ALIGNDWORD(size)   (((size) % 4) ? ((size)+(4-((size) % 4))) : (size))
 #define ALIGNQWORD(size)   (((size) % 8) ? ((size)+(8-((size) % 8))) : (size))
+
+#define XSTRVER2(maj, min)             #maj "." #min
+#define STRVER2(maj, min)              XSTRVER2(maj, min)
 
 #if PHP_VERSION_ID < 50300
  #define PHP_VERSION_52

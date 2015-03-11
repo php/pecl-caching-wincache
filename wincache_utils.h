@@ -60,4 +60,12 @@ extern int wincache_php_snprintf_s(char *buf, size_t len, size_t len2, const cha
 extern const char *
 utils_get_apppool_name();
 
+extern int
+utils_set_apppool_acl(
+    char * filename
+    );
+
+extern int          utils_revert_if_necessary(HANDLE *phOriginalToken);
+extern void         utils_reimpersonate_if_necessary(HANDLE hOriginalToken);
+
 #endif /* _WINCACHE_UTILS_H_ */

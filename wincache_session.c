@@ -44,6 +44,11 @@ static void scache_destructor(void * pdestination)
     _ASSERT(pdestination != NULL);
     ppcache = (zvcache_context **)pdestination;
 
+    if (WCG(zvscache) && WCG(zvscache) == *ppcache)
+    {
+        WCG(zvscache) = NULL;
+    }
+
     zvcache_terminate(*ppcache);
     zvcache_destroy(*ppcache);
 
@@ -65,6 +70,7 @@ PS_OPEN_FUNC(wincache)
     unsigned int       fpathlen   = 0;
     unsigned int       cachekey   = 0;
     int                rethash    = 0;
+    HANDLE             hOriginalToken = NULL;
 
     dprintverbose("start ps_open_func");
 
@@ -120,6 +126,12 @@ PS_OPEN_FUNC(wincache)
     /* Handling save_path as is done in ext\session\mod_files.c */
     if(pzcache == NULL)
     {
+        result = utils_revert_if_necessary(&hOriginalToken);
+        if (FAILED(result))
+        {
+            goto Finished;
+        }
+
         if(*save_path != '\0')
         {
             /* Get last portion from [dirdepth;[filemode;]]dirpath */
@@ -150,8 +162,13 @@ PS_OPEN_FUNC(wincache)
 
         _ASSERT(save_path != NULL);
 
-        /* Create path as save_path\wincache_session_[<namesalt>_]ppid. 6 for _<cachekey> */
-        fpathlen = strlen(save_path) + 1 + sizeof("wincache_session_.tmp") + 6 + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
+        /* Create path as save_path\wincache_<version>_session_[<namesalt>_]ppid. 6 for _<cachekey> */
+        fpathlen = strlen(save_path) + 1 + sizeof("wincache__session_.tmp") + 6 + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
+
+        /* add the PHP_AND_WINCACHE_VERSION */
+        fpathlen += sizeof(STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION));
+        fpathlen += PHP_WINCACHE_VERSION_LEN;
+
         if(fpathlen > MAX_PATH)
         {
             result = FATAL_SESSION_PATHLONG;
@@ -168,11 +185,11 @@ PS_OPEN_FUNC(wincache)
         ZeroMemory(filepath, fpathlen);
         if(WCG(namesalt) == NULL)
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%u_%u.tmp", save_path, cachekey, WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_session_%u_%u.tmp", save_path, cachekey, WCG(parentpid));
         }
         else
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_session_%u_%s_%u.tmp", save_path, cachekey, WCG(namesalt), WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_session_%u_%s_%u.tmp", save_path, cachekey, WCG(namesalt), WCG(parentpid));
         }
 
         /* Create session cache on call to session_start */
@@ -204,6 +221,9 @@ PS_OPEN_FUNC(wincache)
 
 Finished:
 
+    utils_reimpersonate_if_necessary(hOriginalToken);
+    hOriginalToken = NULL;
+
     if(filepath != NULL)
     {
         alloc_pefree(filepath);
@@ -223,6 +243,16 @@ Finished:
 
         if(pzcache != NULL)
         {
+            if (WCG(zvscache) == pzcache)
+            {
+                WCG(zvscache) = NULL;
+            }
+
+            /*
+             * NOTE: It should be safe to destroy the pzcache at this point,
+             * since it should NOT have been added to the phtable.  If it had,
+             * this would lead to a double-deref of the pzcache.
+             */
             zvcache_terminate(pzcache);
             zvcache_destroy(pzcache);
 
@@ -237,36 +267,10 @@ Finished:
     return SUCCESS;
 }
 
-/*
- * Called on session close.
- * Must remove WCG(zvscache) from WCG(phscache), or else we'll get a double-deref
- * on the WCG(zvscache) when we zend_hash_destroy(WCG(phscache)) during module
- * cleanup.
- */
+/* Called on session close.  Nothing to do. */
 PS_CLOSE_FUNC(wincache)
 {
-    zvcache_context ** ppcache    = NULL;
-
     dprintverbose("start ps_close_func");
-
-    if (WCG(phscache))
-    {
-        if ((zend_hash_index_find(WCG(phscache),
-                                ZVSCACHE_KEY,
-                                (void **)&ppcache) != FAILURE) &&
-            (WCG(zvscache) == *ppcache))
-        {
-            /*
-             * NOTE: If PS_OPEN_FUNC added WCG(zvscache) to the WCG(phscache)
-             * Zend HashTable, then any attempt to remove it from the table,
-             * or deletion of the table, will result in it getting cleaned up.
-             * Therefore, we must ensure the main cleanup code doesn't try to
-             * free the memory a second time.
-             */
-            WCG(zvscache) = NULL;
-        }
-
-    }
 
     PS_SET_MOD_DATA(NULL);
 

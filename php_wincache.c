@@ -929,14 +929,7 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         WCG(zvucache) = NULL;
     }
 
-    if(WCG(zvscache) != NULL)
-    {
-        zvcache_terminate(WCG(zvscache));
-        zvcache_destroy(WCG(zvscache));
-
-        WCG(zvscache) = NULL;
-    }
-
+    /* Must shut down this table before shutting down WCG(zvscache) */
     if(WCG(phscache) != NULL)
     {
         /* destructor in wincache_session.c will destroy zvcache_context */
@@ -944,6 +937,14 @@ PHP_MSHUTDOWN_FUNCTION(wincache)
         alloc_pefree(WCG(phscache));
 
         WCG(phscache) = NULL;
+    }
+
+    if(WCG(zvscache) != NULL)
+    {
+        zvcache_terminate(WCG(zvscache));
+        zvcache_destroy(WCG(zvscache));
+
+        WCG(zvscache) = NULL;
     }
 
 #ifdef ZEND_ENGINE_2_4
@@ -1697,6 +1698,22 @@ PHP_FUNCTION(wincache_ocache_fileinfo)
 
     if(WCG(locache) == NULL)
     {
+        /* If there isn't an opcache, just fill out a dummy block */
+        /* so the wincache.php script doesn't choke and spew errors */
+
+        array_init(return_value);
+
+        add_assoc_long(return_value, "total_cache_uptime", 0);
+        add_assoc_bool(return_value, "is_local_cache", 1);
+        add_assoc_long(return_value, "total_file_count", 0);
+        add_assoc_long(return_value, "total_hit_count", 0);
+        add_assoc_long(return_value, "total_miss_count", 0);
+
+        MAKE_STD_ZVAL(zfentries);
+        array_init(zfentries);
+
+        add_assoc_zval(return_value, "file_entries", zfentries);
+
         goto Finished;
     }
 
@@ -1767,6 +1784,17 @@ PHP_FUNCTION(wincache_ocache_meminfo)
 
     if(WCG(locache) == NULL)
     {
+        /* If there isn't an opcache, just fill out a dummy block */
+        /* so the wincache.php script doesn't choke and spew errors */
+
+        array_init(return_value);
+
+        add_assoc_long(return_value, "memory_total", 0);
+        add_assoc_long(return_value, "memory_free", 0);
+        add_assoc_long(return_value, "num_used_blks", 0);
+        add_assoc_long(return_value, "num_free_blks", 0);
+        add_assoc_long(return_value, "memory_overhead", 0);
+
         goto Finished;
     }
 
