@@ -479,16 +479,16 @@ void lock_readlock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_readlock: acquired abandoned mutex %sA. Something bad happend in another process!", 
                                 plock->nameprefix);
-                php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sA. Something bad happend in another process!",
-                          plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                //          plock->nameprefix);
             }
 
             if (ret == WAIT_FAILED)
             {
                 dprintcritical("lock_readlock: Failure waiting on shared readlock %s* (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on shared readlock %s* (%d). Something bad happened!",
-                          plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on shared readlock %s* (%d). Something bad happened!",
+                //           plock->nameprefix);
 
             }
 
@@ -508,16 +508,16 @@ void lock_readlock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_readlock: acquired abandoned mutex %sX. Something bad happend in another process!",
                                 plock->nameprefix);
-                php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sX. Something bad happend in another process!",
-                          plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_readlock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                //           plock->nameprefix);
             }
 
             if (ret == WAIT_FAILED)
             {
                 dprintcritical("lock_readlock: Failure waiting on readlock %sX (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on readlock %sX (%d). Something bad happened!", 
-                          plock->nameprefix, error_setlasterror());
+                // php_error(E_ERROR, "WINCACHE: lock_readlock: Failure waiting on readlock %sX (%d). Something bad happened!", 
+                //           plock->nameprefix, error_setlasterror());
             }
 
             break;
@@ -557,16 +557,16 @@ void lock_readunlock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_readunlock: acquired abandoned mutex %sA. Something bad happend in another process!", 
                                 plock->nameprefix);
-                php_error(E_ERROR, "WINCACHE: lock_readunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
-                          plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_readunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                //          plock->nameprefix);
             }
 
             if (ret == WAIT_FAILED)
             {
                 dprintcritical("lock_readunlock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_readunlock: Failure waiting on readlock %s* (%d). Something bad happened!", 
-                          plock->nameprefix, error_setlasterror());
+                // php_error(E_ERROR, "WINCACHE: lock_readunlock: Failure waiting on readlock %s* (%d). Something bad happened!", 
+                //           plock->nameprefix, error_setlasterror());
             }
 
             _ASSERT(*plock->prcount > 0);
@@ -626,16 +626,16 @@ void lock_writelock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_writelock: acquired abandoned mutex %s%c. Something bad happend in another process!", 
                                 plock->nameprefix, whichLock);
-                php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %s%c. Something bad happend in another process!",
-                          plock->nameprefix, whichLock);
+                // php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %s%c. Something bad happend in another process!",
+                //           plock->nameprefix, whichLock);
             }
 
             if (ret == WAIT_FAILED)
             {
                 dprintcritical("lock_writelock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
-                          plock->nameprefix, error_getlasterror());
+                // php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on shared lock %s* (%d). Something bad happened!", 
+                //           plock->nameprefix, error_getlasterror());
             }
 
             _ASSERT(*plock->prcount == 0);
@@ -653,16 +653,16 @@ void lock_writelock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_writelock: acquired abandoned mutex %sX. Something bad happend in another process!",
                                 plock->nameprefix);
-                php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %sX. Something bad happend in another process!",
-                                plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_writelock: acquired abandoned mutex %sX. Something bad happend in another process!",
+                //           plock->nameprefix);
             }
 
             if (ret == WAIT_FAILED)
             {
                 dprintcritical("lock_writelock: Failure waiting on lock %sX (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on lock %sX (%d). Something bad happened!", 
-                          plock->nameprefix, error_getlasterror());
+                // php_error(E_ERROR, "WINCACHE: lock_writelock: Failure waiting on lock %sX (%d). Something bad happened!", 
+                //           plock->nameprefix, error_getlasterror());
             }
 
             break;
@@ -700,8 +700,8 @@ void lock_writeunlock(lock_context * plock)
                 error_setlasterror();
                 dprintcritical("lock_writeunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
                                 plock->nameprefix);
-                php_error(E_ERROR, "WINCACHE: lock_writeunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
-                          plock->nameprefix);
+                // php_error(E_ERROR, "WINCACHE: lock_writeunlock: acquired abandoned mutex %sA. Something bad happend in another process!",
+                //           plock->nameprefix);
 
                 /* At this point, we know the reader count *must* be zero. */
                 /* Let's take this opportunity to fix any problems */
@@ -717,8 +717,8 @@ void lock_writeunlock(lock_context * plock)
             {
                 dprintcritical("lock_writeunlock: Failure waiting on lock %sA (%d). Something bad happened!", 
                                 plock->nameprefix, error_setlasterror());
-                php_error(E_ERROR, "WINCACHE: lock_writeunlock: Failure waiting on lock %sA (%d). Something bad happened!", 
-                          plock->nameprefix, error_getlasterror());
+                // php_error(E_ERROR, "WINCACHE: lock_writeunlock: Failure waiting on lock %sA (%d). Something bad happened!", 
+                //           plock->nameprefix, error_getlasterror());
             }
 
             _ASSERT(*plock->prcount == 0);
