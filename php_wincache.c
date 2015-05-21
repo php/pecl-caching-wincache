@@ -2844,6 +2844,9 @@ WINCACHE_FUNC(wincache_rmdir)
         }
     }
 
+    /* Mark the aplist entry as deleted */
+    result = aplist_fcache_delete(WCG(lfcache), fullpath TSRMLS_CC);
+
 Finished:
 
     if(fullpath != NULL && fullpath != dirname)
@@ -2952,7 +2955,11 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
     char *         filename      = NULL;
     int            filename_len  = 0;
     char *         respath       = NULL;
-    fcache_value * pfvalue       = NULL;
+    unsigned int   sticks        = 0;
+    unsigned char  lexists       = 0;
+    char *         fullpath      = NULL;
+    unsigned char  file_removed  = 0;
+    fcache_value * pvalue        = NULL;
     zval         * zcontext      = NULL;
 
     if (!WCG(reroute_enabled))
@@ -2977,15 +2984,103 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_unlink - %s", filename);
 
-    result = aplist_fcache_reset_lastcheck_time(WCG(lfcache), filename);
-
-Finished:
-    if(FAILED(result))
+    if(IS_ABSOLUTE_PATH(filename, filename_len))
     {
-        dprintverbose("wincache_unlink failed with error %u", result);
+        fullpath = filename;
+    }
+    else
+    {
+        fullpath = utils_fullpath(filename, filename_len);
+        if(fullpath == NULL)
+        {
+            fullpath = filename;
+        }
     }
 
+    result = aplist_fcache_get(WCG(lfcache), fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* remove directory first */
+    dprintverbose("wincache_unlink - %s. Calling intercepted function.", filename);
     WCG(orig_unlink)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    file_removed = 1;
+
+    if (WCG(lfcache)->pnotify != NULL)
+    {
+        sticks = GetTickCount();
+
+        while(1)
+        {
+            lexists = 1;
+
+            result = fcnotify_listenerexists(WCG(lfcache)->pnotify, respath, &lexists);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+
+            if (lexists)
+            {
+                /* If listener still exists then wait until it is cleared out by file change notification thread */
+                dprintimportant("wincache_unlink: Waiting for file change listener to close");
+                Sleep(50);
+            }
+            else
+            {
+                /* If listener does not exist for this directory then stop waiting. */
+                break;
+            }
+
+            /* If it takes more than 1 second then exit to prevent process hangs. */
+            if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
+            {
+                dprintimportant("wincache_unlink: timed out while waiting for file change listener to close");
+                break;
+            }
+        }
+    }
+
+    /* Mark the aplist entry as deleted */
+    result = aplist_fcache_delete(WCG(lfcache), fullpath TSRMLS_CC);
+
+Finished:
+
+    if(fullpath != NULL && fullpath != filename)
+    {
+        alloc_efree(fullpath);
+        fullpath = NULL;
+    }
+
+    if(respath != NULL)
+    {
+        alloc_efree(respath);
+        respath = NULL;
+    }
+
+    if(pvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pvalue);
+        pvalue = NULL;
+    }
+
+    if (!file_removed)
+    {
+        dprintverbose("wincache_unlink - %s. Calling intercepted function.", filename);
+        WCG(orig_unlink)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+        file_removed = 1;
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_unlink failed with error %u", result);
+        }
+    }
+
+    dprintverbose("end wincache_unlink");
 }
 
 /* {{{ void wincache_intercept_functions_init(TSRMLS_D) */

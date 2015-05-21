@@ -138,11 +138,13 @@ extern void aplist_freeinfo(unsigned char type, cache_info * pinfo);
 extern int  aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue);
 extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC);
 extern void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename);
+extern void aplist_mark_file_changed(aplist_context * pcache, char * filepath);
 
 extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC);
 extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
 extern int  aplist_fcache_use(aplist_context * pcache, const char * fullpath, fcache_value * pvalue, zend_file_handle ** pphandle);
 extern void aplist_fcache_close(aplist_context * pcache, fcache_value * pvalue);
+extern int  aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_DC);
 extern int  aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename TSRMLS_DC);
 
 extern int  aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned int size TSRMLS_DC);

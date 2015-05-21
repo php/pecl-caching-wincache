@@ -1642,6 +1642,23 @@ void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * file
     ZeroMemory(filepath, MAX_PATH);
     _snprintf_s(filepath, MAX_PATH, MAX_PATH - 1, "%s\\%s", folderpath, filename);
 
+    aplist_mark_file_changed(pcache, filepath);
+
+    dprintverbose("end aplist_mark_changed");
+
+    return;
+}
+
+void aplist_mark_file_changed(aplist_context * pcache, char * filepath)
+{
+    unsigned int   findex   = 0;
+    aplist_value * pvalue   = NULL;
+
+    _ASSERT(pcache     != NULL);
+    _ASSERT(filepath   != NULL);
+
+    dprintverbose("start aplist_mark_file_changed");
+
     lock_readlock(pcache->aprwlock);
 
     /* Find the entry for filepath and mark it deleted */
@@ -1655,7 +1672,7 @@ void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * file
 
     lock_readunlock(pcache->aprwlock);
 
-    dprintverbose("end aplist_mark_changed");
+    dprintverbose("end aplist_mark_file_changed");
 
     return;
 }
@@ -2035,6 +2052,58 @@ Finished:
     }
 
     dprintverbose("end aplist_fcache_get");
+
+    return result;
+}
+
+int aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_DC)
+{
+    int              result   = NONFATAL;
+    aplist_value *   pvalue   = NULL;
+    fcache_value *   pfvalue  = NULL;
+    rplist_value *   rpvalue  = NULL;
+    size_t           resentry = 0;
+    unsigned int     findex   = 0;
+
+    dprintverbose("start aplist_fcache_delete: (%s)", filename);
+
+    lock_writelock(pcache->aprwlock);
+
+    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    _ASSERT(rpvalue  != NULL);
+    _ASSERT(resentry != 0);
+
+    /* If found, use new path to look into absolute path cache */
+    if(rpvalue->absentry == 0)
+    {
+        goto Finished;
+    }
+
+    pvalue = APLIST_VALUE(pcache->apalloc, rpvalue->absentry);
+
+    findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
+    remove_aplist_entry(pcache, findex, pvalue);
+
+    /* These values should not be used as they belong to deleted file */
+    pvalue   = NULL;
+    rpvalue  = NULL;
+    resentry = 0;
+
+Finished:
+
+    lock_writeunlock(pcache->aprwlock);
+
+    if(FAILED(result))
+    {
+        dprintimportant("failure %d in aplist_fcache_delete", result);
+    }
+
+    dprintverbose("end aplist_fcache_delete");
 
     return result;
 }
