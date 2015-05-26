@@ -1514,10 +1514,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         goto Finished;
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     /* If a shmfilepath is passed, use that to create filemap */
     result = filemap_initialize(pcache->zvfilemap, ((issession) ? FILEMAP_TYPE_SESSZVALS : FILEMAP_TYPE_USERZVALS), cachekey, mapclass, cachesize, isfirst, shmfilepath TSRMLS_CC);
@@ -1594,7 +1591,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
         header->init_ticks = cticks;
         header->mapcount   = 1;
 
-        SetEvent(pcache->hinitdone);
+        ReleaseMutex(pcache->hinitdone);
         islocked = 0;
     }
     else
@@ -1640,6 +1637,12 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
 
 Finished:
 
+    if (islocked)
+    {
+        ReleaseMutex(pcache->hinitdone);
+        islocked = 0;
+    }
+
     if (prefix != NULL)
     {
         alloc_pefree(prefix);
@@ -1676,11 +1679,6 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (islocked)
-            {
-                SetEvent(pcache->hinitdone);
-            }
-
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }

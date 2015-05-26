@@ -41,7 +41,7 @@
 #define WINCACHE_VMAJOR     1
 #define WINCACHE_VMINOR     3
 #define WINCACHE_VMMDD      7
-#define WINCACHE_VREVISION  5
+#define WINCACHE_VREVISION  6
 
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 #pragma code_page(1252)
@@ -92,6 +92,9 @@ BEGIN
         VALUE "Translation", 0x409, 1200
     END
 END
+
+#pragma message("Including ETW RC")
+#include "..\pecl\wincache\wincache_etw.rc"
 
 #ifdef MC_INCLUDE
 #include MC_INCLUDE

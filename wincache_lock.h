@@ -73,6 +73,8 @@ struct lock_context
     HANDLE         hcanread;          /* Handle to event which tells when read is allowed */
     HANDLE         hcanwrite;         /* Handle to event which tells when write is allowed */
     HANDLE         hxwrite;           /* Handle to mutex to prevent multiple writers */
+    unsigned int   last_access;       /* PID of last process to acquire for read */
+    unsigned int   last_writer;       /* PID of last process to acquire for write */
     unsigned int * prcount;           /* Pointer to shared memory which has reader count */
 };
 

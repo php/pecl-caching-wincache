@@ -68,6 +68,11 @@ SetFileDacl(
     PSTR pszFilePath
     );
 
+void utils_trace_init_event_failure(
+    const char * name,
+    HANDLE hMutex
+    );
+
 /* CRC 32 functions */
 
 static unsigned int crc32_generate(int n);
@@ -328,6 +333,7 @@ int utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer
 {
     int    result  = NONFATAL;
     char * pbslash = NULL;
+    size_t folderlen = 0;
 
     _ASSERT(filepath != NULL);
     _ASSERT(pbuffer  != NULL);
@@ -341,12 +347,23 @@ int utils_filefolder(const char * filepath, unsigned int flength, char * pbuffer
 
     ZeroMemory(pbuffer, length);
 
+    /* REVIEW: Could this ever be '/' on Windows? */
     pbslash = strrchr(filepath, '\\');
-    _ASSERT(pbslash != NULL);
+    if (pbslash == NULL)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
 
     /* length does not include backslash */
-    length = pbslash - filepath;
-    memcpy_s(pbuffer, length, filepath, length);
+    folderlen = pbslash - filepath;
+    if (folderlen > length)
+    {
+        result = FATAL_INVALID_ARGUMENT;
+        goto Finished;
+    }
+
+    memcpy_s(pbuffer, folderlen, filepath, folderlen);
 
 Finished:
 
@@ -619,8 +636,8 @@ Finished:
 }
 
 /*
- * If this succeeds, and *pisfirst == 1, then caller must SetEvent on the
- * returned pinit_event handle.
+ * If this succeeds, then caller must ReleaseMutex on the returned pinit_event
+ * handle.
  */
 int utils_create_init_event(
     char * prefix,
@@ -636,6 +653,8 @@ int utils_create_init_event(
     HANDLE                 hinitdone    = NULL;
     unsigned char          isfirst      = 1;
 
+    *pinit_event = NULL;
+
     len = _snprintf_s(evtname, MAX_PATH, MAX_PATH - 1, "%s%s", prefix, name);
     if (len == -1)
     {
@@ -643,7 +662,7 @@ int utils_create_init_event(
         goto Finished;
     }
 
-    hinitdone = CreateEvent(NULL, TRUE, FALSE, evtname);
+    hinitdone = CreateMutex(NULL, TRUE, evtname);
     if (hinitdone == NULL)
     {
         dprintcritical("Failed to create event %s", evtname);
@@ -661,6 +680,7 @@ int utils_create_init_event(
         if (ret == WAIT_TIMEOUT)
         {
             dprintcritical("Timed out waiting for other process to release %s", evtname);
+            utils_trace_init_event_failure(evtname, hinitdone);
             result = FATAL_ALLOC_INIT_EVENT;
             goto Finished;
         }
@@ -668,6 +688,7 @@ int utils_create_init_event(
         if (ret == WAIT_FAILED)
         {
             dprintcritical("Failed waiting for other process to release %s: (%d)", evtname, error_setlasterror());
+            utils_trace_init_event_failure(evtname, hinitdone);
             result = FATAL_ALLOC_INIT_EVENT;
             goto Finished;
         }
@@ -984,7 +1005,7 @@ GetAppPoolSid(
         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
         {
             error_setlasterror();
-            ret = FATAL_ACL_FAILED;
+            ret = WARNING_APPPOOL_NAME_NOT_FOUND;
             goto Finished;
         }
 
@@ -1195,4 +1216,117 @@ void utils_reimpersonate_if_necessary(HANDLE hOriginalToken)
 
         CloseHandle( hOriginalToken );
     }
+}
+
+void utils_get_filename_and_line(
+    const char **filename,
+    uint *linenumber
+    )
+{
+    const char *error_filename;
+    uint error_lineno;
+
+    TSRMLS_FETCH();
+    if (zend_is_compiling(TSRMLS_C)) {
+        error_filename = zend_get_compiled_filename(TSRMLS_C);
+        error_lineno = zend_get_compiled_lineno(TSRMLS_C);
+    } else if (EG(in_execution)) {
+        error_filename = EG(active_op_array)?EG(active_op_array)->filename:NULL;
+        error_lineno = EG(opline_ptr)?(*EG(opline_ptr))->lineno:0;
+    } else {
+        error_filename = NULL;
+        error_lineno = 0;
+    }
+    if (!error_filename) {
+        error_filename = "Unknown";
+    }
+
+    *filename = error_filename;
+    *linenumber = error_lineno;
+}
+
+/*
+ * Pull in some Ninja Stuff to query the current state of a mutex without 
+ * changing its state.
+ */
+
+//
+// ClientId
+//
+typedef struct _CLIENT_ID {
+    HANDLE UniqueProcess;
+    HANDLE UniqueThread;
+} CLIENT_ID;
+typedef CLIENT_ID *PCLIENT_ID;
+
+//
+// Mutant Information Classes.
+//
+
+typedef enum _MUTANT_INFORMATION_CLASS {
+    MutantBasicInformation,
+    MutantOwnerInformation
+} MUTANT_INFORMATION_CLASS;
+
+//
+// Mutant Information Structures.
+//
+
+typedef struct _MUTANT_OWNER_INFORMATION {
+    CLIENT_ID ClientId;
+} MUTANT_OWNER_INFORMATION, *PMUTANT_OWNER_INFORMATION;
+
+//
+// Mutant object function definitions.
+//
+
+typedef
+__declspec(dllimport)
+LONG
+(NTAPI *PFN_NtQueryMutant) (
+    _In_ HANDLE MutantHandle,
+    _In_ MUTANT_INFORMATION_CLASS MutantInformationClass,
+    _Out_writes_bytes_(MutantInformationLength) PVOID MutantInformation,
+    _In_ ULONG MutantInformationLength,
+    _Out_opt_ PULONG ReturnLength
+    );
+
+extern PFN_NtQueryMutant g_pfnNtQueryMutant = NULL;
+
+void utils_intitalize()
+{
+    HINSTANCE hNtDll = NULL;
+
+    hNtDll = LoadLibrary("ntdll.dll");
+    if (hNtDll != NULL)
+    {
+        g_pfnNtQueryMutant = (PFN_NtQueryMutant) GetProcAddress(hNtDll, "NtQueryMutant");
+        FreeLibrary(hNtDll);
+    }
+}
+
+void utils_terminate()
+{
+    /* Nothing to do */
+    return;
+}
+
+void utils_trace_init_event_failure(
+    const char * name,
+    HANDLE hMutex
+    )
+{
+    BOOL bRet;
+    MUTANT_OWNER_INFORMATION  moi;
+
+    ZeroMemory(&moi, sizeof(moi));
+
+    if (g_pfnNtQueryMutant)
+    {
+        bRet = g_pfnNtQueryMutant(hMutex, MutantOwnerInformation, (void *)&moi, (ULONG) sizeof(moi), NULL);
+    }
+
+    // Get the current owner of the mutex
+    // ETW Trace the event
+    EventWriteInitMutexErrorEvent(name, moi.ClientId.UniqueProcess, moi.ClientId.UniqueThread);
 }

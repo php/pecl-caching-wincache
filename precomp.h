@@ -35,7 +35,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.5"
+#define PHP_WINCACHE_VERSION    "1.3.7.6"
 #define PHP_WINCACHE_VERSION_LEN (sizeof(PHP_WINCACHE_VERSION)-1)
 
 #define GLOBAL_SCOPE_PREFIX     "Global\\"
@@ -174,6 +174,7 @@
 #ifdef ZEND_ENGINE_2_4
 #include "wincache_string.h"
 #endif /* ZEND_ENGINE_2_4 */
+#include "wincache_etw.h"
 #include "php_wincache.h"
 
 #endif /* _PRECOMP_H_ */

@@ -294,10 +294,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     /* shmfilepath = NULL to use page file for shared memory */
     result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
@@ -345,7 +342,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         header->hitcount    = 0;
         header->misscount   = 0;
 
-        SetEvent(pfcache->hinitdone);
+        ReleaseMutex(pfcache->hinitdone);
         islocked = 0;
     }
     else
@@ -358,6 +355,12 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     pfcache->maxfsize = maxfsize * 1024;
 
 Finished:
+
+    if (islocked)
+    {
+        ReleaseMutex(pfcache->hinitdone);
+        islocked = 0;
+    }
 
     if(FAILED(result))
     {
@@ -389,12 +392,6 @@ Finished:
 
         if(pfcache->hinitdone != NULL)
         {
-            if (islocked)
-            {
-                SetEvent(pfcache->hinitdone);
-                islocked = 0;
-            }
-
             CloseHandle(pfcache->hinitdone);
             pfcache->hinitdone = NULL;
         }

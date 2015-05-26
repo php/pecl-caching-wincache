@@ -152,10 +152,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         goto Finished;
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     /* shmfilepath = NULL */
     result = filemap_initialize(pcache->pfilemap, FILEMAP_TYPE_BYTECODES, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
@@ -202,7 +199,7 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
         header->hitcount    = 0;
         header->misscount   = 0;
 
-        SetEvent(pcache->hinitdone);
+        ReleaseMutex(pcache->hinitdone);
         islocked = 0;
     }
     else
@@ -215,6 +212,12 @@ int ocache_initialize(ocache_context * pcache, unsigned short islocal, unsigned 
     _ASSERT(SUCCEEDED(result));
 
 Finished:
+
+    if (islocked)
+    {
+        ReleaseMutex(pcache->hinitdone);
+        islocked = 0;
+    }
 
     if(FAILED(result))
     {
@@ -246,11 +249,6 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (islocked)
-            {
-                SetEvent(pcache->hinitdone);
-            }
-
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }

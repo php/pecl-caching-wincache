@@ -324,6 +324,11 @@ static int create_file_mapping(
 
             if ( FAILED(aclRet) )
             {
+                /* TODO: If the ACL'ing fails, we should close the file and fall */
+                /* back to using the system page file. */
+                CloseHandle(filehandle);
+                filehandle = INVALID_HANDLE_VALUE;
+
                 dprintimportant( "create_file_mapping[%d]: failed to set acl on %s (%d).",
                                  GetCurrentProcessId(),
                                  shmfilepath,
@@ -593,10 +598,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         goto Finished;
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     /* Calculate size and try to get the filemap handle */
     /* Adding two aligned qwords sizes will produce qword */
@@ -655,7 +657,7 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
             pentry = (filemap_information_entry *)((char *)pentry + FILEMAP_INFO_ENTRY_SIZE);
         }
 
-        SetEvent(pinfo->hinitdone);
+        ReleaseMutex(pinfo->hinitdone);
         islocked = 0;
 
         lock_writeunlock(pinfo->hrwlock);
@@ -670,6 +672,12 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     _ASSERT(SUCCEEDED(result));
 
 Finished:
+
+    if(islocked)
+    {
+        ReleaseMutex(pinfo->hinitdone);
+        islocked = 0;
+    }
 
     if(FAILED(result))
     {
@@ -707,11 +715,6 @@ Finished:
 
             if(pinfo->hinitdone != NULL)
             {
-                if(islocked)
-                {
-                    SetEvent(pinfo->hinitdone);
-                }
-
                 CloseHandle(pinfo->hinitdone);
                 pinfo->hinitdone = NULL;
             }

@@ -40,18 +40,20 @@ if (PHP_WINCACHE != "no") {
                            wincache_alloc.c wincache_ocache.c wincache_opcopy.c     \
                            wincache_fcache.c wincache_rplist.c wincache_aplist.c    \
                            wincache_zvcache.c wincache_session.c                    \
-                           wincache_fcnotify.c wincache_string.c");
+                           wincache_fcnotify.c wincache_string.c wincache_etw.c ");
 
     ADD_EXTENSION_DEP('wincache', 'session');
     AC_DEFINE('HAVE_WINCACHE', 1);
+
+    DEFINE('WINCACHE_ETW_RC', '..\\pecl\\wincache\\wincache_etw.rc');
 
     ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
     if (!X64) {
         ADD_FLAG('LDFLAGS_WINCACHE', '/SAFESEH');
     }
-    ADD_FLAG('LDFLAGS_WINCACHE', '/DYNAMICBASE:NO');
 
     ADD_FLAG('CFLAGS_WINCACHE', '/GS');
+    ADD_FLAG('CFLAGS_WINCACHE', '/I$(BUILD_DIR)\\pecl\\wincache\\ ');
 
     if (PHP_DEBUG == "yes") {
         ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
@@ -63,6 +65,8 @@ if (PHP_WINCACHE != "no") {
         }
         ADD_FLAG('CFLAGS_WINCACHE', '/WX');
     }
+
+    ADD_FLAG('DEPS_WINCACHE', '..\\pecl\\wincache\\wincache_etw.rc');
 
     CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
 }

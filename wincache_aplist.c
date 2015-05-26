@@ -820,10 +820,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     /* shmfilepath = NULL to make it use page file */
     result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, isfirst, NULL TSRMLS_CC);
@@ -950,7 +947,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         header->valuecount   = filecount;
         memset((void *)header->values, 0, sizeof(size_t) * filecount);
 
-        SetEvent(pcache->hinitdone);
+        ReleaseMutex(pcache->hinitdone);
         islocked = 0;
     }
     else
@@ -963,6 +960,12 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     pcache->fchangefreq = fchangefreq * 1000;
 
 Finished:
+
+    if (islocked)
+    {
+        ReleaseMutex(pcache->hinitdone);
+        islocked = 0;
+    }
 
     if (prefix != NULL)
     {
@@ -978,12 +981,6 @@ Finished:
 
         if(pcache->hinitdone != NULL)
         {
-            if (islocked)
-            {
-                SetEvent(pcache->hinitdone);
-                islocked = 0;
-            }
-
             CloseHandle(pcache->hinitdone);
             pcache->hinitdone = NULL;
         }
@@ -1118,10 +1115,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         }
     }
 
-    if (isfirst)
-    {
-        islocked = 1;
-    }
+    islocked = 1;
 
     result = ocache_create(&pocache);
     if(FAILED(result))
@@ -1170,7 +1164,7 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
         lock_writeunlock(plcache->aprwlock);
 
         /* Set the event now that ocacheval is set to 0 */
-        SetEvent(hfirst);
+        ReleaseMutex(hfirst);
         islocked = 0;
     }
 
@@ -1181,6 +1175,12 @@ int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned i
 
 Finished:
 
+    if (islocked)
+    {
+        ReleaseMutex(hfirst);
+        islocked = 0;
+    }
+
     if(FAILED(result))
     {
         dprintimportant("failure %d in aplist_ocache_initialize", result);
@@ -1189,12 +1189,6 @@ Finished:
         /* refcount of named object created above */
         if(hfirst != NULL)
         {
-            if (islocked)
-            {
-                SetEvent(hfirst);
-                islocked = 0;
-            }
-
             CloseHandle(hfirst);
             hfirst = NULL;
         }

@@ -1117,7 +1117,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
         index = utils_getindex(folderpath, pheader->valuecount);
 
-        /* Look if folder path  is already present in cache */
+        /* Look if folder path is already present in cache */
         result = findfolder_in_cache(pnotify, folderpath, index, &pvalue);
         if(FAILED(result))
         {

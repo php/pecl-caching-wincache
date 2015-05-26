@@ -90,6 +90,9 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     alloc_free_header *    pfree   = NULL;
     alloc_used_header *    usedh   = NULL;
 
+    const char *           filename;
+    uint                   lineno;
+
     dprintdecorate("start allocate_memory");
 
     _ASSERT(palloc         != NULL);
@@ -127,10 +130,12 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FIRST);
     if (freeh->is_free != BLOCK_ISFREE_FIRST)
     {
-        // php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free block corrupt.\n",
-        //    GetCurrentProcessId());
         dprintcritical("allocate_memory: First block is not BLOCK_ISFREE_FIRST");
         result = FATAL_ALLOC_SEGMENT_CORRUPT;
+
+        utils_get_filename_and_line(&filename, &lineno);
+        EventWriteMemFreeListCorrupt(freeh, palloc, filename, lineno);
+
         goto Finished;
     }
 
@@ -138,10 +143,12 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE || freeh->is_free == BLOCK_ISFREE_LAST);
     if (freeh->is_free != BLOCK_ISFREE_FREE && freeh->is_free != BLOCK_ISFREE_LAST)
     {
-        // php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free list corrupt.\n",
-        //    GetCurrentProcessId());
         dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE or BLOCK_ISFREE_LAST");
         result = FATAL_ALLOC_SEGMENT_CORRUPT;
+
+        utils_get_filename_and_line(&filename, &lineno);
+        EventWriteMemFreeListCorrupt(freeh, palloc, filename, lineno);
+
         goto Finished;
     }
 
@@ -167,10 +174,12 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE);
     if (freeh->is_free != BLOCK_ISFREE_FREE)
     {
-        // php_error(E_ERROR, "Failure in Wincache[%d] allocate_memory: Segment free list corrupt.\n",
-        //    GetCurrentProcessId());
         dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE");
         result = FATAL_ALLOC_SEGMENT_CORRUPT;
+
+        utils_get_filename_and_line(&filename, &lineno);
+        EventWriteMemFreeListCorrupt(freeh, palloc, filename, lineno);
+
         goto Finished;
     }
 
@@ -281,6 +290,9 @@ static void free_memory(alloc_context * palloc, void * paddr)
     alloc_free_header *    freeh  = NULL;
     alloc_free_header *    pfree  = NULL;
 
+    const char *           filename;
+    uint                   lineno;
+
     dprintdecorate("start free_memory");
 
     _ASSERT(palloc != NULL);
@@ -307,10 +319,12 @@ static void free_memory(alloc_context * palloc, void * paddr)
     if ((void *)usedh < segaddr || (char *)usedh > ((char *)segaddr + palloc->size))
     {
         _ASSERT(0);
-        // php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Address %p not in segment\n",
-        //    GetCurrentProcessId(), paddr);
         dprintcritical("free_memory: Address %p not in segment %p (size %d)",
             paddr, segaddr, palloc->size);
+
+        utils_get_filename_and_line(&filename, &lineno);
+        EventWriteMemFreeAddrNotInSegment(paddr, palloc, filename, lineno);
+
         goto Finished;
     }
 
@@ -318,10 +332,12 @@ static void free_memory(alloc_context * palloc, void * paddr)
     _ASSERT(usedh->is_free == BLOCK_ISFREE_USED);
     if (usedh->is_free != BLOCK_ISFREE_USED)
     {
-        // php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Block %p not in use\n",
-        //    GetCurrentProcessId(), paddr);
         dprintcritical("free_memory: Address %p not in use in segment %p (size %d)",
             paddr, segaddr, palloc->size);
+
+        utils_get_filename_and_line(&filename, &lineno);
+        EventWriteMemBlockNotInUse(paddr, palloc, filename, lineno);
+
         goto Finished;
     }
 
@@ -403,10 +419,11 @@ static void free_memory(alloc_context * palloc, void * paddr)
         _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE || freeh->is_free == BLOCK_ISFREE_LAST);
         if (freeh->is_free != BLOCK_ISFREE_FREE && freeh->is_free != BLOCK_ISFREE_LAST)
         {
-            // php_error(E_ERROR, "Failure in Wincache[%d] free_memory: Combining with non-free block %p - CORRUPTION IMMINENT\n",
-            //    GetCurrentProcessId(), freeh);
             dprintcritical("free_memory: Free block %p is not free in segment %p (size %d) - CORRUPTION IMMINENT",
                 freeh, segaddr, palloc->size);
+
+            utils_get_filename_and_line(&filename, &lineno);
+            EventWriteMemCombineNonFreeBlock(freeh, palloc, filename, lineno);
         }
 
         pfree = (alloc_free_header *)usedh;
@@ -642,7 +659,6 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     alloc_free_header *    fremid   = NULL;
     alloc_free_header *    freend   = NULL;
     unsigned char          isfirst  = 1;
-    char                   evtname[   MAX_PATH];
     DWORD                  ret      = 0;
 
     dprintverbose("start alloc_initialize");
@@ -673,12 +689,6 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     }
 
     result = lock_initialize(palloc->rwlock, name, cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    result = lock_getnewname(palloc->rwlock, "ALLOC_INIT", evtname, MAX_PATH);
     if(FAILED(result))
     {
         goto Finished;
@@ -738,7 +748,6 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         }
 
         header->mapcount = 1;
-        SetEvent(palloc->hinitdone);
     }
     else
     {
@@ -749,6 +758,11 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
     _ASSERT(SUCCEEDED(result));
 
 Finished:
+
+    if (palloc->hinitdone)
+    {
+        ReleaseMutex(palloc->hinitdone);
+    }
 
     if(FAILED(result))
     {
