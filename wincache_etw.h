@@ -403,9 +403,9 @@ Remarks:
 //
 // Event Macro for InitMutexErrorEvent
 //
-#define EventWriteInitMutexErrorEvent(Name, OwnerPid, OwnerTid)\
+#define EventWriteInitMutexErrorEvent(Name, Handle)\
         EventEnabledInitMutexErrorEvent() ?\
-        Template_spp(PHP_WincacheHandle, &InitMutexErrorEvent, Name, OwnerPid, OwnerTid)\
+        Template_sp(PHP_WincacheHandle, &InitMutexErrorEvent, Name, Handle)\
         : ERROR_SUCCESS\
 
 //
@@ -557,31 +557,28 @@ Template_x(
 //
 //Template from manifest : InitMutexErrorTemplate
 //
-#ifndef Template_spp_def
-#define Template_spp_def
+#ifndef Template_sp_def
+#define Template_sp_def
 ETW_INLINE
 ULONG
-Template_spp(
+Template_sp(
     _In_ REGHANDLE RegHandle,
     _In_ PCEVENT_DESCRIPTOR Descriptor,
     _In_opt_ LPCSTR  Name,
-    _In_opt_ const void *  OwnerPid,
-    _In_opt_ const void *  OwnerTid
+    _In_opt_ const void *  Handle
     )
 {
-#define ARGUMENT_COUNT_spp 3
+#define ARGUMENT_COUNT_sp 2
 
-    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_spp];
+    EVENT_DATA_DESCRIPTOR EventData[ARGUMENT_COUNT_sp];
 
     EventDataDescCreate(&EventData[0], 
                         (Name != NULL) ? Name : "NULL",
                         (Name != NULL) ? (ULONG)((strlen(Name) + 1) * sizeof(CHAR)) : (ULONG)sizeof("NULL"));
 
-    EventDataDescCreate(&EventData[1], &OwnerPid, sizeof(PVOID)  );
+    EventDataDescCreate(&EventData[1], &Handle, sizeof(PVOID)  );
 
-    EventDataDescCreate(&EventData[2], &OwnerTid, sizeof(PVOID)  );
-
-    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_spp, EventData);
+    return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_sp, EventData);
 }
 #endif
 

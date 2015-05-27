@@ -29,8 +29,7 @@
           </template>
           <template tid="InitMutexErrorTemplate">
             <data name="Name" inType="win:AnsiString" />
-            <data name="OwnerPid" inType="win:Pointer" outType="win:HexInt64" />
-            <data name="OwnerTid" inType="win:Pointer" outType="win:HexInt64" />
+            <data name="Handle" inType="win:Pointer" outType="win:HexInt64" />
           </template>
           <template tid="MemAllocBlockTemplate">
             <data name="Block" inType="win:Pointer" />
@@ -127,7 +126,7 @@
           />
         <string
           id="Event.InitMutexError"
-          value="Failure waiting for INIT mutex %1.  Current owner: %2:%3"
+          value="Failure waiting for INIT mutex %1.  Handle: %2"
           />
         <string
           id="Event.MemBlockNotInUseError"

@@ -40,7 +40,7 @@ if (PHP_WINCACHE != "no") {
                            wincache_alloc.c wincache_ocache.c wincache_opcopy.c     \
                            wincache_fcache.c wincache_rplist.c wincache_aplist.c    \
                            wincache_zvcache.c wincache_session.c                    \
-                           wincache_fcnotify.c wincache_string.c wincache_etw.c ");
+                           wincache_fcnotify.c wincache_string.c");
 
     ADD_EXTENSION_DEP('wincache', 'session');
     AC_DEFINE('HAVE_WINCACHE', 1);

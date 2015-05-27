@@ -584,7 +584,6 @@ PHP_MINIT_FUNCTION(wincache)
 
     dprintverbose("start php_minit");
 
-    utils_intitalize();
     EventRegisterPHP_Wincache();
 
     rethash = zend_hash_find(EG(ini_directives), "wincache.fcenabled", sizeof("wincache.fcenabled"), (void **)&pinientry);
@@ -966,8 +965,6 @@ Finished:
 
     WCG(inifce)      = NULL;
     WCG(inisavepath) = NULL;
-
-    utils_terminate();
 
     EventUnregisterPHP_Wincache();
 
