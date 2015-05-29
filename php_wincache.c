@@ -778,6 +778,8 @@ PHP_MINIT_FUNCTION(wincache)
                 goto Finished;
             }
 
+            EventWriteInitOpcacheLocalFallbackEvent();
+
             /* Couldn't map at same address, create a local ocache */
             result = aplist_create(&plcache2);
             if(FAILED(result))

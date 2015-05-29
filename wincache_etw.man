@@ -59,6 +59,11 @@
                  symbol="InitMutexErrorEvent"
                  message="$(string.Event.InitMutexError)"
                  keywords="Init" />
+          <event value="3"
+                 level="win:Informational"
+                 symbol="InitOpcacheLocalFallbackEvent"
+                 message="$(string.Event.InitOpcacheLocalFallbackInfo)"
+                 keywords="Init" />
 
           <!-- Memory: 10-19 -->
           <event value ="10"
@@ -127,6 +132,10 @@
         <string
           id="Event.InitMutexError"
           value="Failure waiting for INIT mutex %1.  Handle: %2"
+          />
+        <string
+          id="Event.InitOpcacheLocalFallbackInfo"
+          value="Couldn't map opcache at shared address.  Falling back to local opcache."
           />
         <string
           id="Event.MemBlockNotInUseError"

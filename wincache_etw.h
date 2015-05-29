@@ -215,7 +215,7 @@ Remarks:
 #endif
 #endif // MCGEN_DISABLE_PROVIDER_CODE_GENERATION
 //+
-// Provider PHP-Wincache Event Count 10
+// Provider PHP-Wincache Event Count 11
 //+
 EXTERN_C __declspec(selectany) const GUID PhpWinCacheEtwProvider = {0xf7ad0093, 0xd5c3, 0x46b9, {0xbe, 0xea, 0xa9, 0xfc, 0xec, 0x7e, 0x14, 0x08}};
 //
@@ -236,6 +236,8 @@ EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR ModuleInitErrorEvent = {0x
 #define ModuleInitErrorEvent_value 0x1
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR InitMutexErrorEvent = {0x2, 0x0, 0x0, 0x2, 0x0, 0x0, 0x1};
 #define InitMutexErrorEvent_value 0x2
+EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR InitOpcacheLocalFallbackEvent = {0x3, 0x0, 0x0, 0x4, 0x0, 0x0, 0x1};
+#define InitOpcacheLocalFallbackEvent_value 0x3
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR MemBlockNotInUse = {0xa, 0x0, 0x0, 0x2, 0x0, 0x0, 0x2};
 #define MemBlockNotInUse_value 0xa
 EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR MemFreeAddrNotInSegment = {0xb, 0x0, 0x0, 0x2, 0x0, 0x0, 0x2};
@@ -281,9 +283,9 @@ EXTERN_C __declspec(selectany) const EVENT_DESCRIPTOR UnlockFailedWaitForLock = 
 //
 
 EXTERN_C __declspec(selectany) DECLSPEC_CACHEALIGN ULONG PHP_WincacheEnableBits[1];
-EXTERN_C __declspec(selectany) const ULONGLONG PHP_WincacheKeywords[3] = {0x1, 0x2, 0x4};
-EXTERN_C __declspec(selectany) const UCHAR PHP_WincacheLevels[3] = {2, 2, 2};
-EXTERN_C __declspec(selectany) MCGEN_TRACE_CONTEXT PhpWinCacheEtwProvider_Context = {0, 0, 0, 0, 0, 0, 0, 0, 3, PHP_WincacheEnableBits, PHP_WincacheKeywords, PHP_WincacheLevels};
+EXTERN_C __declspec(selectany) const ULONGLONG PHP_WincacheKeywords[4] = {0x1, 0x1, 0x2, 0x4};
+EXTERN_C __declspec(selectany) const UCHAR PHP_WincacheLevels[4] = {2, 4, 2, 2};
+EXTERN_C __declspec(selectany) MCGEN_TRACE_CONTEXT PhpWinCacheEtwProvider_Context = {0, 0, 0, 0, 0, 0, 0, 0, 4, PHP_WincacheEnableBits, PHP_WincacheKeywords, PHP_WincacheLevels};
 
 EXTERN_C __declspec(selectany) REGHANDLE PHP_WincacheHandle = (REGHANDLE)0;
 
@@ -409,10 +411,24 @@ Remarks:
         : ERROR_SUCCESS\
 
 //
+// Enablement check macro for InitOpcacheLocalFallbackEvent
+//
+
+#define EventEnabledInitOpcacheLocalFallbackEvent() ((PHP_WincacheEnableBits[0] & 0x00000002) != 0)
+
+//
+// Event Macro for InitOpcacheLocalFallbackEvent
+//
+#define EventWriteInitOpcacheLocalFallbackEvent()\
+        EventEnabledInitOpcacheLocalFallbackEvent() ?\
+        TemplateEventDescriptor(PHP_WincacheHandle, &InitOpcacheLocalFallbackEvent)\
+        : ERROR_SUCCESS\
+
+//
 // Enablement check macro for MemBlockNotInUse
 //
 
-#define EventEnabledMemBlockNotInUse() ((PHP_WincacheEnableBits[0] & 0x00000002) != 0)
+#define EventEnabledMemBlockNotInUse() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
 
 //
 // Event Macro for MemBlockNotInUse
@@ -426,7 +442,7 @@ Remarks:
 // Enablement check macro for MemFreeAddrNotInSegment
 //
 
-#define EventEnabledMemFreeAddrNotInSegment() ((PHP_WincacheEnableBits[0] & 0x00000002) != 0)
+#define EventEnabledMemFreeAddrNotInSegment() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
 
 //
 // Event Macro for MemFreeAddrNotInSegment
@@ -440,7 +456,7 @@ Remarks:
 // Enablement check macro for MemCombineNonFreeBlock
 //
 
-#define EventEnabledMemCombineNonFreeBlock() ((PHP_WincacheEnableBits[0] & 0x00000002) != 0)
+#define EventEnabledMemCombineNonFreeBlock() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
 
 //
 // Event Macro for MemCombineNonFreeBlock
@@ -454,7 +470,7 @@ Remarks:
 // Enablement check macro for MemFreeListCorrupt
 //
 
-#define EventEnabledMemFreeListCorrupt() ((PHP_WincacheEnableBits[0] & 0x00000002) != 0)
+#define EventEnabledMemFreeListCorrupt() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
 
 //
 // Event Macro for MemFreeListCorrupt
@@ -468,7 +484,7 @@ Remarks:
 // Enablement check macro for LockAbandonedMutex
 //
 
-#define EventEnabledLockAbandonedMutex() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
+#define EventEnabledLockAbandonedMutex() ((PHP_WincacheEnableBits[0] & 0x00000008) != 0)
 
 //
 // Event Macro for LockAbandonedMutex
@@ -482,7 +498,7 @@ Remarks:
 // Enablement check macro for LockFailedWaitForLock
 //
 
-#define EventEnabledLockFailedWaitForLock() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
+#define EventEnabledLockFailedWaitForLock() ((PHP_WincacheEnableBits[0] & 0x00000008) != 0)
 
 //
 // Event Macro for LockFailedWaitForLock
@@ -496,7 +512,7 @@ Remarks:
 // Enablement check macro for UnlockAbandonedMutex
 //
 
-#define EventEnabledUnlockAbandonedMutex() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
+#define EventEnabledUnlockAbandonedMutex() ((PHP_WincacheEnableBits[0] & 0x00000008) != 0)
 
 //
 // Event Macro for UnlockAbandonedMutex
@@ -510,7 +526,7 @@ Remarks:
 // Enablement check macro for UnlockFailedWaitForLock
 //
 
-#define EventEnabledUnlockFailedWaitForLock() ((PHP_WincacheEnableBits[0] & 0x00000004) != 0)
+#define EventEnabledUnlockFailedWaitForLock() ((PHP_WincacheEnableBits[0] & 0x00000008) != 0)
 
 //
 // Event Macro for UnlockFailedWaitForLock
@@ -579,6 +595,24 @@ Template_sp(
     EventDataDescCreate(&EventData[1], &Handle, sizeof(PVOID)  );
 
     return EventWrite(RegHandle, Descriptor, ARGUMENT_COUNT_sp, EventData);
+}
+#endif
+
+//
+//Template from manifest : (null)
+//
+#ifndef TemplateEventDescriptor_def
+#define TemplateEventDescriptor_def
+
+
+ETW_INLINE
+ULONG
+TemplateEventDescriptor(
+    _In_ REGHANDLE RegHandle,
+    _In_ PCEVENT_DESCRIPTOR Descriptor
+    )
+{
+    return EventWrite(RegHandle, Descriptor, 0, NULL);
 }
 #endif
 
@@ -664,6 +698,7 @@ Template_sqqsq(
 #define MSG_Provider_Name                    0x90000001L
 #define MSG_Event_ModInitError               0xB0000001L
 #define MSG_Event_InitMutexError             0xB0000002L
+#define MSG_Event_InitOpcacheLocalFallbackInfo 0xB0000003L
 #define MSG_Event_MemBlockNotInUseError      0xB000000AL
 #define MSG_Event_MemFreeAddrNotInSegmentError 0xB000000BL
 #define MSG_Event_MemCombineNonFreeBlockError 0xB000000CL
