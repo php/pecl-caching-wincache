@@ -174,7 +174,14 @@
 #ifdef ZEND_ENGINE_2_4
 #include "wincache_string.h"
 #endif /* ZEND_ENGINE_2_4 */
+
+#if (_MSC_VER >= 1700)
 #include "wincache_etw.h"
+#else
+/* PHP 5.4 supports XP, which *doesn't* support Manifest based ETW events*/
+#include "wincache_dummy_etw.h"
+#endif /* _MSC_VER 1700 */
+
 #include "php_wincache.h"
 
 #endif /* _PRECOMP_H_ */
