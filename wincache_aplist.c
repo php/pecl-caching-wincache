@@ -906,49 +906,52 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     }
 
     /* Initialize the aplist_header if this is the first process */
-    if(pcache->islocal || isfirst || initmemory)
+    if(pcache->islocal || isfirst)
     {
-        /* No need to get a write lock as other processes */
-        /* are blocked waiting for hinitdone event */
-
-        /* Initialize resolve path cache header */
-        if(pcache->prplist != NULL)
+        if (initmemory)
         {
-            rplist_initheader(pcache->prplist, filecount);
+            /* No need to get a write lock as other processes */
+            /* are blocked waiting for hinitdone event */
+
+            /* Initialize resolve path cache header */
+            if(pcache->prplist != NULL)
+            {
+                rplist_initheader(pcache->prplist, filecount);
+            }
+
+            if(pcache->pnotify != NULL)
+            {
+                fcnotify_initheader(pcache->pnotify, 32);
+            }
+
+            cticks = GetTickCount();
+
+            /* We can set rdcount to 0 safely as other processes are */
+            /* blocked and this process is right now not using lock */
+            header->mapcount     = 1;
+            header->init_ticks   = cticks;
+            header->rdcount      = 0;
+            header->itemcount    = 0;
+
+            _ASSERT(filecount > PER_RUN_SCAVENGE_COUNT);
+
+            /* Calculate scavenger frequency if ttlmax is not 0 */
+            if(ttlmax != 0)
+            {
+                header->ttlmax       = ttlmax * 1000;
+                header->scfreq       = header->ttlmax/(filecount/PER_RUN_SCAVENGE_COUNT);
+                header->lscavenge    = cticks;
+                header->scstart      = 0;
+
+                _ASSERT(header->scfreq > 0);
+            }
+
+            header->valuecount   = filecount;
+            memset((void *)header->values, 0, sizeof(size_t) * filecount);
+
+            ReleaseMutex(pcache->hinitdone);
+            islocked = 0;
         }
-
-        if(pcache->pnotify != NULL)
-        {
-            fcnotify_initheader(pcache->pnotify, 32);
-        }
-
-        cticks = GetTickCount();
-
-        /* We can set rdcount to 0 safely as other processes are */
-        /* blocked and this process is right now not using lock */
-        header->mapcount     = 1;
-        header->init_ticks   = cticks;
-        header->rdcount      = 0;
-        header->itemcount    = 0;
-
-        _ASSERT(filecount > PER_RUN_SCAVENGE_COUNT);
-
-        /* Calculate scavenger frequency if ttlmax is not 0 */
-        if(ttlmax != 0)
-        {
-            header->ttlmax       = ttlmax * 1000;
-            header->scfreq       = header->ttlmax/(filecount/PER_RUN_SCAVENGE_COUNT);
-            header->lscavenge    = cticks;
-            header->scstart      = 0;
-
-            _ASSERT(header->scfreq > 0);
-        }
-
-        header->valuecount   = filecount;
-        memset((void *)header->values, 0, sizeof(size_t) * filecount);
-
-        ReleaseMutex(pcache->hinitdone);
-        islocked = 0;
     }
     else
     {

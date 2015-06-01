@@ -332,18 +332,21 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     header = pfcache->header;
 
     /* Initialize the fcache_header if its not initialized already */
-    if(islocal || isfirst || initmemory)
+    if(islocal || isfirst)
     {
-        /* No need to get a write lock as other processes */
-        /* are blocked waiting for hinitdone event */
+        if (initmemory)
+        {
+            /* No need to get a write lock as other processes */
+            /* are blocked waiting for hinitdone event */
 
-        header->mapcount    = 1;
-        header->itemcount   = 0;
-        header->hitcount    = 0;
-        header->misscount   = 0;
+            header->mapcount    = 1;
+            header->itemcount   = 0;
+            header->hitcount    = 0;
+            header->misscount   = 0;
 
-        ReleaseMutex(pfcache->hinitdone);
-        islocked = 0;
+            ReleaseMutex(pfcache->hinitdone);
+            islocked = 0;
+        }
     }
     else
     {
