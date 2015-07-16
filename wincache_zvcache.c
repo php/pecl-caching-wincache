@@ -1653,20 +1653,20 @@ Finished:
     {
         dprintimportant("failure %d in zvcache_initialize", result);
 
-        if(pcache->zvfilemap != NULL)
-        {
-            filemap_terminate(pcache->zvfilemap);
-            filemap_destroy(pcache->zvfilemap);
-
-            pcache->zvfilemap = NULL;
-        }
-
         if(pcache->zvalloc != NULL)
         {
             alloc_terminate(pcache->zvalloc);
             alloc_destroy(pcache->zvalloc);
 
             pcache->zvalloc = NULL;
+        }
+
+        if(pcache->zvfilemap != NULL)
+        {
+            filemap_terminate(pcache->zvfilemap);
+            filemap_destroy(pcache->zvfilemap);
+
+            pcache->zvfilemap = NULL;
         }
 
         if(pcache->zvrwlock != NULL)

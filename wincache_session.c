@@ -71,6 +71,7 @@ PS_OPEN_FUNC(wincache)
     unsigned int       cachekey   = 0;
     int                rethash    = 0;
     HANDLE             hOriginalToken = NULL;
+    int                fCreatedHashtable = 0;
 
     dprintverbose("start ps_open_func");
 
@@ -94,6 +95,7 @@ PS_OPEN_FUNC(wincache)
         zend_hash_init(phtable, 0, NULL, scache_destructor, 1);
         WCG(phscache) = phtable;
         phtable = NULL;
+        fCreatedHashtable = 1;
     }
 
     /* Use zvscache for unmodified save_path. Else get zvcache_context from phscache */
@@ -234,6 +236,16 @@ Finished:
     {
         dprintimportant("failure %d in ps_open_func", result);
 
+        if (fCreatedHashtable)
+        {
+            /*
+             * If we failed after creating the hashtable and assigning it to
+             * WCG(phscache), then we need to clear out WCG(phscache).
+             */
+            phtable = WCG(phscache);
+            WCG(phscache) = NULL;
+        }
+
         if(phtable != NULL)
         {
             zend_hash_destroy(phtable);
@@ -292,7 +304,11 @@ PS_READ_FUNC(wincache)
     _ASSERT(vallen != NULL);
 
     pzcache = PS_GET_MOD_DATA();
-    _ASSERT(pzcache != NULL);
+    if(pzcache == NULL)
+    {
+        result = FATAL_SESSION_INITIALIZE;
+        goto Finished;
+    }
 
     MAKE_STD_ZVAL(pzval);
     ZVAL_NULL(pzval);
@@ -339,7 +355,11 @@ PS_WRITE_FUNC(wincache)
     _ASSERT(val != NULL);
 
     pzcache = PS_GET_MOD_DATA();
-    _ASSERT(pzcache != NULL);
+    if(pzcache == NULL)
+    {
+        result = FATAL_SESSION_INITIALIZE;
+        goto Finished;
+    }
 
     MAKE_STD_ZVAL(pzval);
     ZVAL_STRINGL(pzval, val, vallen, 0);
@@ -381,7 +401,11 @@ PS_DESTROY_FUNC(wincache)
     _ASSERT(key != NULL);
 
     pzcache = PS_GET_MOD_DATA();
-    _ASSERT(pzcache != NULL);
+    if(pzcache == NULL)
+    {
+        result = FATAL_SESSION_INITIALIZE;
+        goto Finished;
+    }
 
     result = zvcache_delete(pzcache, key);
     if(FAILED(result))
