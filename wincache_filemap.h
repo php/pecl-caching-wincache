@@ -138,7 +138,7 @@ struct filemap_information
 {
     HANDLE                       hinfomap;      /* Handle to filemap object */
     char *                       infoname;      /* Name of memory map to store filemap info */
-    unsigned int                 infonlen;      /* Length of name buffer */
+    size_t                       infonlen;      /* Length of name buffer */
     filemap_information_header * header;        /* Mapped memory address to information segment */
     HANDLE                       hinitdone;     /* event inidicating if memory is initialized */
     lock_context *               hrwlock;       /* Lock object for read/write to info filemap */
@@ -152,10 +152,10 @@ struct filemap_global_context
     filemap_information *        info;          /* pointer to filemap_information */
 };
 
-extern int  filemap_global_initialize(TSRMLS_D);
-extern void filemap_global_terminate(TSRMLS_D);
-extern unsigned int filemap_getpid(TSRMLS_D);
-extern unsigned int filemap_getppid(TSRMLS_D);
+extern int  filemap_global_initialize();
+extern void filemap_global_terminate();
+extern unsigned int filemap_getpid();
+extern unsigned int filemap_getppid();
 
 extern int    filemap_create(filemap_context ** ppfilemap);
 extern void   filemap_destroy(filemap_context * pfilemap);
@@ -168,12 +168,12 @@ filemap_initialize(
     unsigned short fmclass,
     unsigned int size_mb,
     unsigned char isfirst,
-    char * shmfilepath TSRMLS_DC);
+    char * shmfilepath);
 
 extern void   filemap_terminate(filemap_context * pfilemap);
 
-extern size_t filemap_getsize(filemap_context * pfilemap TSRMLS_DC);
-extern unsigned int filemap_getcpid(filemap_context * pfilemap TSRMLS_DC);
+extern size_t filemap_getsize(filemap_context * pfilemap);
+extern unsigned int filemap_getcpid(filemap_context * pfilemap);
 
 extern void   filemap_runtest();
 

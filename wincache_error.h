@@ -64,6 +64,7 @@
 #define FATAL_LOCK_SHORT_BUFFER             FATAL_LOCK_BASE + 4
 #define FATAL_LOCK_NUMBER_LARGE             FATAL_LOCK_BASE + 5
 #define FATAL_LOCK_INVALID_TYPE             FATAL_LOCK_BASE + 6
+#define FATAL_LOCK_NOT_FOUND                FATAL_LOCK_BASE + 7
 
 /* Error codes used in filemap functionality */
 #define FATAL_FILEMAP_BASE                  200
@@ -113,6 +114,7 @@
 #define FATAL_FCACHE_INIT_EVENT             FATAL_FCACHE_BASE + 9
 #define FATAL_FCACHE_ORIGINAL_OPEN          FATAL_FCACHE_BASE + 10
 #define FATAL_FCACHE_BYHANDLE_INFO          FATAL_FCACHE_BASE + 11
+#define FATAL_FCACHE_FILE_TOO_BIG           FATAL_FCACHE_BASE + 12
 
 /* Error codes used by opcode cache */
 #define FATAL_OCACHE_BASE                   700
@@ -140,7 +142,6 @@
 #define FATAL_ZVCACHE_INIT_EVENT            FATAL_ZVCACHE_BASE + 2
 #define FATAL_ZVCACHE_INVALID_ZVAL          FATAL_ZVCACHE_BASE + 3
 #define FATAL_ZVCACHE_INVALID_KEY_LENGTH    FATAL_ZVCACHE_BASE + 4
-#define FATAL_ZVCACHE_BUCKET_COPY_FAILED    FATAL_ZVCACHE_BASE + 5
 
 /* Error codes used by session handler */
 #define FATAL_SESSION_BASE                  1000

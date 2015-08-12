@@ -130,13 +130,13 @@ void dprintdecorate(char * format, ...)
 
 ZEND_INI_MH(wincache_modify_debuglevel)
 {
-    if (new_value_length == 0)
+    if (ZSTR_LEN(new_value) == 0)
     {
         dprintsetlevel(WINCACHE_DEBUG_MTYPE_DISABLED);
     }
     else
     {
-        dprintsetlevel(atoi(new_value));
+        dprintsetlevel(atoi(ZSTR_VAL(new_value)));
         WCG(debuglevel) = gdebuglevel;
     }
     return SUCCESS;

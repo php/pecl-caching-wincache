@@ -87,7 +87,7 @@ extern int lock_get_nameprefix(
     char **ppnew_prefix,
     size_t * pcchnew_prefix
     );
-extern int  lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC);
+extern int  lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount);
 extern void lock_terminate(lock_context * plock);
 
 extern void lock_readlock(lock_context * plock);

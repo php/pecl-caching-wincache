@@ -56,7 +56,6 @@ struct aplist_value
     unsigned short  is_changed;     /* If set to 1, value is marked changed */
 
     size_t          fcacheval;      /* File cache value offset */
-    size_t          ocacheval;      /* Opcode cache value offset */
     size_t          resentry;       /* Offset of first entry in rplist */
     size_t          fcnotify;       /* Offset of file change notification entry */
     unsigned int    fcncount;       /* fcnotify_value reusecount to detect handoff */
@@ -100,7 +99,6 @@ struct aplist_context
     aplist_context *   polocal;     /* Absolute path cache with local opcode cache*/
     rplist_context *   prplist;     /* Resolve path cache to resolve all paths */
     fcache_context *   pfcache;     /* File cache containing file content */
-    ocache_context *   pocache;     /* Opcode cache containing opcodes */
     fcnotify_context * pnotify;     /* File change notification context */
     int                resnumber;   /* Resource number for this extension */
 };
@@ -129,29 +127,23 @@ struct cache_info
 
 extern int  aplist_create(aplist_context ** ppcache);
 extern void aplist_destroy(aplist_context * pcache);
-extern int  aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC);
+extern int  aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax);
 extern void aplist_terminate(aplist_context * pcache);
 
 extern void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal);
 extern int  aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summaryonly, cache_info ** ppinfo);
 extern void aplist_freeinfo(unsigned char type, cache_info * pinfo);
 extern int  aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue);
-extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC);
+extern int  aplist_force_fccheck(aplist_context * pcache, zval * filelist);
 extern void aplist_mark_changed(aplist_context * pcache, char * folderpath, char * filename);
 extern void aplist_mark_file_changed(aplist_context * pcache, char * filepath);
 
-extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC);
-extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
+extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize);
+extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue);
 extern int  aplist_fcache_use(aplist_context * pcache, const char * fullpath, fcache_value * pvalue, zend_file_handle ** pphandle);
 extern void aplist_fcache_close(aplist_context * pcache, fcache_value * pvalue);
-extern int  aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_DC);
-extern int  aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename TSRMLS_DC);
-
-extern int  aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned int size TSRMLS_DC);
-extern int  aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_handle * file_handle, int type, zend_op_array ** poparray, ocache_value ** ppvalue TSRMLS_DC);
-extern int  aplist_ocache_get_value(aplist_context * pcache, const char * filename, ocache_value ** ppvalue);
-extern int  aplist_ocache_use(aplist_context * pcache, ocache_value * pvalue, zend_op_array ** pparray TSRMLS_DC);
-extern void aplist_ocache_close(aplist_context * pcache, ocache_value * pvalue);
+extern int  aplist_fcache_delete(aplist_context * pcache, const char * filename);
+extern int  aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename);
 
 extern void aplist_runtest();
 

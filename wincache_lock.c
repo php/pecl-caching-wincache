@@ -122,7 +122,8 @@ int lock_get_nameprefix(
 {
     int    result  = NONFATAL;
     char * objname = 0;
-    int    namelen = 0;
+    size_t namelen = 0;
+    int    actual_len = 0;
     int    pid     = 0;
     int    ppid    = 0;
     char * scopePrefix = "";
@@ -193,22 +194,25 @@ int lock_get_nameprefix(
     /* Create nameprefix as name_pid_ppid_ */
     if(WCG(namesalt) == NULL)
     {
-        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%u_%u_", scopePrefix, name, cachekey, pid, ppid);
+        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%u_%u_", scopePrefix, name, cachekey, pid, ppid);
     }
     else
     {
-        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%s_%u_%u_", scopePrefix, name, cachekey, WCG(namesalt), pid, ppid);
+        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%s_%u_%u_", scopePrefix, name, cachekey, WCG(namesalt), pid, ppid);
     }
 
-    if (-1 == namelen)
+    if (-1 == actual_len)
     {
         error_setlasterror();
         result = FATAL_LOCK_LONGNAME;
         goto Finished;
     }
 
+    /* Zero out the trailing portion of the buffer, for safety! */
+    ZeroMemory(objname + actual_len, namelen - actual_len);
+
     *ppnew_prefix   = objname;
-    *pcchnew_prefix = namelen;
+    *pcchnew_prefix = actual_len;
 
 Finished:
     return result;
@@ -216,7 +220,7 @@ Finished:
 
 /* Initialize the lock context with valid information */
 /* lock is not ready to use unless initialize is called */
-int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount TSRMLS_DC)
+int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount)
 {
     int    result  = NONFATAL;
     char * objname = 0;
@@ -262,10 +266,9 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
         goto Finished;
     }
 
-    ZeroMemory(plock->nameprefix, namelen + 1);
-
-    strcpy_s(plock->nameprefix, namelen + 1, objname);
-    plock->namelen = namelen;
+    memcpy(plock->nameprefix, objname, namelen);
+    plock->nameprefix[namelen] = '\0';
+    plock->namelen = (unsigned short)namelen;
 
     /* Depending on what type of lock this needs */
     /* to be, create one or two handles */
@@ -333,6 +336,7 @@ int lock_initialize(lock_context * plock, char * name, unsigned short cachekey, 
             /* Only create one mutex which will be used */
             /* to synchronize access to read and write */
             objname[namelen] = 'X';
+            _ASSERT(objname[namelen+1] == '\0');
             plock->hxwrite = CreateMutex(NULL, FALSE, objname);
             if( plock->hxwrite == NULL )
             {
@@ -793,8 +797,8 @@ void lock_writeunlock(lock_context * plock)
 int lock_getnewname(lock_context * plock, char * suffix, char * newname, unsigned int length)
 {
     int          result  = NONFATAL;
-    unsigned int namelen = 0;
-    unsigned int sufflen = 0;
+    size_t       namelen = 0;
+    size_t       sufflen = 0;
 
     dprintverbose("start lock_getnewname");
 
@@ -837,7 +841,6 @@ void lock_runtest()
     lock_context * plock1  = NULL;
     lock_context * plock2  = NULL;
 
-    TSRMLS_FETCH();
     dprintverbose("*** STARTING LOCK TESTS ***");
 
     /* Create two locks of different types */
@@ -859,7 +862,7 @@ void lock_runtest()
     _ASSERT(plock1->id != plock2->id);
 
     /* Initialize first lock */
-    result = lock_initialize(plock1, "LOCK_TEST1", 1, LOCK_TYPE_SHARED, LOCK_USET_SREAD_XWRITE, &rdcount TSRMLS_CC);
+    result = lock_initialize(plock1, "LOCK_TEST1", 1, LOCK_TYPE_SHARED, LOCK_USET_SREAD_XWRITE, &rdcount);
     if(FAILED(result))
     {
         dprintverbose("lock_initialize for plock1 failed");
@@ -874,7 +877,7 @@ void lock_runtest()
     _ASSERT(plock1->hxwrite   != NULL);
 
     /* Initialize second lock */
-    result = lock_initialize(plock2, "LOCK_TEST2", 1, LOCK_TYPE_LOCAL, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(plock2, "LOCK_TEST2", 1, LOCK_TYPE_LOCAL, LOCK_USET_XREAD_XWRITE, NULL);
     if(FAILED(result))
     {
         dprintverbose("lock_intialize for plock2 failed");

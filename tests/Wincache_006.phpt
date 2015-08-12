@@ -4,7 +4,6 @@ Testing static variables inside class
 <?php include('skipif.inc'); ?>
 --INI--
 wincache.enablecli=1
-wincache.ocenabled=1
 wincache.fcenabled=1
 wincache.ucenabled=1
 --FILE--

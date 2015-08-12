@@ -60,16 +60,15 @@ static void scache_destructor(void * pdestination)
 PS_OPEN_FUNC(wincache)
 {
     int                result     = NONFATAL;
-    zvcache_context ** ppcache    = NULL;
+    zvcache_context *  pcache     = NULL;
     zvcache_context *  pzcache    = NULL;
     zend_ini_entry *   pinientry  = NULL;
     HashTable *        phtable    = NULL;
     unsigned char      hashupdate = 0;
     char *             scolon     = NULL;
-    char  *            filepath   = NULL;
-    unsigned int       fpathlen   = 0;
-    unsigned int       cachekey   = 0;
-    int                rethash    = 0;
+    char *             filepath   = NULL;
+    size_t             fpathlen   = 0;
+    uint32_t           cachekey   = 0;
     HANDLE             hOriginalToken = NULL;
     int                fCreatedHashtable = 0;
 
@@ -77,8 +76,8 @@ PS_OPEN_FUNC(wincache)
 
     if(WCG(inisavepath) == NULL)
     {
-        rethash = zend_hash_find(EG(ini_directives), "session.save_path", sizeof("session.save_path"), (void **)&pinientry);
-        _ASSERT(rethash != FAILURE);
+        pinientry = zend_hash_str_find_ptr(EG(ini_directives), "session.save_path", sizeof("session.save_path")-1);
+        _ASSERT(pinientry != NULL);
         WCG(inisavepath) = pinientry;
     }
 
@@ -100,7 +99,7 @@ PS_OPEN_FUNC(wincache)
 
     /* Use zvscache for unmodified save_path. Else get zvcache_context from phscache */
     /* If save path is modified but is same as PHP_INI_SYSTEM, use zvscache */
-    if(WCG(inisavepath)->modified == 0 || _stricmp(WCG(inisavepath)->orig_value, WCG(inisavepath)->value) == 0)
+    if(WCG(inisavepath)->modified == 0 || zend_string_equals(WCG(inisavepath)->orig_value, WCG(inisavepath)->value))
     {
         pzcache  = WCG(zvscache);
         cachekey = ZVSCACHE_KEY;
@@ -113,14 +112,15 @@ PS_OPEN_FUNC(wincache)
         cachekey = utils_hashcalc(save_path, strlen(save_path));
         cachekey = (cachekey % 65534) + 2;
 
-        if(zend_hash_index_find(WCG(phscache), (ulong)cachekey, (void **)&ppcache) == FAILURE)
+        pcache = zend_hash_index_find_ptr(WCG(phscache), (ulong)cachekey);
+        if(pcache == NULL)
         {
             /* If cachekey cache is not found, update it after creating it */
             hashupdate = 1;
         }
         else
         {
-            pzcache = *ppcache;
+            pzcache = pcache;
         }
     }
 
@@ -151,11 +151,7 @@ PS_OPEN_FUNC(wincache)
             save_path = php_get_temporary_directory();
 
             /* Check if path is accessible as per open_basedir */
-            if(
-#ifndef ZEND_ENGINE_2_4
-                (PG(safe_mode) && (!php_checkuid(save_path, NULL, CHECKUID_CHECK_FILE_AND_DIR))) ||
-#endif /* ZEND_ENGINE_2_4 */
-                php_check_open_basedir(save_path TSRMLS_CC))
+            if(php_check_open_basedir(save_path))
             {
                 result = FATAL_SESSION_INITIALIZE;
                 goto Finished;
@@ -202,7 +198,7 @@ PS_OPEN_FUNC(wincache)
         }
 
         /* issession = 1, islocal = 0, zvcount = 256 */
-        result = zvcache_initialize(pzcache, 1, 0, (unsigned short)cachekey, 256, WCG(scachesize), filepath TSRMLS_CC);
+        result = zvcache_initialize(pzcache, 1, 0, (unsigned short)cachekey, 256, WCG(scachesize), filepath);
         if(FAILED(result))
         {
             goto Finished;
@@ -210,7 +206,7 @@ PS_OPEN_FUNC(wincache)
 
         if(hashupdate)
         {
-            zend_hash_index_update(WCG(phscache), (ulong)cachekey, (void **)&pzcache, sizeof(zvcache_context *), NULL);
+            zend_hash_index_update_ptr(WCG(phscache), (ulong)cachekey, (void *) pzcache);
         }
 
         if(cachekey == ZVSCACHE_KEY)
@@ -294,14 +290,14 @@ PS_CLOSE_FUNC(wincache)
 PS_READ_FUNC(wincache)
 {
     int               result  = NONFATAL;
-    zval *            pzval   = NULL;
+    zval              tmp_zval;
+    zval *            pzval   = &tmp_zval;
     zvcache_context * pzcache = NULL;
 
     dprintverbose("start ps_read_func");
 
     _ASSERT(key    != NULL);
     _ASSERT(val    != NULL);
-    _ASSERT(vallen != NULL);
 
     pzcache = PS_GET_MOD_DATA();
     if(pzcache == NULL)
@@ -310,31 +306,23 @@ PS_READ_FUNC(wincache)
         goto Finished;
     }
 
-    MAKE_STD_ZVAL(pzval);
     ZVAL_NULL(pzval);
 
-    result = zvcache_get(pzcache, key, &pzval TSRMLS_CC);
+    result = zvcache_get(pzcache, ZSTR_VAL(key), &pzval);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    *val = Z_STRVAL_P(pzval);
-    *vallen = Z_STRLEN_P(pzval);
+    *val = zend_string_copy(Z_STR_P(pzval));
 
 Finished:
-
-    if(pzval != NULL)
-    {
-        FREE_ZVAL(pzval);
-        pzval = NULL;
-    }
 
     if(FAILED(result))
     {
         dprintimportant("failure %d in ps_read_func", result);
 
-
+        *val =  ZSTR_EMPTY_ALLOC();
         return FAILURE;
     }
 
@@ -345,9 +333,9 @@ Finished:
 /* Called on session close which writes all values to memory */
 PS_WRITE_FUNC(wincache)
 {
-    int               result  = NONFATAL;
-    zval *            pzval   = NULL;
-    zvcache_context * pzcache = NULL;
+    int               result   = NONFATAL;
+    zval              tmp_zval;
+    zvcache_context * pzcache  = NULL;
 
     dprintverbose("start ps_write_func");
 
@@ -361,23 +349,16 @@ PS_WRITE_FUNC(wincache)
         goto Finished;
     }
 
-    MAKE_STD_ZVAL(pzval);
-    ZVAL_STRINGL(pzval, val, vallen, 0);
+    ZVAL_STR(&tmp_zval, val);
 
     /* ttl = session.gc_maxlifetime, isadd = 0 */
-    result = zvcache_set(pzcache, key, pzval, INI_INT("session.gc_maxlifetime"), 0 TSRMLS_CC);
+    result = zvcache_set(pzcache, ZSTR_VAL(key), &tmp_zval, (unsigned int)INI_INT("session.gc_maxlifetime"), 0);
     if(FAILED(result))
     {
         goto Finished;
     }
 
 Finished:
-
-    if(pzval != NULL)
-    {
-        FREE_ZVAL(pzval);
-        pzval = NULL;
-    }
 
     if(FAILED(result))
     {
@@ -407,7 +388,7 @@ PS_DESTROY_FUNC(wincache)
         goto Finished;
     }
 
-    result = zvcache_delete(pzcache, key);
+    result = zvcache_delete(pzcache, ZSTR_VAL(key));
     if(FAILED(result))
     {
         /* Entry not found is not a fatal error */

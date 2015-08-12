@@ -52,7 +52,7 @@ static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * pliste
 static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * pvalue);
 static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
 static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
-static int  pidhandles_apply(void * pdestination TSRMLS_DC);
+static int  pidhandles_apply(void * pdestination);
 static void run_fcnotify_scavenger(fcnotify_context * pnotify);
 static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_value * pvalue);
 
@@ -276,7 +276,7 @@ static int create_fcnotify_data(fcnotify_context * pnotify, const char * folderp
     int               result    = NONFATAL;
     fcnotify_value *  pvalue    = NULL;
     alloc_context *   palloc    = NULL;
-    unsigned int      pathlen   = 0;
+    size_t            pathlen   = 0;
     char *            paddr     = NULL;
     unsigned int      fshare    = 0;
     unsigned int      flags     = 0;
@@ -683,7 +683,7 @@ void fcnotify_destroy(fcnotify_context * pnotify)
     return;
 }
 
-int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void * paplist, alloc_context * palloc, unsigned int filecount TSRMLS_DC)
+int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void * paplist, alloc_context * palloc, unsigned int filecount)
 {
     int               result   = NONFATAL;
     unsigned short    locktype = LOCK_TYPE_SHARED;
@@ -727,7 +727,7 @@ int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void
         goto Finished;
     }
 
-    result = lock_initialize(pnotify->fclock, "FILE_CHANGE_NOTIFY", 1, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pnotify->fclock, "FILE_CHANGE_NOTIFY", 1, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount);
     if(FAILED(result))
     {
         goto Finished;
@@ -886,7 +886,7 @@ void fcnotify_terminate(fcnotify_context * pnotify)
     return;
 }
 
-static int pidhandles_apply(void * pdestination TSRMLS_DC)
+static int pidhandles_apply(void * pdestination)
 {
     HANDLE *      hprocess = NULL;
     unsigned int  exitcode = 0;
@@ -915,7 +915,6 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
     unsigned int      count      = 0;
     HashTable *       phashtable = NULL;
 
-    TSRMLS_FETCH();
     dprintverbose("start run_fcnotify_scavenger");
 
     pheader = pnotify->fcheader;
@@ -948,7 +947,7 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
     lock_writeunlock(pnotify->fclock);
 
     /* Go through pidhandles table and remove entries for dead processes */
-    zend_hash_apply(phashtable, pidhandles_apply TSRMLS_CC);
+    zend_hash_apply(phashtable, pidhandles_apply);
     pnotify->lscavenge = GetTickCount();
 
     dprintverbose("end run_fcnotify_scavenger");
@@ -980,7 +979,8 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
 
     phashtable = pnotify->pidhandles;
 
-    if(zend_hash_index_find(phashtable, (ulong)ownerpid, (void **)&phdata) == FAILURE)
+    phdata = (HANDLE *)zend_hash_index_find_ptr(phashtable, (zend_ulong)ownerpid);
+    if(phdata == NULL)
     {
         /* Check if impersonation is enabled */
         /* If it is, get impersonated token and set it back after calling OpenProcess */
@@ -1009,7 +1009,7 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
             }
 
             /* Keep the handle around to save OpenProcess calls */
-            zend_hash_index_update(phashtable, (ulong)ownerpid, (void **)&hprocess, sizeof(HANDLE), NULL);
+            zend_hash_index_update_ptr(phashtable, (zend_ulong)ownerpid, (void *)hprocess);
         }
         else
         {
@@ -1024,7 +1024,7 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
         {
             /* GetProcessId failure means process is gone */
             CloseHandle(hprocess);
-            zend_hash_index_del(phashtable, (ulong)ownerpid);
+            zend_hash_index_del(phashtable, (zend_ulong)ownerpid);
 
             listenp = PROCESS_IS_DEAD;
         }
@@ -1038,7 +1038,7 @@ Finished:
 int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * poffset, unsigned int * pcount)
 {
     int               result     = NONFATAL;
-    unsigned int      flength    = 0;
+    size_t            flength    = 0;
     char *            folderpath = NULL;
     unsigned char     allocated  = 0;
     unsigned int      index      = 0;

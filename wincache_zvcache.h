@@ -34,62 +34,12 @@
 #ifndef _WINCACHE_ZVCACHE_H_
 #define _WINCACHE_ZVCACHE_H_
 
-typedef struct zv_bucket
+typedef struct _zvcache_hashtable_pool_tracker zvcache_hashtable_pool_tracker;
+struct _zvcache_hashtable_pool_tracker
 {
-    ulong             h;                 /* Bucket hash */
-    uint              nKeyLength;        /* Bucket key length */
-    size_t            pData;             /* void *pData; Pointer to data */
-    size_t            pDataPtr;          /* void *pDataPtr; Sometimes data itself */
-    size_t            pListNext;         /* struct bucket *pListNext; Offset */
-    size_t            pListLast;         /* struct bucket *pListLast; Offset */
-    size_t            pNext;             /* struct bucket *pNext; Offset */
-    size_t            pLast;             /* struct bucket *pLast; Offset */
-    char              arKey[1];          /* Must be last element */
-} zv_Bucket;
-
-typedef struct _zv_hashtable
-{
-    uint              nTableSize;        /* Bucket table size */
-    uint              nTableMask;        /* Bucket table mask */
-    uint              nNumOfElements;    /* Number of elements in hashtable */
-    ulong             nNextFreeElement;  /* Next free element */
-    size_t            pInternalPointer;  /* Bucket *pInternalPointer; Offset */
-    size_t            pListHead;         /* Bucket *pListHead; Offset */
-    size_t            pListTail;         /* Bucket *pListTail; Offset */
-    size_t            arBuckets;         /* Bucket **arBuckets; Offset */
-    dtor_func_t       pDestructor;       /* Destructor action */
-    zend_bool         persistent;        /* Persistent allocation */
-    unsigned char     nApplyCount;       /* Apply counter */
-    zend_bool         bApplyProtection;  /* Apply protection */
-#if ZEND_DEBUG
-    int               inconsistent;      /* Need not worry about this */
-#endif
-} zv_HashTable;
-
-typedef union _zv_zvalue_value
-{
-    long              lval;              /* long val */
-    double            dval;              /* double val */
-    struct
-    {
-        size_t        val;               /* char *val; Offset */
-        int           len;               /* string val length */
-    } str;
-    struct
-    {
-        size_t        val;               /* Hashtable *ht; Offset */
-        size_t        hoff;              /* Memory pool offset */
-    } ht;
-    zend_object_value obj;               /* zend_object_value */
-} zv_zvalue_value;
-
-typedef struct _zv_zval_struct
-{
-    zv_zvalue_value   value;             /* union value */
-    zend_uint         refcount__gc;      /* reference counter */
-    zend_uchar        type;              /* type */
-    zend_uchar        is_ref__gc;        /* is reference */
-} zv_zval;
+    size_t        val;                   /* Hashtable *ht; Offset */
+    size_t        hoff;                  /* Memory pool offset */
+};
 
 typedef struct zvcache_value zvcache_value;
 struct zvcache_value
@@ -97,7 +47,7 @@ struct zvcache_value
     size_t            zvalue;            /* Offset of zval value stored */
     size_t            keystr;            /* Offset of key string */
     unsigned short    keylen;            /* Length of key string */
-    unsigned int      sizeb;             /* Memory allocated for zvalue in bytes */
+    size_t            sizeb;             /* Memory allocated for zvalue in bytes */
 
     unsigned int      add_ticks;         /* Tick count when entry was created */
     unsigned int      use_ticks;         /* Tick count when entry was last used */
@@ -131,7 +81,7 @@ struct zvcopy_context
     void *            palloc;            /* Allocator for alloc_a* functions */
     char *            pbaseadr;          /* Base address of the segment */
     size_t            hoffset;           /* Offset of mpool_header */
-    unsigned int      allocsize;         /* Amount of memory allocated */
+    size_t            allocsize;         /* Amount of memory allocated */
 
     fn_malloc         fnmalloc;          /* Function to use for malloc */
     fn_realloc        fnrealloc;         /* Function to use for realloc */
@@ -143,10 +93,10 @@ typedef struct zvcache_context zvcache_context;
 struct zvcache_context
 {
     unsigned int      id;                /* unique identifier for cache */
+    unsigned int      issession;         /* session cache or user cache */
     unsigned short    islocal;           /* is the cache local or shared */
     unsigned short    cachekey;          /* unique cache key used in names */
     HANDLE            hinitdone;         /* event indicating if memory is initialized */
-    unsigned int      issession;         /* session cache or user cache */
 
     zvcopy_context *  incopy;            /* zvcopy context to use for non-array copyin */
     zvcopy_context *  outcopy;           /* zvcopy context to use for all copyout */
@@ -174,23 +124,33 @@ struct zvcache_info_entry
     char *            key;               /* cache item key */
     unsigned int      ttl;               /* ttl of this entry */
     unsigned int      age;               /* Age in seconds */
-    unsigned short    type;              /* type of zval which is stored as value */
-    unsigned int      sizeb;             /* memory allocated for zval in bytes */
+    zend_uchar        type;              /* type of zval which is stored as value */
+    size_t            sizeb;             /* memory allocated for zval in bytes */
     unsigned int      hitcount;          /* hitcount for this entry */
 };
 
 extern int  zvcache_create(zvcache_context ** ppcache);
 extern void zvcache_destroy(zvcache_context * pcache);
-extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
+
+extern int  zvcache_initialize(
+    zvcache_context * pcache,
+    unsigned int issession,
+    unsigned short islocal,
+    unsigned short cachekey,
+    unsigned int zvcount,
+    unsigned int cachesize,
+    char * shmfilepath
+    );
+
 extern void zvcache_terminate(zvcache_context * pcache);
 
-extern int  zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRMLS_DC);
-extern int  zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, unsigned char isadd TSRMLS_DC);
+extern int  zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue);
+extern int  zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, unsigned char isadd);
 extern int  zvcache_delete(zvcache_context * pcache, const char * key);
 extern int  zvcache_clear(zvcache_context * pcache);
 extern int  zvcache_exists(zvcache_context * pcache, const char * key, unsigned char * pexists);
 extern int  zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, zvcache_info * pcinfo, zend_llist * plist);
-extern int  zvcache_change(zvcache_context * pcache, const char * key, int delta, int * newvalue);
-extern int  zvcache_compswitch(zvcache_context * pcache, const char * key, int oldvalue, int newvalue);
+extern int  zvcache_change(zvcache_context * pcache, const char * key, zend_long delta, zend_long * newvalue);
+extern int  zvcache_compswitch(zvcache_context * pcache, const char * key, zend_long oldvalue, zend_long newvalue);
 
 #endif /* _WINCACHE_ZVCACHE_H_ */

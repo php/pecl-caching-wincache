@@ -114,7 +114,7 @@ struct fcnotify_info
 
 extern int  fcnotify_create(fcnotify_context ** ppnotify);
 extern void fcnotify_destroy(fcnotify_context * pnotify);
-extern int  fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void * paplist, alloc_context * palloc, unsigned int filecount TSRMLS_DC);
+extern int  fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void * paplist, alloc_context * palloc, unsigned int filecount);
 extern void fcnotify_initheader(fcnotify_context * pnotify, unsigned int filecount);
 extern void fcnotify_terminate(fcnotify_context * pnotify);
 

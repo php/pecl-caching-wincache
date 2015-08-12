@@ -541,7 +541,7 @@ static void * alloc_realloc(alloc_context * palloc, unsigned int type, void * ad
 static char * alloc_strdup(alloc_context * palloc, unsigned int type, const char * str)
 {
     char * result = NULL;
-    int    strl   = 0;
+    size_t strl   = 0;
 
     _ASSERT(str != NULL);
     strl = strlen(str) + 1;
@@ -650,7 +650,7 @@ void alloc_destroy(alloc_context * palloc)
 
 /* initmemory should be 1 for all non file backed shared memory allocators and 0 */
 /* for file backed shared memory allocators when filemap->existing is set to 1 */
-int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, unsigned short cachekey, void * staddr, size_t size, unsigned char initmemory TSRMLS_DC)
+int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name, unsigned short cachekey, void * staddr, size_t size, unsigned char initmemory)
 {
     int                    result   = NONFATAL;
     unsigned short         locktype = LOCK_TYPE_SHARED;
@@ -688,7 +688,7 @@ int alloc_initialize(alloc_context * palloc, unsigned short islocal, char * name
         palloc->islocal = islocal;
     }
 
-    result = lock_initialize(palloc->rwlock, name, cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(palloc->rwlock, name, cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL);
     if(FAILED(result))
     {
         goto Finished;
@@ -1348,7 +1348,7 @@ char * alloc_osstrdup(alloc_context * palloc, size_t hoffset, const char * str)
 char * alloc_omstrdup(alloc_context * palloc, size_t hoffset, const char * str)
 {
     char * memaddr = NULL;
-    int    strl    = 0;
+    size_t strl    = 0;
 
     _ASSERT(palloc  != NULL);
     _ASSERT(hoffset >  0);
@@ -1407,7 +1407,6 @@ void alloc_runtest()
     alloc_free_header *     freeh  = NULL;
     alloc_used_header *     usedh  = NULL;
 
-    TSRMLS_FETCH();
     dprintverbose("*** STARTING ALLOC TESTS ***");
 
     memaddr = malloc(4096);
@@ -1423,7 +1422,7 @@ void alloc_runtest()
         goto Finished;
     }
 
-    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", 1, memaddr, 4096, 1 TSRMLS_CC);
+    result = alloc_initialize(palloc, islocal, "ALLOC_TEST", 1, memaddr, 4096, 1);
     if(FAILED(result))
     {
         goto Finished;

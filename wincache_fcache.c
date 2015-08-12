@@ -136,7 +136,11 @@ static int read_file_content(HANDLE hFile, unsigned int filesize, void ** ppbuff
         }
         else
         {
-            readahead = filesize - coffset;
+            /*
+             * we've validated that the difference is safe to cast to
+             * a 32-bit value before making this assignment.
+             */
+            readahead = (unsigned int)(filesize - coffset);
         }
 
         breturn = ReadFile(hFile, pvread, readahead, &readahead, &Overlapped);
@@ -238,7 +242,7 @@ void fcache_destroy(fcache_context * pfcache)
     return;
 }
 
-int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC)
+int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize)
 {
     int             result      = NONFATAL;
     size_t          size        = 0;
@@ -281,7 +285,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
-    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL TSRMLS_CC);
+    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL);
     if(FAILED(result))
     {
         goto Finished;
@@ -297,14 +301,14 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     islocked = 1;
 
     /* shmfilepath = NULL to use page file for shared memory */
-    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, isfirst, NULL TSRMLS_CC);
+    result = filemap_initialize(pfcache->pfilemap, FILEMAP_TYPE_FILECONTENT, cachekey, mapclass, cachesize, isfirst, NULL);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     pfcache->memaddr = (char *)pfcache->pfilemap->mapaddr;
-    size = filemap_getsize(pfcache->pfilemap TSRMLS_CC);
+    size = filemap_getsize(pfcache->pfilemap);
     initmemory = (pfcache->pfilemap->existing == 0);
 
     /* Create allocator for filecache segment */
@@ -315,7 +319,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", cachekey, pfcache->memaddr, size, 1 TSRMLS_CC);
+    result = alloc_initialize(pfcache->palloc, islocal, "FILECONTENT_SEGMENT", cachekey, pfcache->memaddr, size, 1);
     if(FAILED(result))
     {
         goto Finished;
@@ -682,18 +686,13 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
 
     phandle->filename      = (char *)filename;
     phandle->free_filename = 0;
-    phandle->opened_path   = alloc_estrdup(filename);
+    phandle->opened_path   = zend_string_init(filename, strlen(filename), 0);
 
     ZeroMemory(&phandle->handle.stream, sizeof(zend_stream));
 
     phandle->handle.stream.reader  = (zend_stream_reader_t)fcache_reader;
     phandle->handle.stream.closer  = (zend_stream_closer_t)fcache_closer;
-
-#if PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION >= 3
     phandle->handle.stream.fsizer  = (zend_stream_fsizer_t)fcache_fsizer;
-#elif PHP_MAJOR_VERSION == 5 && PHP_MINOR_VERSION == 2
-    phandle->handle.stream.fteller = (zend_stream_fteller_t)fcache_fsizer;
-#endif
 
     fhandle->pfcache = pcache;
     fhandle->pfvalue = pvalue;
@@ -826,7 +825,7 @@ void fcache_freeinfo(fcache_entry_info * pinfo)
     return;
 }
 
-size_t fcache_fsizer(void * handle TSRMLS_DC)
+size_t fcache_fsizer(void * handle)
 {
     size_t          size    = 0;
     fcache_handle * fhandle = NULL;
@@ -843,7 +842,7 @@ size_t fcache_fsizer(void * handle TSRMLS_DC)
     return size;
 }
 
-size_t fcache_reader(void * handle, char * buf, size_t length TSRMLS_DC)
+size_t fcache_reader(void * handle, char * buf, size_t length)
 {
     size_t          size    = 0;
     fcache_handle * fhandle = NULL;
@@ -882,7 +881,7 @@ size_t fcache_reader(void * handle, char * buf, size_t length TSRMLS_DC)
     return size;
 }
 
-void fcache_closer(void * handle TSRMLS_DC)
+void fcache_closer(void * handle)
 {
     fcache_handle * fhandle = NULL;
 
@@ -913,7 +912,6 @@ void fcache_runtest()
     unsigned int     maxfsize  = 250;
     char *           filename  = "testfile.php";
 
-    TSRMLS_FETCH();
     dprintverbose("*** STARTING FCACHE TESTS ***");
 
     result = fcache_create(&pfcache);
@@ -922,7 +920,7 @@ void fcache_runtest()
         goto Finished;
     }
 
-    result = fcache_initialize(pfcache, islocal, 57, cachesize, maxfsize TSRMLS_CC);
+    result = fcache_initialize(pfcache, islocal, 57, cachesize, maxfsize);
     if(FAILED(result))
     {
         goto Finished;
@@ -958,13 +956,13 @@ Finished:
  * php_stream_ops functions
  */
 
-size_t wincache_stream_write(php_stream *stream, const char *buf, size_t count TSRMLS_DC)
+size_t wincache_stream_write(php_stream *stream, const char *buf, size_t count)
 {
     /* ignore writes */
     return 0;
 }
 
-size_t wincache_stream_read(php_stream *stream, char *buf, size_t count TSRMLS_DC)
+size_t wincache_stream_read(php_stream *stream, char *buf, size_t count)
 {
     size_t toread = 0;
 
@@ -996,12 +994,12 @@ size_t wincache_stream_read(php_stream *stream, char *buf, size_t count TSRMLS_D
     return toread;
 }
 
-int  wincache_stream_close(php_stream *stream, int close_handle TSRMLS_DC)
+int  wincache_stream_close(php_stream *stream, int close_handle)
 {
     /* ignore close */
     return 0;
 }
-int  wincache_stream_flush(php_stream *stream TSRMLS_DC)
+int  wincache_stream_flush(php_stream *stream)
 {
     /* ignore flush */
     return 0;
@@ -1026,10 +1024,10 @@ Returns:
     0 - Success
     -1 - Failure
  -*/
-int  wincache_stream_seek(php_stream *stream, off_t offset, int whence, off_t *newoffset TSRMLS_DC)
+int  wincache_stream_seek(php_stream *stream, zend_off_t offset, int whence, zend_off_t *newoffset)
 {
     int ret = -1;
-    long newPos = 0;
+    zend_off_t newPos = 0;
 
     switch (whence) {
     case SEEK_CUR: /* Current Position.  Offset may be negative. */
@@ -1078,19 +1076,19 @@ int  wincache_stream_seek(php_stream *stream, off_t offset, int whence, off_t *n
     return ret;
 }
 
-int  wincache_stream_cast(php_stream *stream, int castas, void **ret TSRMLS_DC)
+int  wincache_stream_cast(php_stream *stream, int castas, void **ret)
 {
     /* ignore cast */
     return 0;
 }
 
-int wincache_stream_stat(php_stream *stream, php_stream_statbuf *ssb TSRMLS_DC)
+int wincache_stream_stat(php_stream *stream, php_stream_statbuf *ssb)
 {
     /* never return stat info */
     return -1;
 }
 
-int wincache_stream_set_option(php_stream *stream, int option, int value, void *ptrparam TSRMLS_DC)
+int wincache_stream_set_option(php_stream *stream, int option, int value, void *ptrparam)
 {
     /* ignore set option */
     return 0;

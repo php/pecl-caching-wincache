@@ -102,7 +102,7 @@ struct fcache_entry_info
 
 extern int  fcache_create(fcache_context ** ppfcache);
 extern void fcache_destroy(fcache_context * pfcache);
-extern int  fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize TSRMLS_DC);
+extern int  fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, unsigned int maxfsize);
 extern void fcache_terminate(fcache_context * pfcache);
 
 extern int  fcache_createval(fcache_context * pfcache, const char * filename, fcache_value ** ppvalue);
@@ -115,9 +115,9 @@ extern void fcache_refdec(fcache_context * pfcache, fcache_value * pvalue);
 extern int  fcache_getinfo(fcache_value * pvalue, fcache_entry_info ** ppinfo);
 extern void fcache_freeinfo(fcache_entry_info * pinfo);
 
-extern size_t fcache_fsizer(void * handle TSRMLS_DC);
-extern size_t fcache_reader(void * handle, char * buf, size_t length TSRMLS_DC);
-extern void   fcache_closer(void * handle TSRMLS_DC);
+extern size_t fcache_fsizer(void * handle);
+extern size_t fcache_reader(void * handle, char * buf, size_t length);
+extern void   fcache_closer(void * handle);
 
 extern void fcache_runtest();
 

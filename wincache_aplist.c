@@ -56,7 +56,7 @@ static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist
 static void remove_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue);
 static void delete_aplist_fileentry(aplist_context * pcache, const char * filename);
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull);
-static int  set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue TSRMLS_DC);
+static int  set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue);
 
 /* Globals */
 unsigned short glcacheid = 1;
@@ -96,7 +96,7 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
                 /* If this process is good to delete the opcode */
                 /* cache data tell caller to delete it */
                 if(ppdelete != NULL && *ppdelete == NULL &&
-                   pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache != NULL && pcache->polocal == NULL)
+                   pcache->apctype == APLIST_TYPE_GLOBAL)
                 {
                     *ppdelete = pvalue;
                 }
@@ -246,14 +246,13 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     char *                     filepath  = NULL;
 
     HANDLE                     hFile     = INVALID_HANDLE_VALUE;
-    unsigned int               filesizel = 0;
-    unsigned int               filesizeh = 0;
+    LARGE_INTEGER              li        = { 0 };
     unsigned int               openflags = 0;
     BY_HANDLE_FILE_INFORMATION finfo;
     aplist_value *             pvalue    = NULL;
 
-    unsigned int               flength   = 0;
-    unsigned int               alloclen  = 0;
+    size_t                     flength   = 0;
+    size_t                     alloclen  = 0;
     char *                     pbaseadr  = NULL;
     char *                     pcurrent  = NULL;
 
@@ -323,8 +322,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         goto Finished;
     }
 
-    filesizel = GetFileSize(hFile, &filesizeh);
-    if(filesizel == INVALID_FILE_SIZE)
+    if(0 == GetFileSizeEx(hFile, &li))
     {
         error_setlasterror();
         result = FATAL_FCACHE_GETFILESIZE;
@@ -332,8 +330,11 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         goto Finished;
     }
 
-    /* File sizes greater than 4096MB not allowed */
-    _ASSERT(filesizeh == 0);
+    /* Fail if file is larger than 4GB */
+    if (li.HighPart != 0)
+    {
+        result = FATAL_FCACHE_FILE_TOO_BIG;
+    }
 
     if(!GetFileInformationByHandle(hFile, &finfo))
     {
@@ -353,7 +354,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     *(pcurrent + flength) = 0;
     pvalue->file_path     = pcurrent - pcache->apmemaddr;
 
-    pvalue->file_size     = filesizel;
+    pvalue->file_size     = li.LowPart;
     pvalue->modified_time = finfo.ftLastWriteTime;
     pvalue->attributes    = finfo.dwFileAttributes;
 
@@ -365,7 +366,6 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->is_changed  = 0;
 
     pvalue->fcacheval   = 0;
-    pvalue->ocacheval   = 0;
     pvalue->resentry    = 0;
     pvalue->fcnotify    = 0;
     pvalue->fcncount    = 0;
@@ -423,11 +423,10 @@ static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
             fcnotify_close(pcache->pnotify, &pvalue->fcnotify, &pvalue->fcncount);
         }
 
-        /* Resolve path cache, file cache and ocache entries */
+        /* Resolve path cache and file cache entries */
         /* should be deleted by a call to remove_aplist_entry */
         _ASSERT(pvalue->resentry  == 0);
         _ASSERT(pvalue->fcacheval == 0);
-        _ASSERT(pvalue->ocacheval == 0);
 
         alloc_sfree(pcache->apalloc, pvalue);
         pvalue = NULL;
@@ -488,29 +487,12 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     aplist_header * header  = NULL;
     aplist_value *  ptemp   = NULL;
     fcache_value *  pfvalue = NULL;
-    ocache_value *  povalue = NULL;
 
     dprintverbose("start remove_aplist_entry");
 
     _ASSERT(pcache            != NULL);
     _ASSERT(pvalue            != NULL);
     _ASSERT(pvalue->file_path != 0);
-
-    /* If entry from global cache is removed by a process which has */
-    /* a local cache, mark the entry deleted but do not delete it */
-    if(pcache->apctype == APLIST_TYPE_GLOBAL && pcache->pocache == NULL && pcache->polocal != NULL)
-    {
-        /* Mark resolve path entries deleted so that it rplist stop */
-        /* handing pointer to aplist entries which are marked deleted */
-        if(pvalue->resentry != 0)
-        {
-            _ASSERT(pcache->prplist != NULL);
-            rplist_markdeleted(pcache->prplist, pvalue->resentry);
-        }
-
-        pvalue->is_deleted = 1;
-        goto Finished;
-    }
 
     /* Delete resolve path cache entries */
     if(pvalue->resentry != 0)
@@ -534,22 +516,6 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         {
             fcache_destroyval(pcache->pfcache, pfvalue);
             pfvalue = NULL;
-        }
-    }
-
-    /* Delete opcode cache entry */
-    if(pvalue->ocacheval != 0)
-    {
-        _ASSERT(pcache->pocache != NULL);
-        povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-
-        InterlockedExchange(&povalue->is_deleted, 1);
-        pvalue->ocacheval = 0;
-
-        if(InterlockedCompareExchange(&povalue->refcount, 0, 0) == 0)
-        {
-            ocache_destroyval(pcache->pocache, povalue);
-            povalue = NULL;
         }
     }
 
@@ -579,11 +545,9 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
         }
     }
 
-    /* Destroy aplist data now that fcache and ocache is deleted */
+    /* Destroy aplist data now that fcache is deleted */
     destroy_aplist_data(pcache, pvalue);
     pvalue = NULL;
-
-Finished:
 
     dprintverbose("end remove_aplist_entry");
     return;
@@ -720,7 +684,6 @@ int aplist_create(aplist_context ** ppcache)
     pcache->prplist     = NULL;
     pcache->pnotify     = NULL;
     pcache->pfcache     = NULL;
-    pcache->pocache     = NULL;
     pcache->resnumber   = -1;
 
     *ppcache = pcache;
@@ -752,10 +715,10 @@ void aplist_destroy(aplist_context * pcache)
     return;
 }
 
-int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax TSRMLS_DC)
+int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned int filecount, unsigned int fchangefreq, unsigned int ttlmax)
 {
     int             result      = NONFATAL;
-    size_t          mapsize     = 0;
+    unsigned int    mapsize     = 0;
     size_t          segsize     = 0;
     aplist_header * header      = NULL;
     unsigned int    msize       = 0;
@@ -774,7 +737,6 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     dprintverbose("start aplist_initialize");
 
     _ASSERT(pcache       != NULL);
-    _ASSERT(apctype      == APLIST_TYPE_GLOBAL  || apctype     == APLIST_TYPE_OPCODE_LOCAL);
     _ASSERT(filecount    >= NUM_FILES_MINIMUM   && filecount   <= NUM_FILES_MAXIMUM);
     _ASSERT((fchangefreq >= FCHECK_FREQ_MINIMUM && fchangefreq <= FCHECK_FREQ_MAXIMUM) || fchangefreq == 0);
     _ASSERT((ttlmax      >= TTL_VALUE_MINIMUM   && ttlmax      <= TTL_VALUE_MAXIMUM)   || ttlmax == 0);
@@ -786,7 +748,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     /* Disable scavenger if opcode cache is local only */
     /* Or if ttlmax value is set to 0 */
     pcache->scstatus = SCAVENGER_STATUS_ACTIVE;
-    if(pcache->apctype == APLIST_TYPE_OPCODE_LOCAL || ttlmax == 0)
+    if(ttlmax == 0)
     {
         pcache->scstatus = SCAVENGER_STATUS_INACTIVE;
     }
@@ -823,14 +785,14 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     islocked = 1;
 
     /* shmfilepath = NULL to make it use page file */
-    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, isfirst, NULL TSRMLS_CC);
+    result = filemap_initialize(pcache->apfilemap, FILEMAP_TYPE_FILELIST, cachekey, mapclass, mapsize, isfirst, NULL);
     if(FAILED(result))
     {
         goto Finished;
     }
 
     pcache->apmemaddr = (char *)pcache->apfilemap->mapaddr;
-    segsize = filemap_getsize(pcache->apfilemap TSRMLS_CC);
+    segsize = filemap_getsize(pcache->apfilemap);
     initmemory = (pcache->apfilemap->existing == 0);
 
     /* Create allocator for file list segment */
@@ -841,7 +803,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     }
 
     /* initmemory = 1 for all page file backed shared memory allocators */
-    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", cachekey, pcache->apfilemap->mapaddr, segsize, 1 TSRMLS_CC);
+    result = alloc_initialize(pcache->apalloc, pcache->islocal, "FILELIST_SEGMENT", cachekey, pcache->apfilemap->mapaddr, segsize, 1);
     if(FAILED(result))
     {
         goto Finished;
@@ -865,7 +827,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
         goto Finished;
     }
 
-    result = lock_initialize(pcache->aprwlock, "FILELIST_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount TSRMLS_CC);
+    result = lock_initialize(pcache->aprwlock, "FILELIST_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount);
     if(FAILED(result))
     {
         goto Finished;
@@ -880,7 +842,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
             goto Finished;
         }
 
-        result = rplist_initialize(pcache->prplist, pcache->islocal, isfirst, cachekey, filecount TSRMLS_CC);
+        result = rplist_initialize(pcache->prplist, pcache->islocal, isfirst, cachekey, filecount);
         if(FAILED(result))
         {
             goto Finished;
@@ -897,7 +859,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
 
             /* Number of folders on which listeners will be active will */
             /* be very small. Using filecount as 32 so that scavenger is quick */
-            result = fcnotify_initialize(pcache->pnotify, pcache->islocal, pcache, pcache->apalloc, 32 TSRMLS_CC);
+            result = fcnotify_initialize(pcache->pnotify, pcache->islocal, pcache, pcache->apalloc, 32);
             if(FAILED(result))
             {
                 goto Finished;
@@ -1045,7 +1007,7 @@ Finished:
     return result;
 }
 
-int aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC)
+int aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize)
 {
     int              result  = NONFATAL;
     fcache_context * pfcache = NULL;
@@ -1060,7 +1022,7 @@ int aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsign
         goto Finished;
     }
 
-    result = fcache_initialize(pfcache, plcache->islocal, 1, size, maxfilesize TSRMLS_CC);
+    result = fcache_initialize(pfcache, plcache->islocal, 1, size, maxfilesize);
     if(FAILED(result))
     {
         goto Finished;
@@ -1086,133 +1048,6 @@ Finished:
     }
 
     dprintverbose("end aplist_fcache_initialize");
-
-    return result;
-}
-
-int aplist_ocache_initialize(aplist_context * plcache, int resnumber, unsigned int size TSRMLS_DC)
-{
-    int              result  = NONFATAL;
-    ocache_context * pocache = NULL;
-    HANDLE           hfirst  = NULL;
-    unsigned char    isfirst = 1;
-    unsigned char    islocked = 0;
-
-    unsigned int     count   = 0;
-    aplist_value *   pvalue  = NULL;
-    unsigned int     index   = 0;
-    size_t           offset  = 0;
-    DWORD            ret     = 0;
-
-    dprintverbose("start aplist_ocache_initialize");
-
-    _ASSERT(plcache != NULL);
-
-    if(!plcache->islocal)
-    {
-        result = utils_create_init_event(plcache->aprwlock->nameprefix, "GLOBAL_OCACHE_FINIT", &hfirst, &isfirst);
-        if (FAILED(result))
-        {
-            result = FATAL_APLIST_OCACHE_INIT_EVENT;
-            goto Finished;
-        }
-    }
-
-    islocked = 1;
-
-    result = ocache_create(&pocache);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    result = ocache_initialize(pocache, plcache->islocal, 1, resnumber, size TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    if(!plcache->islocal && isfirst)
-    {
-        _ASSERT(hfirst != NULL);
-
-        /* A new opcode cache is created for global aplist. It is possible that */
-        /* global aplist is old with obsolete ocacheval offsets. Set ocachevals to 0 */
-        lock_writelock(plcache->aprwlock);
-
-        count = plcache->apheader->valuecount;
-        for(index = 0; index < count; index++)
-        {
-            offset = plcache->apheader->values[index];
-            if(offset == 0)
-            {
-                continue;
-            }
-
-            pvalue = (aplist_value *)alloc_get_cachevalue(plcache->apalloc, offset);
-            while(pvalue != NULL)
-            {
-                pvalue->ocacheval = 0;
-
-                offset = pvalue->next_value;
-                if(offset == 0)
-                {
-                    break;
-                }
-
-                pvalue = (aplist_value *)alloc_get_cachevalue(plcache->apalloc, offset);
-            }
-        }
-
-        lock_writeunlock(plcache->aprwlock);
-
-        /* Set the event now that ocacheval is set to 0 */
-        ReleaseMutex(hfirst);
-        islocked = 0;
-    }
-
-    plcache->resnumber = resnumber;
-    plcache->pocache   = pocache;
-
-    _ASSERT(SUCCEEDED(result));
-
-Finished:
-
-    if (islocked)
-    {
-        ReleaseMutex(hfirst);
-        islocked = 0;
-    }
-
-    if(FAILED(result))
-    {
-        dprintimportant("failure %d in aplist_ocache_initialize", result);
-
-        /* Make sure process with local cache doesn't increment */
-        /* refcount of named object created above */
-        if(hfirst != NULL)
-        {
-            CloseHandle(hfirst);
-            hfirst = NULL;
-        }
-
-        if(pocache != NULL)
-        {
-            ocache_terminate(pocache);
-            ocache_destroy(pocache);
-
-            pocache = NULL;
-        }
-    }
-
-    /*
-     * TODO: We're leaking the hfirst handle if we succeed.  Must Fix!
-     * TODO: We MUST keep the hfirst handle alive for the lifetime of the
-     * process, otherwise other instances might erroneously believe they're
-     * 'first', and wipe out the cache.
-     */
-
-    dprintverbose("end aplist_ocache_initialize");
 
     return result;
 }
@@ -1255,15 +1090,6 @@ void aplist_terminate(aplist_context * pcache)
             pcache->pfcache = NULL;
         }
 
-        if(pcache->pocache != NULL)
-        {
-            ocache_terminate(pcache->pocache);
-            ocache_destroy(pcache->pocache);
-
-            pcache->pocache   = NULL;
-            pcache->resnumber = -1;
-        }
-
         if(pcache->aprwlock != NULL)
         {
             lock_terminate(pcache->aprwlock);
@@ -1296,17 +1122,6 @@ void aplist_terminate(aplist_context * pcache)
     }
 
     dprintverbose("end aplist_terminate");
-
-    return;
-}
-
-void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal)
-{
-    _ASSERT(pcache != NULL);
-    _ASSERT(plocal != NULL);
-
-    pcache->scstatus = SCAVENGER_STATUS_INACTIVE;
-    pcache->polocal  = plocal;
 
     return;
 }
@@ -1381,15 +1196,6 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     /* or if the cache entry is stale, create a new entry */
     if(fchange == FILE_IS_CHANGED || pvalue == NULL)
     {
-        /* If we are about to create an entry in global aplist, */
-        /* remove the cache entry in local cache if one is present */
-        if(pcache->pocache == NULL && pcache->polocal != NULL)
-        {
-            lock_writelock(pcache->polocal->aprwlock);
-            delete_aplist_fileentry(pcache->polocal, filename);
-            lock_writeunlock(pcache->polocal->aprwlock);
-        }
-
         result = create_aplist_data(pcache, filename, &pnewval);
         if(FAILED(result))
         {
@@ -1500,10 +1306,10 @@ Finished:
     return result;
 }
 
-int aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC)
+int aplist_force_fccheck(aplist_context * pcache, zval * filelist)
 {
     int              result    = NONFATAL;
-    zval **          fileentry = NULL;
+    zval *           fileentry = NULL;
     aplist_value *   pvalue    = NULL;
     unsigned char    flock     = 0;
 
@@ -1522,11 +1328,11 @@ int aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC)
     flock = 1;
 
     /* Always make currently executing file refresh on next load */
-    if(filelist != NULL && zend_is_executing(TSRMLS_C))
+    if(filelist != NULL && zend_is_executing())
     {
-        execfile = zend_get_executed_filename(TSRMLS_C);
+        execfile = zend_get_executed_filename();
 
-        result = set_lastcheck_time(pcache, execfile, 0 TSRMLS_CC);
+        result = set_lastcheck_time(pcache, execfile, 0);
         if(FAILED(result))
         {
             goto Finished;
@@ -1569,7 +1375,7 @@ int aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC)
         }
 
         /* Set the last_check time of this file to 0 */
-        result = set_lastcheck_time(pcache, Z_STRVAL_P(filelist), 0 TSRMLS_CC);
+        result = set_lastcheck_time(pcache, Z_STRVAL_P(filelist), 0);
         if(FAILED(result))
         {
             goto Finished;
@@ -1577,29 +1383,27 @@ int aplist_force_fccheck(aplist_context * pcache, zval * filelist TSRMLS_DC)
     }
     else if(Z_TYPE_P(filelist) == IS_ARRAY)
     {
-        zend_hash_internal_pointer_reset(Z_ARRVAL_P(filelist));
-        while(zend_hash_get_current_data(Z_ARRVAL_P(filelist), (void **)&fileentry) == SUCCESS)
+        ZEND_HASH_FOREACH_VAL(Z_ARRVAL_P(filelist), fileentry)
         {
             /* If array contains an entry which is not string, return false */
-            if(Z_TYPE_PP(fileentry) != IS_STRING)
+            if(Z_TYPE_P(fileentry) != IS_STRING)
             {
                 result = FATAL_INVALID_ARGUMENT;
                 goto Finished;
             }
 
-            if(Z_STRLEN_PP(fileentry) == 0)
+            if(Z_STRLEN_P(fileentry) == 0)
             {
                 continue;
             }
 
-            result = set_lastcheck_time(pcache, Z_STRVAL_PP(fileentry), 0 TSRMLS_CC);
+            result = set_lastcheck_time(pcache, Z_STRVAL_P(fileentry), 0);
             if(FAILED(result))
             {
                 goto Finished;
             }
 
-            zend_hash_move_forward(Z_ARRVAL_P(filelist));
-        }
+        } ZEND_HASH_FOREACH_END();
     }
 
     _ASSERT(SUCCEEDED(result));
@@ -1674,7 +1478,7 @@ void aplist_mark_file_changed(aplist_context * pcache, char * filepath)
     return;
 }
 
-static int set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue TSRMLS_DC)
+static int set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue)
 {
     int           result       = NONFATAL;
     char *        resolve_path = NULL;
@@ -1688,7 +1492,7 @@ static int set_lastcheck_time(aplist_context * pcache, const char * filename, un
 
     /* Ok to call aplist_fcache_get with lock acquired when last param is NULL */
     /* If file is not accessible or not present, we will throw an error */
-    result = aplist_fcache_get(pcache, filename, SKIP_STREAM_OPEN_CHECK, &resolve_path, NULL TSRMLS_CC);
+    result = aplist_fcache_get(pcache, filename, SKIP_STREAM_OPEN_CHECK, &resolve_path, NULL);
     if(FAILED(result))
     {
         goto Finished;
@@ -1723,19 +1527,19 @@ Finished:
     return result;
 }
 
-int aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename TSRMLS_DC)
+int aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename)
 {
-    return set_lastcheck_time(pcache, filename, 0 TSRMLS_CC);
+    return set_lastcheck_time(pcache, filename, 0);
 }
 
 /* Used by wincache_resolve_path and wincache_stream_open_function */
 /* If ppvalue is passed as null, this function return the standardized form of */
 /* filename which can include resolve path to absolute path mapping as well */
 /* Make sure this function is called without write lock when ppvalue is non-null */
-int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC)
+int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue)
 {
     int              result   = NONFATAL;
-    unsigned int     length   = 0;
+    size_t           length   = 0;
     unsigned int     findex   = 0;
     unsigned int     addticks = 0;
     unsigned char    fchanged = 0;
@@ -1762,7 +1566,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     lock_readlock(pcache->aprwlock);
     flock = 1;
 
-    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
+    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -1869,8 +1673,15 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     /* If no valid absentry is found so far, get the fullpath from php-core */
     if(pvalue == NULL)
     {
+        length = strlen(filename);
+        if (length > MAXPATHLEN)
+        {
+            result = WARNING_ORESOLVE_FAILURE;
+            goto Finished;
+        }
+
         /* Get fullpath by using copy of php_resolve_path */
-        fullpath = utils_resolve_path(filename, strlen(filename), PG(include_path) TSRMLS_CC);
+        fullpath = utils_resolve_path(filename, (int)length, PG(include_path));
         if(fullpath == NULL)
         {
             result = WARNING_ORESOLVE_FAILURE;
@@ -1921,7 +1732,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             {
                 /* Do a check for include_path, open_basedir validity */
                 /* by calling original stream open function */
-                result = original_stream_open_function(fullpath, &fhandle TSRMLS_CC);
+                result = original_stream_open_function(fullpath, &fhandle);
 
                 /* Set is_verified status in rpvalue */
                 if(rpvalue != NULL)
@@ -1935,23 +1746,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
                     goto Finished;
                 }
 
-                if(fhandle.handle.stream.closer && fhandle.handle.stream.handle)
-                {
-                    fhandle.handle.stream.closer(fhandle.handle.stream.handle TSRMLS_CC);
-                    fhandle.handle.stream.handle = NULL;
-                }
-
-                if(fhandle.opened_path)
-                {
-                    efree(fhandle.opened_path);
-                    fhandle.opened_path = NULL;
-                }
-
-                if(fhandle.free_filename && fhandle.filename)
-                {
-                    efree((void *)fhandle.filename);
-                    fhandle.filename = NULL;
-                }
+                zend_file_handle_dtor(&fhandle);
             }
             else
             {
@@ -1997,7 +1792,11 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
         if(rpvalue != NULL && rpvalue->absentry == 0)
         {
             rplist_setabsval(pcache->prplist, rpvalue, alloc_get_valueoffset(pcache->apalloc, pvalue), pvalue->resentry);
+#ifdef _WIN64
+            InterlockedExchange64(&pvalue->resentry, resentry);
+#else
             InterlockedExchange(&pvalue->resentry, resentry);
+#endif
         }
     }
 
@@ -2053,7 +1852,7 @@ Finished:
     return result;
 }
 
-int aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_DC)
+int aplist_fcache_delete(aplist_context * pcache, const char * filename)
 {
     int              result   = NONFATAL;
     aplist_value *   pvalue   = NULL;
@@ -2066,7 +1865,7 @@ int aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_D
 
     lock_writelock(pcache->aprwlock);
 
-    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
+    result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry);
     if(FAILED(result))
     {
         goto Finished;
@@ -2140,217 +1939,6 @@ void aplist_fcache_close(aplist_context * pcache, fcache_value * pfvalue)
     return;
 }
 
-/*++
-
-Routine Description:
-
-    Fetches the cached opcode cache entry for the filename/file_handle, if it
-    exists.
-
-    If the file is not cached, compile the file and create the opcode cache
-    entry with the returned opcode array.
-
-    If this function creates the opcode cache entry, the poparray will contain
-    the original compiled opcode array.  If this function simply found an
-    existing opcode cache entry, the poparray will contain NULL.
-
-Arguments:
-
-    pcache - Cache Context.
-    filename - Name of file to cache.
-    file_handle - File handle of file to cache.
-    type - (???)
-    poparray - receives pointer to opcode array if the file is not found in the
-      opcode cache.  Set to NULL if the file is in the opcode cache, or if the
-      call failed.
-    ppvalue - On successful return, receives the pointer to the opcode cache
-      entry.  Set to NULL if the call failed.
-
-Return Value:
-
-    NONFATAL - successful return.
-    FAILED() - downstream failure.
-
---*/
-int aplist_ocache_get(aplist_context * pcache, const char * filename, zend_file_handle * file_handle, int type, zend_op_array ** poparray, ocache_value ** ppvalue TSRMLS_DC)
-{
-    int            result  = NONFATAL;
-    unsigned int   findex  = 0;
-    aplist_value * pvalue  = NULL;
-    ocache_value * povalue = NULL;
-
-    dprintverbose("start aplist_ocache_get");
-
-    _ASSERT(pcache      != NULL);
-    _ASSERT(filename    != NULL);
-    _ASSERT(file_handle != NULL);
-    _ASSERT(poparray    != NULL);
-    _ASSERT(ppvalue     != NULL);
-
-    *poparray = NULL;
-    *ppvalue  = NULL;
-
-    findex = utils_getindex(filename, pcache->apheader->valuecount);
-
-    result = aplist_getentry(pcache, filename, findex, &pvalue);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    lock_readlock(pcache->aprwlock);
-
-    /* If opcode cache value is not created for this file, create one */
-    if(pvalue->ocacheval == 0)
-    {
-        lock_readunlock(pcache->aprwlock);
-
-        /* Create opcode cache entry in shared segment */
-        result = ocache_createval(pcache->pocache, filename, file_handle, type, poparray, &povalue TSRMLS_CC);
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
-
-        /* Get a write lock and update ocacheval if some other */
-        /* process didn't beat this process in updating the value */
-        lock_writelock(pcache->aprwlock);
-        if(pvalue->ocacheval == 0)
-        {
-            pvalue->ocacheval = ocache_getoffset(pcache->pocache, povalue);
-        }
-        else
-        {
-            ocache_destroyval(pcache->pocache, povalue);
-            povalue = NULL;
-        }
-
-        lock_writeunlock(pcache->aprwlock);
-        lock_readlock(pcache->aprwlock);
-    }
-
-    if(povalue == NULL)
-    {
-        _ASSERT(pvalue->ocacheval != 0);
-        povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-    }
-
-    _ASSERT(povalue != NULL);
-    *ppvalue = povalue;
-
-    if(*poparray == NULL)
-    {
-        /* We found an entry in the opcode cache */
-        /* Do ref increment before releasing the readlock */
-        ocache_refinc(pcache->pocache, povalue);
-    }
-
-    lock_readunlock(pcache->aprwlock);
-
-    _ASSERT(SUCCEEDED(result));
-
-Finished:
-
-    if(FAILED(result))
-    {
-        dprintimportant("failure %d in aplist_ocache_get", result);
-    }
-
-    dprintverbose("end aplist_ocache_get");
-
-    return result;
-}
-
-int aplist_ocache_get_value(aplist_context * pcache, const char * filename, ocache_value ** ppvalue)
-{
-    int            result  = NONFATAL;
-    unsigned int   findex  = 0;
-    aplist_value * pvalue  = NULL;
-    ocache_value * povalue = NULL;
-
-    dprintverbose("start aplist_ocache_get_value");
-
-    _ASSERT(pcache   != NULL);
-    _ASSERT(filename != NULL);
-    _ASSERT(ppvalue  != NULL);
-
-    *ppvalue  = NULL;
-
-    findex = utils_getindex(filename, pcache->apheader->valuecount);
-    result = aplist_getentry(pcache, filename, findex, &pvalue);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    lock_readlock(pcache->aprwlock);
-    if(pvalue->ocacheval == 0)
-    {
-        lock_readunlock(pcache->aprwlock);
-        result = FATAL_UNEXPECTED_DATA;
-
-        goto Finished;
-    }
-
-    povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-
-    _ASSERT(povalue != NULL);
-    *ppvalue = povalue;
-
-    /* Do refinc while holding the lock so that ocache */
-    /* entry doesn't get deleted while before refinc */
-    ocache_refinc(pcache->pocache, povalue);
-
-    lock_readunlock(pcache->aprwlock);
-
-    _ASSERT(SUCCEEDED(result));
-
-Finished:
-
-    if(FAILED(result))
-    {
-        dprintimportant("failure %d in aplist_ocache_get_value", result);
-    }
-
-    dprintverbose("end aplist_ocache_get_value");
-    return result;
-}
-
-int aplist_ocache_use(aplist_context * pcache, ocache_value * povalue, zend_op_array ** pparray TSRMLS_DC)
-{
-    int result         = NONFATAL;
-
-    dprintverbose("start aplist_ocache_use");
-
-    _ASSERT(pcache      != NULL);
-    _ASSERT(povalue     != NULL);
-    _ASSERT(pparray     != NULL);
-
-    result = ocache_useval(pcache->pocache, povalue, pparray TSRMLS_CC);
-    if(FAILED(result))
-    {
-        goto Finished;
-    }
-
-    _ASSERT(SUCCEEDED(result));
-
-Finished:
-
-    if(FAILED(result))
-    {
-        dprintimportant("failure %d in aplist_ocache_use", result);
-    }
-
-    dprintverbose("end aplist_ocache_use");
-    return result;
-}
-
-void aplist_ocache_close(aplist_context * pcache, ocache_value * povalue)
-{
-    ocache_refdec(pcache->pocache, povalue);
-    return;
-}
-
 int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summaryonly, cache_info ** ppinfo)
 {
     int                  result  = NONFATAL;
@@ -2361,7 +1949,6 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
 
     unsigned char        flock   = 0;
     fcache_value *       pfvalue = NULL;
-    ocache_value *       povalue = NULL;
 
     unsigned int         ticks   = 0;
     unsigned int         index   = 0;
@@ -2398,9 +1985,9 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
     }
     else if(type == CACHE_TYPE_BYTECODES)
     {
-        pcinfo->itemcount = pcache->pocache->header->itemcount;
-        pcinfo->hitcount  = pcache->pocache->header->hitcount;
-        pcinfo->misscount = pcache->pocache->header->misscount;
+        dprintimportant("Opcode Cache is no longer supported.");
+        result = FATAL_OCACHE_CREATION;
+        goto Finished;
     }
 
     pcinfo->entries = NULL;
@@ -2422,7 +2009,7 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
         pvalue = (aplist_value *)alloc_get_cachevalue(pcache->apalloc, offset);
         while(pvalue != NULL)
         {
-            if((type == CACHE_TYPE_FILECONTENT && pvalue->fcacheval != 0) || (type == CACHE_TYPE_BYTECODES && pvalue->ocacheval != 0))
+            if (type == CACHE_TYPE_FILECONTENT && pvalue->fcacheval != 0)
             {
                 ptemp = (cache_entry_info *)alloc_emalloc(sizeof(cache_entry_info));
                 if(ptemp == NULL)
@@ -2454,8 +2041,9 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
                 }
                 else if(type == CACHE_TYPE_BYTECODES)
                 {
-                    povalue = ocache_getvalue(pcache->pocache, pvalue->ocacheval);
-                    result = ocache_getinfo(povalue, (ocache_entry_info **)&ptemp->cdata);
+                    dprintimportant("Opcode Cache no longer supported.");
+                    result = FATAL_OCACHE_CREATION;
+                    goto Finished;
                 }
 
                 if(FAILED(result))
@@ -2520,11 +2108,6 @@ Finished:
                     {
                         fcache_freeinfo(ptemp->cdata);
                     }
-                    else if(type == CACHE_TYPE_BYTECODES)
-                    {
-                        ocache_freeinfo(ptemp->cdata);
-                    }
-
                     ptemp->cdata = NULL;
                 }
 
@@ -2569,11 +2152,6 @@ void aplist_freeinfo(unsigned char type, cache_info * pinfo)
                 {
                     fcache_freeinfo(petemp->cdata);
                 }
-                else if(type == CACHE_TYPE_BYTECODES)
-                {
-                    ocache_freeinfo(petemp->cdata);
-                }
-
                 petemp->cdata = NULL;
             }
 
@@ -2600,7 +2178,6 @@ void aplist_runtest()
     unsigned int     ttlmax    = 0;
     char *           filename  = "testfile.php";
 
-    TSRMLS_FETCH();
     dprintverbose("*** STARTING APLIST TESTS ***");
 
     result = aplist_create(&pcache);
@@ -2609,7 +2186,7 @@ void aplist_runtest()
         goto Finished;
     }
 
-    result = aplist_initialize(pcache, APLIST_TYPE_GLOBAL, filecount, fchfreq, ttlmax TSRMLS_CC);
+    result = aplist_initialize(pcache, APLIST_TYPE_GLOBAL, filecount, fchfreq, ttlmax);
     if(FAILED(result))
     {
         goto Finished;
