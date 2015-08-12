@@ -214,6 +214,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
                 {
                     goto Finished;
                 }
+                _ASSERT(offset != 0);
 
                 phashcopy->oomcode   = FATAL_OUT_OF_SMEMORY;
                 phashcopy->palloc    = pcache->zvalloc;
@@ -692,6 +693,10 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     /* bucket key name is copied starting at last element of struct Bucket */
     // BUGBUG: in some cases nKeyLength can be zero.
     msize = sizeof(zv_Bucket) + poriginal->nKeyLength;
+#ifdef ZEND_ENGINE_2_4
+    /* Add one for the null terminator */
+    msize++;
+#endif /* ZEND_ENGINE_2_4 */
 
     /* Allocate memory if required */
     if(*pcopied == NULL)
@@ -709,6 +714,13 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     else
     {
         pnewb = *pcopied;
+
+        if (pnewb->nKeyLength < poriginal->nKeyLength)
+        {
+            dprintimportant("existing zv_Bucket does not have enough space to copy in the key!");
+            result = FATAL_ZVCACHE_BUCKET_COPY_FAILED;
+            goto Finished;
+        }
     }
 
     pnewb->h          = poriginal->h;
@@ -719,11 +731,15 @@ static int copyin_bucket(zvcache_context * pcache, zvcopy_context * pcopy, HashT
     pnewb->pListLast  = 0;
     pnewb->pNext      = 0;
     pnewb->pLast      = 0;
+
+    if (poriginal->nKeyLength)
+    {
 #ifdef ZEND_ENGINE_2_4
-    memcpy_s(&pnewb->arKey, poriginal->nKeyLength+1, poriginal->arKey, poriginal->nKeyLength+1);
+        memcpy_s(&pnewb->arKey, poriginal->nKeyLength+1, poriginal->arKey, poriginal->nKeyLength+1);
 #else /* ZEND_ENGINE_2_3 and Below */
-    memcpy_s(&pnewb->arKey, poriginal->nKeyLength, &poriginal->arKey, poriginal->nKeyLength);
+        memcpy_s(&pnewb->arKey, poriginal->nKeyLength, &poriginal->arKey, poriginal->nKeyLength);
 #endif /* ZEND_ENGINE_2_4 */
+    }
 
     /* Do zval ref copy */
     pbuffer = (size_t *)ZMALLOC(pcopy, sizeof(size_t));
@@ -978,18 +994,19 @@ static int copyout_bucket(zvcache_context * pcache, zvcopy_context * pcopy, Hash
     pnewb->pNext      = NULL;
     pnewb->pLast      = NULL;
 
-#ifdef ZEND_ENGINE_2_4
     if (pnewb->nKeyLength)
     {
+#ifdef ZEND_ENGINE_2_4
         pnewb->arKey = (const char *)(pnewb + 1);
         memcpy_s((char *)pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
-    }
 #else /* ZEND_ENGINE_2_3 and Below */
-    memcpy_s((char *)&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
+        memcpy_s((char *)&pnewb->arKey, pcopied->nKeyLength, &pcopied->arKey, pcopied->nKeyLength);
 #endif /* ZEND_ENGINE_2_4 */
 
-    /* NOTE: arKey is null-terminated because we ZeroMem'd the buffer, above */
-    _ASSERT(pnewb->arKey[pnewb->nKeyLength] == '\0');
+        /* NOTE: arKey is null-terminated because we ZeroMem'd the buffer, above */
+        _ASSERT(pnewb->arKey[pnewb->nKeyLength] == '\0');
+    }
+
 
     /* Do zval ref copy */
     pbuffer = (zval **)ZMALLOC(pcopy, sizeof(zval *));
