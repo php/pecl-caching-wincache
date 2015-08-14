@@ -122,7 +122,7 @@ array(4) {
   ["pink"]=>
   int(9)
   ["chartruce"]=>
-  string(2) "10"
+  %Sstring(2) "10"
   [0]=>
   string(5) "brown"
   ["magenta"]=>
@@ -165,11 +165,11 @@ bool(true)
 wincache_ucache_get('foo6'):
 array(6) {
   ["black"]=>
-  %string(5) "BAR++"
+  &string(5) "BAR++"
   ["black2"]=>
-  %string(5) "BAR++"
+  &string(5) "BAR++"
   ["gray"]=>
-  %srray(4) {
+  &array(4) {
     ["green"]=>
     int(5)
     ["Blue"]=>
@@ -180,7 +180,7 @@ array(6) {
     string(5) "eight"
   }
   ["ref_to_arr"]=>
-  %srray(4) {
+  &array(4) {
     ["green"]=>
     int(5)
     ["Blue"]=>
@@ -232,11 +232,11 @@ array(6) {
 wincache_ucache_get('foo6'):
 array(6) {
   ["black"]=>
-  %string(5) "BAR++"
+  &string(5) "BAR++"
   ["black2"]=>
-  %string(5) "BAR++"
+  &string(5) "BAR++"
   ["gray"]=>
-  %srray(4) {
+  &array(4) {
     ["green"]=>
     int(5)
     ["Blue"]=>
@@ -247,7 +247,7 @@ array(6) {
     string(5) "eight"
   }
   ["ref_to_arr"]=>
-  %srray(4) {
+  &array(4) {
     ["green"]=>
     int(5)
     ["Blue"]=>

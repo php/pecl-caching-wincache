@@ -28,6 +28,7 @@
    | Module: php_wincache.h                                                                       |
    +----------------------------------------------------------------------------------------------+
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
+   | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
    +----------------------------------------------------------------------------------------------+
 */
 
@@ -85,6 +86,8 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     void                    (*orig_realpath)(INTERNAL_FUNCTION_PARAMETERS);
                                           /* Pointer to the original unlink function */
     void                    (*orig_unlink)(INTERNAL_FUNCTION_PARAMETERS);
+                                          /* Pointer to the original rename function */
+    void                    (*orig_rename)(INTERNAL_FUNCTION_PARAMETERS);
     zend_bool                enablecli;   /* Enable wincache for command line sapi */
     zend_bool                fcenabled;   /* File cache enabled or disabled */
     unsigned int             fcachesize;  /* File cache size in MBs */

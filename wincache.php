@@ -30,6 +30,7 @@
    +----------------------------------------------------------------------------------------------+
    | Authors: Don Venkat Raman <don.raman@microsoft.com>                                          |
    |          Ruslan Yakushev <ruslany@microsoft.com>                                             |
+   | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
    +----------------------------------------------------------------------------------------------+
 */
 

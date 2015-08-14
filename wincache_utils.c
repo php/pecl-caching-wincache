@@ -28,6 +28,7 @@
    | Module: wincache_utils.c                                                                     |
    +----------------------------------------------------------------------------------------------+
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
+   | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
    +----------------------------------------------------------------------------------------------+
 */
 
@@ -1300,4 +1301,49 @@ const char * utils_get_typename(zend_uchar type)
     }
 
     return valuetype;
+}
+
+void utils_wait_for_listener(const char * respath, unsigned int timeout)
+{
+    int            result        = NONFATAL;
+    unsigned int   sticks        = 0;
+    unsigned char  lexists       = 0;
+
+    if (WCG(lfcache)->pnotify != NULL)
+    {
+        sticks = GetTickCount();
+
+        while(1)
+        {
+            lexists = 1;
+
+            result = fcnotify_listenerexists(WCG(lfcache)->pnotify, respath, &lexists);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+
+            if (lexists)
+            {
+                /* If listener still exists then wait until it is cleared out by file change notification thread */
+                dprintverbose("utils_wait_for_listener: Waiting for file change listener to close");
+                Sleep(50);
+            }
+            else
+            {
+                /* If listener does not exist for this directory then stop waiting. */
+                break;
+            }
+
+            /* If it takes more than 1 second then exit to prevent process hangs. */
+            if(utils_ticksdiff(0, sticks) >= timeout)
+            {
+                dprintimportant("utils_wait_for_listener: Timed out while waiting for file change listener to close");
+                break;
+            }
+        }
+    }
+
+Finished:
+    return;
 }

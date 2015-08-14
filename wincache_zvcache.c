@@ -77,9 +77,11 @@ static int  copyin_memory(zvcopy_context * pcopy, HashTable * phtable, void * sr
 static int  copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, zval * poriginal, zval ** ppcopied);
 static int  copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, HashTable * poriginal, HashTable ** ppcopied);
 static int  copyin_string(zvcopy_context * pcopy, HashTable *phxlate, zend_string * orig_string, zend_string ** new_string);
+static int  copyin_reference(zvcache_context * pcache, zvcopy_context * pcopy, HashTable *phtable, zend_reference * orig_ref, zend_reference ** new_ref);
 
 static int  copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, zval * pcached, zval ** ppcopied);
 static int  copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, HashTable * pcached, HashTable ** ppcopied);
+static int  copyout_reference(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, zend_reference * pcached, zend_reference ** ppnew_ref);
 
 static int  find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned int index, zvcache_value ** ppvalue);
 static int  create_zvcache_data(zvcache_context * pcache, const char * key, zval * pzval, unsigned int ttl, zvcache_value ** ppvalue);
@@ -117,6 +119,7 @@ static int copyin_memory(zvcopy_context * pcopy, HashTable * phtable, void * src
         }
     }
 
+    /* Allocate cache memory & copy the original into the cache. */
     pdest = (zend_string *)ZMALLOC(pcopy, size);
     if (pdest == NULL)
     {
@@ -126,14 +129,14 @@ static int copyin_memory(zvcopy_context * pcopy, HashTable * phtable, void * src
 
     *pallocated = 1;
 
+    pcopy->allocsize += size;
+    memcpy_s(pdest, size, src, size);
+
+    /* update the table */
     if(phtable != NULL && phtable->nTableSize)
     {
         zend_hash_index_update_ptr(phtable, (zend_ulong)src, (void *)pdest);
     }
-
-    /* Allocate the zend_string & copy the original into the cache. */
-    pcopy->allocsize += size;
-    memcpy_s(pdest, size, src, size);
 
     *ppdest = pdest;
 
@@ -158,6 +161,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
     unsigned char        isfirst    = 0;
     zend_string *        pzstr      = NULL;
     zvcache_hashtable_pool_tracker * table_tracker = NULL;
+    zend_reference *     pzref      = NULL;
 
     dprintverbose("start copyin_zval");
 
@@ -309,12 +313,12 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             break;
 
         case IS_REFERENCE:
-            /* Traverse the reference: Copy in the target zval of the reference */
-            result = copyin_zval(pcache, pcopy, phtable, Z_REFVAL_P(poriginal), ppcopied);
+            result = copyin_reference(pcache, pcopy, phtable, Z_REF_P(poriginal), &pzref);
             if(FAILED(result))
             {
                 goto Finished;
             }
+            Z_REF_P(pnewzv) = (zend_reference *)ZOFFSET(pcopy, pzref);
             break;
 
         case IS_OBJECT:
@@ -325,14 +329,21 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
 
             if(smartstr.s && ZSTR_LEN(smartstr.s))
             {
-                result = copyin_string(pcopy, phtable, smartstr.s, &pzstr);
-                if (FAILED(result))
+                size_t size = _ZSTR_STRUCT_SIZE(ZSTR_LEN(smartstr.s));
+                zend_string * pdest = NULL;
+                pdest = (zend_string *)ZMALLOC(pcopy, size);
+                if (pdest == NULL)
                 {
+                    result = pcopy->oomcode;
                     goto Finished;
                 }
 
+                /* Allocate the zend_string & copy the original into the cache. */
+                pcopy->allocsize += size;
+                memcpy_s(pdest, size, smartstr.s, size);
+
                 /* Use Offset in copied-in zval */
-                Z_PTR_P(pnewzv) = (zend_string *)ZOFFSET(pcopy, pzstr);
+                Z_PTR_P(pnewzv) = (zend_string *)ZOFFSET(pcopy, pdest);
                 smart_str_free(&smartstr);
             }
             else
@@ -396,6 +407,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
     unsigned char          isfirst    = 0;
     zend_uchar             added_to_phtable = 0;
     zvcache_hashtable_pool_tracker * table_tracker = NULL;
+    zend_reference *       pref       = NULL;
 
     dprintverbose("start copyout_zval");
 
@@ -507,10 +519,13 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             break;
 
         case IS_REFERENCE:
-            /* We should never have an IS_REFERENCE zval in the user/session cache! */
-            dprintimportant("Unexpected IS_REFERENCE found in zvcache!");
-            result = FATAL_ZVCACHE_INVALID_ZVAL;
-            goto Finished;
+            result = copyout_reference(pcache, pcopy, phtable, (zend_reference *)ZVALUE(pcache->incopy, (size_t)Z_REF_P(pcached)), &pref);
+            if(FAILED(result))
+            {
+                goto Finished;
+            }
+            Z_REF_P(pnewzv) = pref;
+            break;
 
         case IS_OBJECT:
             /* Deserialize stored data to produce object */
@@ -861,6 +876,105 @@ Finished:
 
 }
 
+static int copyin_reference(zvcache_context * pcache, zvcopy_context * pcopy, HashTable *phtable, zend_reference * orig_ref, zend_reference ** new_ref)
+{
+    int                  result     = NONFATAL;
+    size_t               size       = 0;
+    zend_reference *     pzref      = NULL;
+    zval *               pnew_zval  = NULL;
+    zend_uchar           allocated  = 0;
+
+    _ASSERT(orig_ref != NULL);
+    _ASSERT(new_ref  != NULL);
+    _ASSERT(*new_ref == NULL);
+
+    size = sizeof(zend_reference);
+    result = copyin_memory(pcopy, phtable, orig_ref, size, &pzref, &allocated);
+    if (FAILED(result))
+    {
+        goto Finished;
+    }
+
+    if (allocated)
+    {
+        pnew_zval = &pzref->val;
+        result = copyin_zval(pcache, pcopy, phtable, pnew_zval, &pnew_zval);
+    }
+    else
+    {
+        // TODO: figure out what to do with the refcount on reference that was
+        // already copied in.
+    }
+
+    *new_ref = pzref;
+
+Finished:
+
+    return result;
+
+}
+
+static int copyout_reference(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, zend_reference * pcached, zend_reference ** ppnew_ref)
+{
+    int                  result     = NONFATAL;
+    size_t               size       = 0;
+    zend_reference *     pzref      = NULL;
+    zval *               pnew_zval  = NULL;
+
+    _ASSERT(pcache    != NULL);
+    _ASSERT(pcopy     != NULL);
+    _ASSERT(pcached   != NULL);
+    _ASSERT(ppnew_ref != NULL);
+
+    /* check table to see if we've already copied this item out*/
+    if(phtable != NULL && phtable->nTableSize)
+    {
+        if((pzref = zend_hash_index_find_ptr(phtable, (zend_ulong)pcached)) != NULL)
+        {
+            *ppnew_ref = pzref;
+            goto Finished;
+        }
+    }
+
+    /* Allocate memory as required */
+    if(*ppnew_ref == NULL)
+    {
+        pzref = (zend_reference *)ZMALLOC(pcopy, sizeof(zend_reference));
+        if(pzref == NULL)
+        {
+            result = pcopy->oomcode;
+            goto Finished;
+        }
+    }
+    else
+    {
+        pzref = *ppnew_ref;
+    }
+
+    *pzref = *pcached;
+
+    /* copy out zval */
+    pnew_zval = &pzref->val;
+    result = copyout_zval(pcache, pcopy, phtable, pnew_zval, &pnew_zval);
+    if (FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* update the table */
+    if(phtable != NULL && phtable->nTableSize)
+    {
+        zend_hash_index_update_ptr(phtable, (zend_ulong)pcached, (void *)pzref);
+    }
+
+    *ppnew_ref = pzref;
+
+Finished:
+
+    return result;
+
+}
+
 /* Call this method atleast under a read lock */
 static int find_zvcache_entry(zvcache_context * pcache, const char * key, unsigned int index, zvcache_value ** ppvalue)
 {
@@ -1040,14 +1154,15 @@ static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalu
                     table_tracker = NULL;
                     break;
 
-#if 0
                 case IS_REFERENCE:
-                    // TODO: figure out how to free a reference
+                    ZFREE(pcache->incopy, ZVALUE(pcache->incopy, (size_t)Z_REF_P(pzval)));
+                    Z_REF_P(pzval) = NULL;
                     break;
 
                 case IS_OBJECT:
+                    ZFREE(pcache->incopy, ZVALUE(pcache->incopy, (size_t)Z_PTR_P(pzval)));
+                    Z_PTR_P(pzval) = NULL;
                     break;
-#endif // 0
 
                 default:
                     dprintimportant("destroy_zvcache_data: Can't free unsupported type %d", Z_TYPE_P(pzval));

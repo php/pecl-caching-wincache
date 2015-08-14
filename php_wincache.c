@@ -28,6 +28,7 @@
    | Module: php_wincache.c                                                                       |
    +----------------------------------------------------------------------------------------------+
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
+   | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
    +----------------------------------------------------------------------------------------------+
 */
 
@@ -82,6 +83,7 @@ static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS);
 static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS);
 static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS);
 static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS);
+static void wincache_rename(INTERNAL_FUNCTION_PARAMETERS);
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_ucache_lasterror);
@@ -938,7 +940,7 @@ Finished:
     if (res_path_str != NULL)
     {
         alloc_efree(res_path_str);
-        resolve_path = NULL;
+        res_path_str = NULL;
     }
 
     if(FAILED(result))
@@ -2160,8 +2162,6 @@ WINCACHE_FUNC(wincache_rmdir)
     char *             respath      = NULL;
     fcache_value *     pvalue       = NULL;
     unsigned char      retval       = 1;
-    unsigned int       sticks       = 0;
-    unsigned char      lexists      = 0;
     char *             fullpath     = NULL;
     unsigned char      directory_removed = 0;
     zval              *zcontext     = NULL;
@@ -2208,43 +2208,13 @@ WINCACHE_FUNC(wincache_rmdir)
     WCG(orig_rmdir)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
     directory_removed = 1;
 
-    if (WCG(lfcache)->pnotify != NULL)
+    if (Z_TYPE_INFO_P(return_value) == IS_TRUE)
     {
-        sticks = GetTickCount();
+        utils_wait_for_listener(respath, RMDIR_WAIT_TIME);
 
-        while(1)
-        {
-            lexists = 1;
-
-            result = fcnotify_listenerexists(WCG(lfcache)->pnotify, respath, &lexists);
-            if(FAILED(result))
-            {
-                goto Finished;
-            }
-
-            if (lexists)
-            {
-                /* If listener still exists then wait until it is cleared out by file change notification thread */
-                dprintimportant("wincache_rmdir: Waiting for file change listener to close");
-                Sleep(50);
-            }
-            else
-            {
-                /* If listener does not exist for this directory then stop waiting. */
-                break;
-            }
-
-            /* If it takes more than 1 second then exit to prevent process hangs. */
-            if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
-            {
-                dprintimportant("wincache_rmdir: timed out while waiting for file change listener to close");
-                break;
-            }
-        }
+        /* Mark the aplist entry as deleted */
+        result = aplist_fcache_delete(WCG(lfcache), fullpath);
     }
-
-    /* Mark the aplist entry as deleted */
-    result = aplist_fcache_delete(WCG(lfcache), fullpath);
 
 Finished:
 
@@ -2354,8 +2324,6 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
     char *         filename      = NULL;
     size_t         filename_len  = 0;
     char *         respath       = NULL;
-    unsigned int   sticks        = 0;
-    unsigned char  lexists       = 0;
     char *         fullpath      = NULL;
     unsigned char  file_removed  = 0;
     fcache_value * pvalue        = NULL;
@@ -2366,7 +2334,7 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(WCG(lfcache) == NULL || ZEND_NUM_ARGS() > 1)
+    if(WCG(lfcache) == NULL)
     {
         goto Finished;
     }
@@ -2407,43 +2375,13 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
     WCG(orig_unlink)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
     file_removed = 1;
 
-    if (WCG(lfcache)->pnotify != NULL)
+    if (Z_TYPE_INFO_P(return_value) == IS_TRUE)
     {
-        sticks = GetTickCount();
+        utils_wait_for_listener(respath, RMDIR_WAIT_TIME);
 
-        while(1)
-        {
-            lexists = 1;
-
-            result = fcnotify_listenerexists(WCG(lfcache)->pnotify, respath, &lexists);
-            if(FAILED(result))
-            {
-                goto Finished;
-            }
-
-            if (lexists)
-            {
-                /* If listener still exists then wait until it is cleared out by file change notification thread */
-                dprintimportant("wincache_unlink: Waiting for file change listener to close");
-                Sleep(50);
-            }
-            else
-            {
-                /* If listener does not exist for this directory then stop waiting. */
-                break;
-            }
-
-            /* If it takes more than 1 second then exit to prevent process hangs. */
-            if(utils_ticksdiff(0, sticks) >= RMDIR_WAIT_TIME)
-            {
-                dprintimportant("wincache_unlink: timed out while waiting for file change listener to close");
-                break;
-            }
-        }
+        /* Mark the aplist entry as deleted */
+        result = aplist_fcache_delete(WCG(lfcache), fullpath);
     }
-
-    /* Mark the aplist entry as deleted */
-    result = aplist_fcache_delete(WCG(lfcache), fullpath);
 
 Finished:
     if(fullpath != NULL && fullpath != filename)
@@ -2481,6 +2419,110 @@ Finished:
     dprintverbose("end wincache_unlink");
 }
 
+static void wincache_rename(INTERNAL_FUNCTION_PARAMETERS)
+{
+    int            result        = NONFATAL;
+    char *         srcname       = NULL;
+    size_t         srcname_len   = 0;
+    char *         dstname       = NULL;
+    size_t         dstname_len   = 0;
+    char *         respath       = NULL;
+    char *         srcfullpath   = NULL;
+    unsigned char  file_removed  = 0;
+    fcache_value * pvalue        = NULL;
+    zval         * zcontext      = NULL;
+
+    if (!WCG(reroute_enabled))
+    {
+        goto Finished;
+    }
+
+    if(WCG(lfcache) == NULL)
+    {
+        goto Finished;
+    }
+
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "ss|r", &srcname, &srcname_len, &dstname, &dstname_len, &zcontext) == FAILURE)
+    {
+        RETURN_FALSE;
+    }
+
+    if (srcname_len == 0 || dstname_len == 0)
+    {
+        goto Finished;
+    }
+
+    dprintverbose("wincache_rename - %s,%s", srcname, dstname);
+
+    if(IS_ABSOLUTE_PATH(srcname, srcname_len))
+    {
+        srcfullpath = srcname;
+    }
+    else
+    {
+        srcfullpath = utils_fullpath(srcname, srcname_len);
+        if(srcfullpath == NULL)
+        {
+            srcfullpath = srcname;
+        }
+    }
+
+    result = aplist_fcache_get(WCG(lfcache), srcfullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* remove directory first */
+    dprintverbose("wincache_rename - %s,$s. Calling intercepted function.", srcname, dstname);
+    WCG(orig_rename)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+    file_removed = 1;
+
+    if (Z_TYPE_INFO_P(return_value) == IS_TRUE)
+    {
+        utils_wait_for_listener(respath, RMDIR_WAIT_TIME);
+
+        /* Mark the aplist entry as deleted */
+        result = aplist_fcache_delete(WCG(lfcache), srcfullpath);
+    }
+
+Finished:
+    if(srcfullpath != NULL && srcfullpath != srcname)
+    {
+        alloc_efree(srcfullpath);
+        srcfullpath = NULL;
+    }
+
+    if(respath != NULL)
+    {
+        alloc_efree(respath);
+        respath = NULL;
+    }
+
+    if(pvalue != NULL)
+    {
+        aplist_fcache_close(WCG(lfcache), pvalue);
+        pvalue = NULL;
+    }
+
+    if (!file_removed)
+    {
+        dprintverbose("wincache_rename - %s,$s. Calling intercepted function.", srcname, dstname);
+        WCG(orig_rename)(INTERNAL_FUNCTION_PARAM_PASSTHRU);
+        file_removed = 1;
+    }
+    else
+    {
+        if(FAILED(result))
+        {
+            dprintimportant("wincache_rename failed with error %u", result);
+        }
+    }
+
+    dprintverbose("end wincache_rename");
+}
+
+
 /* {{{ void wincache_intercept_functions_init() */
 #define WINCACHE_INTERCEPT(func) \
     WCG(orig_##func) = NULL;\
@@ -2506,6 +2548,7 @@ void wincache_intercept_functions_init()
     WINCACHE_INTERCEPT(readfile);
     WINCACHE_INTERCEPT(realpath);
     WINCACHE_INTERCEPT(unlink);
+    WINCACHE_INTERCEPT(rename);
     dprintverbose("wincache_intercept_functions_init called");
 }
 /* }}} */
@@ -2533,6 +2576,7 @@ void wincache_intercept_functions_shutdown()
     WINCACHE_RELEASE(readfile);
     WINCACHE_RELEASE(realpath);
     WINCACHE_RELEASE(unlink);
+    WINCACHE_RELEASE(rename);
     dprintverbose("wincache_intercept_functions_shutdown called");
 }
 /* }}} */
