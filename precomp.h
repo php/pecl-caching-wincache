@@ -44,7 +44,6 @@
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
-/* #define DEBUG_DUMP_OPARRAY */
 
 #ifdef PHP_WIN32
  #define PHP_WINCACHE_API __declspec(dllexport)
@@ -122,8 +121,6 @@
 #define FCHECK_FREQ_MAXIMUM        300
 #define TTL_VALUE_MINIMUM          60
 #define TTL_VALUE_MAXIMUM          7200
-#define INTERNED_SIZE_MINIMUM      4
-#define INTERNED_SIZE_MAXIMUM      32
 
 #define FIVE_SECOND_WAIT           5000
 #define MAX_INIT_EVENT_WAIT        30000
