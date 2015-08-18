@@ -71,7 +71,7 @@ C_ASSERT(SIZEOF_SIZE_T <= SIZEOF_ZEND_LONG);
 #define ZVALUE(pcopy, offset)        ((offset == 0) ? NULL : ((pcopy)->pbaseadr + (offset)))
 #define ZVCACHE_VALUE(p, o)          ((zvcache_value *)alloc_get_cachevalue(p, o))
 #define ZVALUE_HT_GET_DATA_ADDR(pcopy, ht) \
-    ((char*)(ZVALUE(pcopy,(size_t)(ht)->arData)) - HT_HASH_SIZE(ht))
+  ((char*)(ZVALUE((pcopy),(size_t)(ht)->arData)) - HT_HASH_SIZE((ht)->nTableMask))
 
 static int  copyin_memory(zvcopy_context * pcopy, HashTable * phtable, void * src, size_t size, void **ppdest, zend_uchar *pallocated);
 static int  copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTable * phtable, zval * poriginal, zval ** ppcopied);
@@ -221,7 +221,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             /* Fix up the zval type flags */
             Z_TYPE_FLAGS_P(pnewzv) &= ~(IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE);
 
-            /* Use Offset in copied-in zval */
+            /* Use offset in cached zval pointer */
             Z_STR_P(pnewzv) = (zend_string *)ZOFFSET(pcopy, pzstr);
             break;
 
@@ -780,9 +780,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
         goto Finished;
     }
 
-    // ZVALUE_HT_GET_DATA_ADDR(pcache->incopy,pcached)
-    pdata_temp = (char *)ZVALUE(pcache->incopy,(size_t)pcached->arData);
-    pdata_temp -= HT_HASH_SIZE(pcached);
+    pdata_temp = ZVALUE_HT_GET_DATA_ADDR(pcache->incopy,pcached);
     memcpy(ptemp, pdata_temp, tmp_size);
     HT_SET_DATA_ADDR(pnew_table, ptemp);
 
@@ -862,11 +860,6 @@ static int copyin_string(zvcopy_context * pcopy, HashTable *phtable, zend_string
          */
         GC_FLAGS(pzstr) = IS_STR_INTERNED | IS_STR_PERMANENT;
     }
-    else
-    {
-        // TODO: figure out what to do with the refcount on string that was
-        // already copied in.
-    }
 
     *new_string = pzstr;
 
@@ -899,11 +892,7 @@ static int copyin_reference(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     {
         pnew_zval = &pzref->val;
         result = copyin_zval(pcache, pcopy, phtable, pnew_zval, &pnew_zval);
-    }
-    else
-    {
-        // TODO: figure out what to do with the refcount on reference that was
-        // already copied in.
+        GC_REFCOUNT(pzref) = 2;
     }
 
     *new_ref = pzref;

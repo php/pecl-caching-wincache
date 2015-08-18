@@ -617,7 +617,7 @@ char * utils_build_temp_filename(char * suffix)
 
     filename_len = strlen(temp_dir);
 
-    // TODO: make sure trailing char is not IS_SLASH()
+    // TODO: Make sure trailing char is not IS_SLASH()
 
     filename_len += strlen(suffix);
     filename_len++;     /* DEFAULT_SLASH separator */

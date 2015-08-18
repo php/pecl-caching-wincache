@@ -35,6 +35,15 @@
 
 #define ZVSCACHE_KEY    1
 
+#ifdef _WIN64
+#define SESSION_NAME_SUFFIX_FORMAT           "_session_%u_%u_x64.tmp"
+#define SESSION_NAME_NAMESALT_SUFFIX_FORMAT  "_session_%u_%s_%u_x64.tmp"
+#else  /* not _WIN64 */
+#define SESSION_NAME_SUFFIX_FORMAT           "_session_%u_%u.tmp"
+#define SESSION_NAME_NAMESALT_SUFFIX_FORMAT  "_session_%u_%s_%u.tmp"
+#endif /* _WIN64 */
+
+
 ps_module ps_mod_wincache = { PS_MOD(wincache) };
 
 static void scache_destructor(void * pdestination)
@@ -161,7 +170,7 @@ PS_OPEN_FUNC(wincache)
         _ASSERT(save_path != NULL);
 
         /* Create path as save_path\wincache_<version>_session_[<namesalt>_]ppid. 6 for _<cachekey> */
-        fpathlen = strlen(save_path) + 1 + sizeof("wincache__session_.tmp") + 6 + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
+        fpathlen = strlen(save_path) + 1 + sizeof("wincache__session_x64_.tmp") + 6 + ((WCG(namesalt) == NULL) ? 0 : (strlen(WCG(namesalt)) + 1)) + 5;
 
         /* add the PHP_AND_WINCACHE_VERSION */
         fpathlen += sizeof(STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION));
@@ -183,11 +192,11 @@ PS_OPEN_FUNC(wincache)
         ZeroMemory(filepath, fpathlen);
         if(WCG(namesalt) == NULL)
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_session_%u_%u.tmp", save_path, cachekey, WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION SESSION_NAME_SUFFIX_FORMAT, save_path, cachekey, WCG(parentpid));
         }
         else
         {
-            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_session_%u_%s_%u.tmp", save_path, cachekey, WCG(namesalt), WCG(parentpid));
+            _snprintf_s(filepath, fpathlen, fpathlen - 1, "%s\\wincache_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION SESSION_NAME_NAMESALT_SUFFIX_FORMAT, save_path, cachekey, WCG(namesalt), WCG(parentpid));
         }
 
         /* Create session cache on call to session_start */

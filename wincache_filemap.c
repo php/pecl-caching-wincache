@@ -57,6 +57,14 @@ static char * g_filemap_prefix[] = {
     FILEMAP_SESSZVALS_PREFIX,   /* FILEMAP_TYPE_SESSZVALS   */
 };
 
+#ifdef _WIN64
+#define FILEMAP_PREFIX_FORMAT           "%s_%u_%u_x64"
+#define FILEMAP_NAMESALT_PREFIX_FORMAT  "%s_%u_%s_%u_x64"
+#else  /* not _WIN64 */
+#define FILEMAP_PREFIX_FORMAT           "%s_%u_%u"
+#define FILEMAP_NAMESALT_PREFIX_FORMAT  "%s_%u_%s_%u"
+#endif /* _WIN64 */
+
 /* Global information containing information */
 /* about all the memory maps which got created */
 unsigned short gfilemapid = 1;
@@ -186,11 +194,11 @@ static int build_filemap_name(
     int ret;
     if (namesalt == NULL)
     {
-        ret = _snprintf_s(dest, dest_size, dest_size - 1, "%s_%u_%u", get_filemap_prefix(fmaptype), cachekey, pid);
+        ret = _snprintf_s(dest, dest_size, dest_size - 1, FILEMAP_PREFIX_FORMAT, get_filemap_prefix(fmaptype), cachekey, pid);
     }
     else
     {
-        ret = _snprintf_s(dest, dest_size, dest_size - 1, "%s_%u_%s_%u", get_filemap_prefix(fmaptype), cachekey, namesalt, pid);
+        ret = _snprintf_s(dest, dest_size, dest_size - 1, FILEMAP_NAMESALT_PREFIX_FORMAT, get_filemap_prefix(fmaptype), cachekey, namesalt, pid);
     }
 
     return ret;

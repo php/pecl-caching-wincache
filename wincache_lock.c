@@ -34,6 +34,15 @@
 
 #include "precomp.h"
 
+#ifdef _WIN64
+#define LOCK_SUFFIX_FORMAT              "_%u_%u_%u_x64_"
+#define LOCK_NAMESALT_SUFFIX_FORMAT     "_%u_%s_%u_%u_x64_"
+#else  /* not _WIN64 */
+#define LOCK_SUFFIX_FORMAT              "_%u_%u_%u_"
+#define LOCK_NAMESALT_SUFFIX_FORMAT     "_%u_%s_%u_%u_"
+#endif /* _WIN64 */
+
+
 /* Globals */
 unsigned short glockid = 1;
 
@@ -195,11 +204,11 @@ int lock_get_nameprefix(
     /* Create nameprefix as name_pid_ppid_ */
     if(WCG(namesalt) == NULL)
     {
-        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%u_%u_", scopePrefix, name, cachekey, pid, ppid);
+        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION LOCK_SUFFIX_FORMAT, scopePrefix, name, cachekey, pid, ppid);
     }
     else
     {
-        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%s_%u_%u_", scopePrefix, name, cachekey, WCG(namesalt), pid, ppid);
+        actual_len = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION LOCK_NAMESALT_SUFFIX_FORMAT, scopePrefix, name, cachekey, WCG(namesalt), pid, ppid);
     }
 
     if (-1 == actual_len)

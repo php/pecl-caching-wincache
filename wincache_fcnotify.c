@@ -37,7 +37,11 @@
 #define PROCESS_IS_DEAD               1
 #define FCNOTIFY_VALUE(p, o)          ((fcnotify_value *)alloc_get_cachevalue(p, o))
 #define FCNOTIFY_TERMKEY              ((ULONG_PTR)-1)
-#define SCAVENGER_FREQUENCY           900000
+#ifdef WINCACHE_DEBUG
+#define SCAVENGER_FREQUENCY           (10 * 1000)
+#else /* WINCACHE_DEBUG */
+#define SCAVENGER_FREQUENCY           (900 * 1000)
+#endif /* WINCACHE_DEBUG */
 #define PALIVECHK_FREQUENCY           1000
 
 static unsigned int WINAPI change_notification_thread(void * parg);
@@ -52,7 +56,7 @@ static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * pliste
 static void destroy_fcnotify_data(fcnotify_context * pnotify, fcnotify_value * pvalue);
 static void add_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
 static void remove_fcnotify_entry(fcnotify_context * pnotify, unsigned int index, fcnotify_value * pvalue);
-static int  pidhandles_apply(void * pdestination);
+static int  pidhandles_apply(zval * pdestination);
 static void run_fcnotify_scavenger(fcnotify_context * pnotify);
 static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_value * pvalue);
 
@@ -132,6 +136,13 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
             plistener->pfcnvalue->plistener = NULL;
             lock_writeunlock(pnotify->fclock);
         }
+
+        // TODO: Handle ERROR_NOTIFY_ENUM_DIR - change buffer overflowed & we
+        // TODO: missed some changes.
+        // TODO: Not sure what to do here, since we don't have a mechanism for
+        // TODO: invalidating a directory and all files under the directory.
+        // TODO: The aplist cache is only designed to lookup full paths. Any
+        // TODO: other enumeration would be an O(1) traversal of the cache.
 
         goto Finished;
     }
@@ -259,7 +270,11 @@ static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnot
     listener_refinc(plistener);
 
     /* file name, last write, attributes and security change should be delivered */
-    cflags = FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE | FILE_NOTIFY_CHANGE_ATTRIBUTES | FILE_NOTIFY_CHANGE_SECURITY;
+    cflags = FILE_NOTIFY_CHANGE_FILE_NAME  |
+             FILE_NOTIFY_CHANGE_DIR_NAME   |
+             FILE_NOTIFY_CHANGE_LAST_WRITE |
+             FILE_NOTIFY_CHANGE_ATTRIBUTES |
+             FILE_NOTIFY_CHANGE_SECURITY;
     result = ReadDirectoryChangesW(plistener->folder_handle, &plistener->fninfo, 1024, FALSE, cflags, &bytecount, &plistener->overlapped, NULL);
 
     if(!result)
@@ -886,17 +901,17 @@ void fcnotify_terminate(fcnotify_context * pnotify)
     return;
 }
 
-static int pidhandles_apply(void * pdestination)
+static int pidhandles_apply(zval * pdestination)
 {
-    HANDLE *      hprocess = NULL;
+    HANDLE        hprocess = NULL;
     unsigned int  exitcode = 0;
 
     _ASSERT(pdestination != NULL);
-    hprocess = (HANDLE *)pdestination;
+    hprocess = (HANDLE)Z_PTR_P(pdestination);
 
-    if(GetExitCodeProcess(*hprocess, &exitcode) && exitcode != STILL_ACTIVE)
+    if(GetExitCodeProcess(hprocess, &exitcode) && exitcode != STILL_ACTIVE)
     {
-        CloseHandle(*hprocess);
+        CloseHandle(hprocess);
         return ZEND_HASH_APPLY_REMOVE;
     }
     else
@@ -959,7 +974,6 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
 {
     HashTable *   phashtable = NULL;
     HANDLE        hprocess   = NULL;
-    HANDLE *      phdata     = NULL;
     unsigned char listenp    = PROCESS_IS_ALIVE;
     unsigned int  exitcode   = 0;
     HANDLE        htoken     = NULL;
@@ -979,8 +993,8 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
 
     phashtable = pnotify->pidhandles;
 
-    phdata = (HANDLE *)zend_hash_index_find_ptr(phashtable, (zend_ulong)ownerpid);
-    if(phdata == NULL)
+    hprocess = (HANDLE)zend_hash_index_find_ptr(phashtable, (zend_ulong)ownerpid);
+    if(hprocess == NULL)
     {
         /* Check if impersonation is enabled */
         /* If it is, get impersonated token and set it back after calling OpenProcess */
@@ -1019,7 +1033,6 @@ static unsigned char process_alive_check(fcnotify_context * pnotify, fcnotify_va
     }
     else
     {
-        hprocess = *phdata;
         if(GetExitCodeProcess(hprocess, &exitcode) && exitcode != STILL_ACTIVE)
         {
             /* GetProcessId failure means process is gone */

@@ -273,7 +273,7 @@ PHP_INI_BEGIN()
 /* index 17 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
 /* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
 /* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
-/* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "1", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
+/* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "0", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
 /* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "0", PHP_INI_SYSTEM | PHP_INI_PERDIR, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
 /* index 22 */ STD_PHP_INI_ENTRY("wincache.filemapdir", NULL, PHP_INI_SYSTEM, OnUpdateString, filemapdir, zend_wincache_globals, wincache_globals)
 PHP_INI_END()
@@ -332,7 +332,7 @@ static void globals_initialize(zend_wincache_globals * globals)
     WCG(inisavepath) = NULL; /* Fill when ps_open is called */
     WCG(dofctoggle)  = 0;    /* If set to 1, toggle value of fcenabled */
     WCG(apppoolid)   = NULL; /* Use this application id */
-    WCG(srwlocks)    = 1;    /* Enable shared reader/writer locks by default */
+    WCG(srwlocks)    = 0;    /* Enable shared reader/writer locks by default */
     WCG(reroute_enabled) = 0;/* Enable wrappers around standard PHP functions */
     WCG(filemapdir)  = NULL; /* Directory where temp filemap files should be created */
 
@@ -567,8 +567,8 @@ PHP_MINIT_FUNCTION(wincache)
     if(WCG(namesalt) != NULL && strlen(WCG(namesalt)) > NAMESALT_LENGTH_MAXIMUM)
     {
         // TODO: instead of stomping on memory we don't own, we should just
-        // allocate off a duplicate and truncate the value.  Maybe even have a
-        // static array we use whenever this happens?
+        // TODO: allocate off a duplicate and truncate the value.  Maybe even
+        // TODO: have a static array we use whenever this happens?
 
         pinientry = zend_hash_str_find_ptr(EG(ini_directives), "wincache.namesalt", sizeof("wincache.namesalt")-1);
         _ASSERT(pinientry != NULL);
