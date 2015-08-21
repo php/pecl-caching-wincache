@@ -45,12 +45,12 @@ if (PHP_WINCACHE != "no") {
                                wincache_zvcache.c wincache_session.c                    \
                                wincache_fcnotify.c",
                                true,
-                               "/D ZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+                               "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
 
         ADD_EXTENSION_DEP('wincache', 'session');
         AC_DEFINE('HAVE_WINCACHE', 1);
 
-        DEFINE('WINCACHE_ETW_RC', '..\\pecl\\wincache\\wincache_etw.rc');
+        DEFINE('WINCACHE_ETW_RC', configure_module_dirname + '\\wincache_etw.rc');
 
         ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
         if (!X64) {
@@ -58,7 +58,7 @@ if (PHP_WINCACHE != "no") {
         }
 
         ADD_FLAG('CFLAGS_WINCACHE', '/GS');
-        ADD_FLAG('CFLAGS_WINCACHE', '/I$(BUILD_DIR)\\pecl\\wincache\\ ');
+        ADD_FLAG('CFLAGS_WINCACHE', '/I' + configure_module_dirname + ' ');
 
         if (PHP_DEBUG == "yes") {
             ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
@@ -71,7 +71,7 @@ if (PHP_WINCACHE != "no") {
             ADD_FLAG('CFLAGS_WINCACHE', '/WX');
         }
 
-        ADD_FLAG('DEPS_WINCACHE', '..\\pecl\\wincache\\wincache_etw.rc');
+        ADD_FLAG('DEPS_WINCACHE', configure_module_dirname + '\\wincache_etw.rc');
 
         CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
     }
