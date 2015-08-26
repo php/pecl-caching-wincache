@@ -109,6 +109,12 @@
         <file role="test" name="wincache_ucache_serialization.phpt"/>
         <file role="test" name="wincache_ucache_set_array.phpt"/>
         <file role="test" name="wincache_ucache_string.phpt"/>
+        <dir role="test" name="bar">
+          <file role="test" name="wincache_005_2.php"/>
+        </dir>
+        <dir role="test" name="foo">
+          <file role="test" name="wincache_005_1.php"/>
+        </dir>
       </dir>
     </dir>
   </contents>
