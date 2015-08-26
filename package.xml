@@ -29,14 +29,14 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2015-08-27</date>
+  <date>2015-08-26</date>
   <version>
     <release>2.0.0.0</release>
     <api>2.0.0</api>
   </version>
   <stability>
-    <release>experimental</release>
-    <api>experimental</api>
+    <release>alpha</release>
+    <api>alpha</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
@@ -48,14 +48,14 @@
 - Remove unused settings
 - Enforce NTS-only build
 - Comment clean up
-- Minor bug fixes & tweaks
+- Minor bug fixes and tweaks
   </notes>
   <contents>
     <dir name="/">
       <file role="doc" name="config.w32"/>
       <file role="doc" name="INSTALL"/>
       <file role="doc" name="LICENSE"/>
-      <file role="src" name="MSG00001.bin"/>
+      <file role="data" name="MSG00001.bin"/>
       <file role="src" name="php_wincache.c"/>
       <file role="src" name="php_wincache.h"/>
       <file role="src" name="precomp.h"/>
@@ -73,7 +73,7 @@
       <file role="src" name="wincache_etw.h"/>
       <file role="src" name="wincache_etw.man"/>
       <file role="src" name="wincache_etw.rc"/>
-      <file role="src" name="wincache_etwTEMP.bin"/>
+      <file role="data" name="wincache_etwTEMP.bin"/>
       <file role="src" name="wincache_fcache.c"/>
       <file role="src" name="wincache_fcache.h"/>
       <file role="src" name="wincache_fcnotify.c"/>
@@ -86,8 +86,6 @@
       <file role="src" name="wincache_rplist.h"/>
       <file role="src" name="wincache_session.h"/>
       <file role="src" name="wincache_session.c"/>
-      <file role="src" name="wincache_string.c"/>
-      <file role="src" name="wincache_string.h"/>
       <file role="src" name="wincache_utils.c"/>
       <file role="src" name="wincache_utils.h"/>
       <file role="src" name="wincache_zvcache.h"/>
@@ -130,7 +128,7 @@
   <changelog>
 
 <!-- Cut and paste from this blank item, and then copy in the stuff from the
-     current package (above). --E.
+     current package (above).
 
     <release>
       <date>1980-01-01</date>
