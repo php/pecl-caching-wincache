@@ -3,7 +3,7 @@
   <name>WINCACHE</name>
   <channel>pecl.php.net</channel>
   <summary>Windows Cache Extension for PHP</summary>
-  <description>Windows Cache Extension for PHP is a PHP accelerator that is used to increase the speed of PHP applications running on Windows and Windows Server. Once the Windows Cache Extension for PHP is enabled and loaded by the PHP engine, PHP applications can take advantage of the functionality without any code modifications. The extension includes PHP opcode cache, file system cache and relative path cache. In addition the extension provides cache API's and a PHP session handler.
+  <description>Windows Cache Extension for PHP is a PHP accelerator that is used to increase the speed of PHP applications running on Windows and Windows Server. Once the Windows Cache Extension for PHP is enabled and loaded by the PHP engine, PHP applications can take advantage of the functionality without any code modifications. The extension includes file system cache and relative path cache. In addition the extension provides cache API's and a PHP session handler.
   </description>
   <lead>
     <name>Ruslan Yakushev</name>
