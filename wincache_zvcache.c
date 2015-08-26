@@ -1264,7 +1264,7 @@ static void remove_zvcache_entry(zvcache_context * pcache, unsigned int index, z
     return;
 }
 
-/* Call this method under write lock */
+/* Call this method under lock */
 static void run_zvcache_scavenger(zvcache_context * pcache)
 {
     unsigned int sindex   = 0;
@@ -1370,7 +1370,7 @@ int zvcache_create(zvcache_context ** ppcache)
     pcache->zvmemaddr   = NULL;
     pcache->zvheader    = NULL;
     pcache->zvfilemap   = NULL;
-    pcache->zvrwlock    = NULL;
+    pcache->zvlock      = NULL;
     pcache->zvalloc     = NULL;
 
     *ppcache = pcache;
@@ -1497,13 +1497,13 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     header = pcache->zvheader;
 
     /* Create reader writer locks for the zvcache */
-    result = lock_create(&pcache->zvrwlock);
+    result = lock_create(&pcache->zvlock);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    result = lock_initialize(pcache->zvrwlock, lockname, cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount);
+    result = lock_initialize(pcache->zvlock, lockname, cachekey, locktype, &header->last_owner);
     if(FAILED(result))
     {
         goto Finished;
@@ -1523,7 +1523,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
             /* blocked and this process is right now not using lock */
             header->hitcount     = 0;
             header->misscount    = 0;
-            header->rdcount      = 0;
+            header->last_owner   = 0;
 
             header->lscavenge    = cticks;
             header->scstart      = 0;
@@ -1614,12 +1614,12 @@ Finished:
             pcache->zvfilemap = NULL;
         }
 
-        if(pcache->zvrwlock != NULL)
+        if(pcache->zvlock != NULL)
         {
-            lock_terminate(pcache->zvrwlock);
-            lock_destroy(pcache->zvrwlock);
+            lock_terminate(pcache->zvlock);
+            lock_destroy(pcache->zvlock);
 
-            pcache->zvrwlock = NULL;
+            pcache->zvlock = NULL;
         }
 
         if(pcache->hinitdone != NULL)
@@ -1664,12 +1664,12 @@ void zvcache_terminate(zvcache_context * pcache)
             pcache->zvfilemap = NULL;
         }
 
-        if(pcache->zvrwlock != NULL)
+        if(pcache->zvlock != NULL)
         {
-            lock_terminate(pcache->zvrwlock);
-            lock_destroy(pcache->zvrwlock);
+            lock_terminate(pcache->zvlock);
+            lock_destroy(pcache->zvlock);
 
-            pcache->zvrwlock = NULL;
+            pcache->zvlock = NULL;
         }
 
         if(pcache->hinitdone != NULL)
@@ -1702,7 +1702,7 @@ int zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue)
     header = pcache->zvheader;
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_readlock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     result = find_zvcache_entry(pcache, key, index, &pentry);
@@ -1744,7 +1744,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -1777,28 +1777,27 @@ int zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsign
 
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_readlock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
+    flock = 1;
 
     result = find_zvcache_entry(pcache, key, index, &pentry);
-    if(pentry != NULL && SUCCEEDED(result))
-    {
-        InterlockedExchange(&pentry->use_ticks, GetTickCount());
-    }
-
-    lock_readunlock(pcache->zvrwlock);
-
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    /* If key already exists, throw error for add */
-    if(pentry != NULL && isadd == 1)
+    if(pentry != NULL)
     {
-        _ASSERT(pentry->zvalue != 0);
+        /* If key already exists, throw error for add */
+        if(isadd == 1)
+        {
+            _ASSERT(pentry->zvalue != 0);
 
-        result = WARNING_ZVCACHE_EXISTS;
-        goto Finished;
+            result = WARNING_ZVCACHE_EXISTS;
+            goto Finished;
+        }
+
+        InterlockedExchange(&pentry->use_ticks, GetTickCount());
     }
 
     /* Only update the session entry if the value changed */
@@ -1828,12 +1827,9 @@ int zvcache_set(zvcache_context * pcache, const char * key, zval * pzval, unsign
         goto Finished;
     }
 
-    lock_writelock(pcache->zvrwlock);
-    flock = 1;
-
     run_zvcache_scavenger(pcache);
 
-    /* Check again after getting the write lock */
+    /* Check again after scavenging */
     result = find_zvcache_entry(pcache, key, index, &pentry);
     if(FAILED(result))
     {
@@ -1866,7 +1862,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -1900,7 +1896,7 @@ int zvcache_delete(zvcache_context * pcache, const char * key)
 
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_writelock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     run_zvcache_scavenger(pcache);
@@ -1925,7 +1921,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -1952,7 +1948,7 @@ int zvcache_clear(zvcache_context * pcache)
 
     _ASSERT(pcache != NULL);
 
-    lock_writelock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
 
     /* No point running the scavenger on call to clear */
 
@@ -1980,7 +1976,7 @@ int zvcache_clear(zvcache_context * pcache)
 
     _ASSERT(SUCCEEDED(result));
 
-    lock_writeunlock(pcache->zvrwlock);
+    lock_unlock(pcache->zvlock);
 
     dprintverbose("end zvcache_clear");
 
@@ -2003,7 +1999,7 @@ int zvcache_exists(zvcache_context * pcache, const char * key, unsigned char * p
     *pexists = 0;
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_readlock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     result = find_zvcache_entry(pcache, key, index, &pentry);
@@ -2027,7 +2023,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -2079,7 +2075,7 @@ int zvcache_list(zvcache_context * pcache, zend_bool summaryonly, char * pkey, z
     palloc = pcache->zvalloc;
     cticks  = GetTickCount();
 
-    lock_readlock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     pcinfo->hitcount  = header->hitcount;
@@ -2160,7 +2156,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -2193,7 +2189,7 @@ int zvcache_change(zvcache_context * pcache, const char * key, zend_long delta, 
     *newvalue = 0;
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_writelock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     run_zvcache_scavenger(pcache);
@@ -2226,7 +2222,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 
@@ -2255,7 +2251,7 @@ int zvcache_compswitch(zvcache_context * pcache, const char * key, zend_long old
 
     index = utils_getindex(key, pcache->zvheader->valuecount);
 
-    lock_writelock(pcache->zvrwlock);
+    lock_lock(pcache->zvlock);
     flock = 1;
 
     run_zvcache_scavenger(pcache);
@@ -2297,7 +2293,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->zvrwlock);
+        lock_unlock(pcache->zvlock);
         flock = 0;
     }
 

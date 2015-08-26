@@ -148,6 +148,7 @@
 #define FATAL_SESSION_BASE                  1000
 #define FATAL_SESSION_INITIALIZE            FATAL_SESSION_BASE + 1
 #define FATAL_SESSION_PATHLONG              FATAL_SESSION_BASE + 2
+#define FATAL_SESSION_EMPTY_ID              FATAL_SESSION_BASE + 3
 
 /* Error codes used by file change notification */
 #define FATAL_FCNOTIFY_BASE                 1100

@@ -254,28 +254,26 @@ zend_module_entry wincache_module_entry = {
     ZEND_GET_MODULE(wincache)
 #endif
 
-/* If index of ocenabled is changed, change the define statement at top */
 PHP_INI_BEGIN()
 /* index 0 */  STD_PHP_INI_BOOLEAN("wincache.fcenabled", "1", PHP_INI_ALL, OnUpdateBool, fcenabled, zend_wincache_globals, wincache_globals)
-/* index 2 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
-/* index 3 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
-/* index 5 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
-/* index 6 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
-/* index 7 */  STD_PHP_INI_ENTRY("wincache.chkinterval", "30", PHP_INI_SYSTEM, OnUpdateLong, fcchkfreq, zend_wincache_globals, wincache_globals)
-/* index 8 */  STD_PHP_INI_ENTRY("wincache.ttlmax", "1200", PHP_INI_SYSTEM, OnUpdateLong, ttlmax, zend_wincache_globals, wincache_globals)
-/* index 9 */  STD_PHP_INI_ENTRY("wincache.debuglevel", "0", PHP_INI_ALL, wincache_modify_debuglevel, debuglevel, zend_wincache_globals, wincache_globals)
-/* index 10 */ STD_PHP_INI_ENTRY("wincache.ignorelist", NULL, PHP_INI_ALL, OnUpdateString, ignorelist, zend_wincache_globals, wincache_globals)
-/* index 12 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
-/* index 13 */ STD_PHP_INI_ENTRY("wincache.namesalt", NULL, PHP_INI_SYSTEM, OnUpdateString, namesalt, zend_wincache_globals, wincache_globals)
-/* index 14 */ STD_PHP_INI_ENTRY("wincache.localheap", "0", PHP_INI_SYSTEM, OnUpdateBool, localheap, zend_wincache_globals, wincache_globals)
-/* index 15 */ STD_PHP_INI_BOOLEAN("wincache.ucenabled", "1", PHP_INI_ALL, OnUpdateBool, ucenabled, zend_wincache_globals, wincache_globals)
-/* index 16 */ STD_PHP_INI_ENTRY("wincache.ucachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, ucachesize, zend_wincache_globals, wincache_globals)
-/* index 17 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
-/* index 18 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
-/* index 19 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
-/* index 20 */ STD_PHP_INI_BOOLEAN("wincache.srwlocks", "0", PHP_INI_SYSTEM, OnUpdateBool, srwlocks, zend_wincache_globals, wincache_globals)
-/* index 21 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "0", PHP_INI_SYSTEM | PHP_INI_PERDIR, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
-/* index 22 */ STD_PHP_INI_ENTRY("wincache.filemapdir", NULL, PHP_INI_SYSTEM, OnUpdateString, filemapdir, zend_wincache_globals, wincache_globals)
+/* index 1 */  STD_PHP_INI_BOOLEAN("wincache.enablecli", "0", PHP_INI_SYSTEM, OnUpdateBool, enablecli, zend_wincache_globals, wincache_globals)
+/* index 2 */  STD_PHP_INI_ENTRY("wincache.fcachesize", "24", PHP_INI_SYSTEM, OnUpdateLong, fcachesize, zend_wincache_globals, wincache_globals)
+/* index 3 */  STD_PHP_INI_ENTRY("wincache.maxfilesize", "256", PHP_INI_SYSTEM, OnUpdateLong, maxfilesize, zend_wincache_globals, wincache_globals)
+/* index 4 */  STD_PHP_INI_ENTRY("wincache.filecount", "4096", PHP_INI_SYSTEM, OnUpdateLong, numfiles, zend_wincache_globals, wincache_globals)
+/* index 5 */  STD_PHP_INI_ENTRY("wincache.chkinterval", "30", PHP_INI_SYSTEM, OnUpdateLong, fcchkfreq, zend_wincache_globals, wincache_globals)
+/* index 6 */  STD_PHP_INI_ENTRY("wincache.ttlmax", "1200", PHP_INI_SYSTEM, OnUpdateLong, ttlmax, zend_wincache_globals, wincache_globals)
+/* index 7 */  STD_PHP_INI_ENTRY("wincache.debuglevel", "0", PHP_INI_ALL, wincache_modify_debuglevel, debuglevel, zend_wincache_globals, wincache_globals)
+/* index 8 */ STD_PHP_INI_ENTRY("wincache.ignorelist", NULL, PHP_INI_ALL, OnUpdateString, ignorelist, zend_wincache_globals, wincache_globals)
+/* index 9 */ STD_PHP_INI_ENTRY("wincache.fcenabledfilter", NULL, PHP_INI_SYSTEM, OnUpdateString, fcefilter, zend_wincache_globals, wincache_globals)
+/* index 10 */ STD_PHP_INI_ENTRY("wincache.namesalt", NULL, PHP_INI_SYSTEM, OnUpdateString, namesalt, zend_wincache_globals, wincache_globals)
+/* index 11 */ STD_PHP_INI_ENTRY("wincache.localheap", "0", PHP_INI_SYSTEM, OnUpdateBool, localheap, zend_wincache_globals, wincache_globals)
+/* index 12 */ STD_PHP_INI_BOOLEAN("wincache.ucenabled", "1", PHP_INI_ALL, OnUpdateBool, ucenabled, zend_wincache_globals, wincache_globals)
+/* index 13 */ STD_PHP_INI_ENTRY("wincache.ucachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, ucachesize, zend_wincache_globals, wincache_globals)
+/* index 14 */ STD_PHP_INI_ENTRY("wincache.scachesize", "8", PHP_INI_SYSTEM, OnUpdateLong, scachesize, zend_wincache_globals, wincache_globals)
+/* index 15 */ STD_PHP_INI_BOOLEAN("wincache.fcndetect", "1", PHP_INI_SYSTEM, OnUpdateBool, fcndetect, zend_wincache_globals, wincache_globals)
+/* index 16 */ STD_PHP_INI_ENTRY("wincache.apppoolid", NULL, PHP_INI_SYSTEM, OnUpdateString, apppoolid, zend_wincache_globals, wincache_globals)
+/* index 17 */ STD_PHP_INI_BOOLEAN("wincache.reroute_enabled", "0", PHP_INI_SYSTEM | PHP_INI_PERDIR, OnUpdateBool, reroute_enabled, zend_wincache_globals, wincache_globals)
+/* index 18 */ STD_PHP_INI_ENTRY("wincache.filemapdir", NULL, PHP_INI_SYSTEM, OnUpdateString, filemapdir, zend_wincache_globals, wincache_globals)
 PHP_INI_END()
 
 /* END OF PHP EXTENSION MACROS STUFF */
@@ -315,6 +313,9 @@ static void globals_initialize(zend_wincache_globals * globals)
     WCG(namesalt)    = NULL; /* Salt to use in names used by wincache */
     WCG(fcndetect)   = 1;    /* File change notification enabled by default */
     WCG(localheap)   = 0;    /* Local heap is disabled by default */
+    WCG(apppoolid)   = NULL; /* Use this application id */
+    WCG(reroute_enabled) = 0;/* Enable wrappers around standard PHP functions */
+    WCG(filemapdir)  = NULL; /* Directory where temp filemap files should be created */
 
     WCG(lasterror)   = 0;    /* GetLastError() value set by wincache */
     WCG(uclasterror) = 0;    /* Last error returned by user cache */
@@ -322,7 +323,6 @@ static void globals_initialize(zend_wincache_globals * globals)
     WCG(zvucache)    = NULL; /* zvcache_context for user zvals */
     WCG(zvscache)    = NULL; /* zvcache_context for session data */
     WCG(phscache)    = NULL; /* Hashtable containing zvcache_contexts */
-    WCG(issame)      = 1;    /* Indicates if same aplist is used */
     WCG(wclocks)     = NULL; /* HashTable for locks created by wincache_lock */
     WCG(zvcopied)    = NULL; /* HashTable which helps with refcounting */
     WCG(parentpid)   = 0;    /* Parent process identifier to use */
@@ -331,10 +331,6 @@ static void globals_initialize(zend_wincache_globals * globals)
     WCG(inifce)      = NULL; /* Ini entry null until register_ini called */
     WCG(inisavepath) = NULL; /* Fill when ps_open is called */
     WCG(dofctoggle)  = 0;    /* If set to 1, toggle value of fcenabled */
-    WCG(apppoolid)   = NULL; /* Use this application id */
-    WCG(srwlocks)    = 0;    /* Enable shared reader/writer locks by default */
-    WCG(reroute_enabled) = 0;/* Enable wrappers around standard PHP functions */
-    WCG(filemapdir)  = NULL; /* Directory where temp filemap files should be created */
 
     dprintverbose("end globals_initialize");
 
@@ -1396,7 +1392,7 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &flength) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &flength) == FAILURE)
     {
         RETURN_FALSE;
     }
@@ -1470,12 +1466,12 @@ static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
     }
 
     /* TBD?? Call original function if filename contains "://" */
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s|b", &filename, &filename_len, &use_include_path) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p|b", &filename, &filename_len, &use_include_path) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if (filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -1557,12 +1553,12 @@ static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if (filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -1637,12 +1633,12 @@ static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS)
     }
 
     /* TBD?? Call original function if filename contains "://" */
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s|b", &filename, &filename_len, &flags) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p|b", &filename, &filename_len, &flags) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if (filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -1720,12 +1716,12 @@ static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if(filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -1876,12 +1872,12 @@ static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if(filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -2016,12 +2012,12 @@ static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if(filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -2095,12 +2091,12 @@ static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if(filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -2174,7 +2170,7 @@ WINCACHE_FUNC(wincache_rmdir)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s|r", &dirname, &dirname_len, &zcontext) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p|r", &dirname, &dirname_len, &zcontext) == FAILURE)
     {
         RETURN_FALSE;
     }
@@ -2274,12 +2270,12 @@ static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s", &filename, &filename_len) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p", &filename, &filename_len) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if(filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -2339,12 +2335,12 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "s|r", &filename, &filename_len, &zcontext) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "p|r", &filename, &filename_len, &zcontext) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    if (filename_len == 0)
+    if (!filename || filename_len == 0 || filename[0] == '\0')
     {
         goto Finished;
     }
@@ -2442,7 +2438,7 @@ static void wincache_rename(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    if(zend_parse_parameters(ZEND_NUM_ARGS(), "ss|r", &srcname, &srcname_len, &dstname, &dstname_len, &zcontext) == FAILURE)
+    if(zend_parse_parameters(ZEND_NUM_ARGS(), "pp|r", &srcname, &srcname_len, &dstname, &dstname_len, &zcontext) == FAILURE)
     {
         RETURN_FALSE;
     }
@@ -3617,7 +3613,7 @@ PHP_FUNCTION(wincache_lock)
         }
 
         /* Use global or shared locktype based on isglobal value */
-        result = lock_initialize(pcontext, lockname, 1, ((isglobal) ? LOCK_TYPE_GLOBAL : LOCK_TYPE_SHARED), LOCK_USET_XREAD_XWRITE, NULL);
+        result = lock_initialize(pcontext, lockname, 1, ((isglobal) ? LOCK_TYPE_GLOBAL : LOCK_TYPE_SHARED), NULL);
         if(FAILED(result))
         {
             goto Finished;
@@ -3644,14 +3640,14 @@ PHP_FUNCTION(wincache_lock)
     _ASSERT(plock    != NULL);
     _ASSERT(pcontext != NULL);
 
-    if(pcontext->state == LOCK_STATE_WRITELOCK)
+    if(pcontext->state == LOCK_STATE_LOCKED)
     {
         /* Ignoring call to wincache_lock as lock is already acquired */
         result = WARNING_LOCK_IGNORE;
         goto Finished;
     }
 
-    lock_writelock(pcontext);
+    lock_lock(pcontext);
     plock->tuse = GetTickCount();
 
 Finished:
@@ -3717,14 +3713,14 @@ PHP_FUNCTION(wincache_unlock)
     pcontext = plock->lockobj;
     _ASSERT(pcontext != NULL);
 
-    if(pcontext->state != LOCK_STATE_WRITELOCK)
+    if(pcontext->state != LOCK_STATE_LOCKED)
     {
         /* Ignoring call to unlock as the lock is not acquired yet */
         result = WARNING_LOCK_IGNORE;
         goto Finished;
     }
 
-    lock_writeunlock(pcontext);
+    lock_unlock(pcontext);
     plock->tuse = GetTickCount();
 
 Finished:
@@ -3764,7 +3760,7 @@ PHP_FUNCTION(wincache_runtests)
     dprintverbose("end wincache_runtests");
     return;
 }
-#endif
+#endif /* WINCACHE_TEST */
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_fcache_find)
@@ -3815,7 +3811,7 @@ Finished:
 
     RETURN_FALSE;
 }
-#endif
+#endif /* WINCACHE_TEST */
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_fcnotify_fileinfo)
@@ -3876,7 +3872,7 @@ Finished:
 
     return;
 }
-#endif
+#endif /* WINCACHE_TEST */
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_fcnotify_meminfo)
@@ -3913,5 +3909,5 @@ Finished:
 
     return;
 }
-#endif
+#endif /* WINCACHE_TEST */
 

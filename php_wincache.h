@@ -58,7 +58,6 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     zvcache_context *        zvucache;    /* User controlled user cache */
     zvcache_context *        zvscache;    /* Zval cache used to store session data */
     HashTable *              phscache;    /* Hashtable for session caches for modified savepaths */
-    unsigned char            issame;      /* Is the opcode cache local */
     unsigned int             numfiles;    /* Configured number of files to handle */
     unsigned int             fcchkfreq;   /* File change check frequency in seconds */
     unsigned int             ttlmax;      /* Seconds a cache entry can stay dormant */
@@ -112,10 +111,8 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     zend_ini_entry *         inifce;      /* fcenabled ini_entry in ini_directives */
     zend_ini_entry *         inisavepath; /* save_path ini_entry in ini_directives */
     unsigned char            dofctoggle;  /* Do toggle of fcenabled due to filter settigns */
-    zend_bool                srwlocks;    /* Enable shared reader/writer locks */
                                           /* Enable wrapper functions around standard PHP functions */
     zend_bool                reroute_enabled;
-    unsigned int             internedsize; /* Bytes for the interned strings cache */
     const char *             apppoolid;   /* The application id. */
     char *                   filemapdir;  /* Directory where temp filemap files should be created */
 ZEND_END_MODULE_GLOBALS(wincache)

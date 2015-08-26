@@ -40,7 +40,6 @@ error_context wincache_errors[] =
     { FATAL_OUT_OF_SMEMORY, "Fatal: Out of shared memor error" },
     { FATAL_ACCESS_DENIED, "Fatal: Access Denied" },
     { FATAL_LOCK_INIT_CREATEMUTEX, "Fatal: CreateMutex operation failed in lock_initialize" },
-    { FATAL_LOCK_INIT_CREATEEVENT, "Fatal: CreateEvent operation failed in lock_initialize" },
     { FATAL_LOCK_LONGNAME, "Fatal: Lock prefix is too long" },
     { FATAL_FILEMAP_CREATION, "Fatal: Filemap creation error" },
     { FATAL_FILEMAP_INFOCREATE, "Fatal: CreateFileMapping operation for information filemap failed" },

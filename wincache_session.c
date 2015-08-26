@@ -315,6 +315,14 @@ PS_READ_FUNC(wincache)
         goto Finished;
     }
 
+    if (ZSTR_LEN(key) == 0 || ZSTR_VAL(key)[0] == '\0')
+    {
+        dprintverbose("ps_read_func: empty session ID name");
+
+        result = FATAL_SESSION_EMPTY_ID;
+        goto Finished;
+    }
+
     ZVAL_NULL(pzval);
 
     result = zvcache_get(pzcache, ZSTR_VAL(key), &pzval);
@@ -358,6 +366,14 @@ PS_WRITE_FUNC(wincache)
         goto Finished;
     }
 
+    if (ZSTR_LEN(key) == 0 || ZSTR_VAL(key)[0] == '\0')
+    {
+        dprintverbose("ps_write_func: empty session ID name");
+
+        result = FATAL_SESSION_EMPTY_ID;
+        goto Finished;
+    }
+
     ZVAL_STR(&tmp_zval, val);
 
     /* ttl = session.gc_maxlifetime, isadd = 0 */
@@ -397,11 +413,19 @@ PS_DESTROY_FUNC(wincache)
         goto Finished;
     }
 
+    if (ZSTR_LEN(key) == 0 || ZSTR_VAL(key)[0] == '\0')
+    {
+        dprintverbose("ps_destroy_func: empty session ID name");
+
+        /* ignore this and carry on... */
+        goto Finished;
+    }
+
     result = zvcache_delete(pzcache, ZSTR_VAL(key));
     if(FAILED(result))
     {
         /* Entry not found is not a fatal error */
-        if(result = WARNING_ZVCACHE_EMISSING)
+        if(result == WARNING_ZVCACHE_EMISSING)
         {
             result = NONFATAL;
         }

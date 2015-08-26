@@ -286,7 +286,7 @@ int fcache_initialize(fcache_context * pfcache, unsigned short islocal, unsigned
         goto Finished;
     }
 
-    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, LOCK_USET_XREAD_XWRITE, NULL);
+    result = lock_initialize(pfcache->prwlock, "FILECONTENT_CACHE", cachekey, locktype, NULL);
     if(FAILED(result))
     {
         goto Finished;

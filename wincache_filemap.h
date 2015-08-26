@@ -142,7 +142,7 @@ struct filemap_information
     size_t                       infonlen;      /* Length of name buffer */
     filemap_information_header * header;        /* Mapped memory address to information segment */
     HANDLE                       hinitdone;     /* event inidicating if memory is initialized */
-    lock_context *               hrwlock;       /* Lock object for read/write to info filemap */
+    lock_context *               hlock;         /* Lock object for info filemap */
 };
 
 typedef struct filemap_global_context filemap_global_context;

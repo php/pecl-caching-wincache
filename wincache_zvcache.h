@@ -66,7 +66,7 @@ struct zvcache_header
     unsigned int      hitcount;          /* Cache items cumulative hit count */
     unsigned int      misscount;         /* Cache items cumulative miss count */
     unsigned int      init_ticks;        /* Tick count when the cache first got created */
-    unsigned int      rdcount;           /* Reader count for shared lock */
+    unsigned int      last_owner;        /* PID of last owner for lock */
 
     unsigned int      lscavenge;         /* Ticks when last scavenger run happened */
     unsigned int      scstart;           /* Index from where scavenger should start */
@@ -105,7 +105,7 @@ struct zvcache_context
     char *            zvmemaddr;         /* base addr of memory segment */
     zvcache_header *  zvheader;          /* zvcache cache header */
     filemap_context * zvfilemap;         /* filemap where zvcache is kept */
-    lock_context *    zvrwlock;          /* reader writer lock for zvcache header */
+    lock_context *    zvlock;            /* lock for zvcache header */
     alloc_context *   zvalloc;           /* alloc context for zvcache segment */
 };
 

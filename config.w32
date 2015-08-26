@@ -63,11 +63,7 @@ if (PHP_WINCACHE != "no") {
         if (PHP_DEBUG == "yes") {
             ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
             ADD_FLAG('CFLAGS_WINCACHE', '/D WINCACHE_DEBUG');
-            if (VCVERS >= 1700) {
-                ADD_FLAG('CFLAGS_WINCACHE', '/ZI');
-            } else {
-                ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
-            }
+            ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
             ADD_FLAG('CFLAGS_WINCACHE', '/WX');
         }
 

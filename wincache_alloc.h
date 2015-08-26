@@ -59,19 +59,19 @@ typedef char * (*fn_strdup)(void * palloc, size_t hoffset, const char * str);
 typedef void   (*fn_free)(void * palloc, size_t hoffset, void * addr);
 
 /* TBD? Right now I am doing a custom implementation which will probably work */
-/* best for the problem at hand. Try a quick fit memory allocator later. Lock */
-/* is shared, xread, xwrite. Change to sread, xwrite lock if possible. */
+/* best for the problem at hand. Try a quick fit memory allocator later. */
 
 typedef struct alloc_segment_header alloc_segment_header;
 struct alloc_segment_header
 {
     unsigned int mapcount;    /* How many processes mapped this segment */
+    unsigned int usedcount;   /* Number of used blocks. Determine fragmentation */
+    unsigned int freecount;   /* Number of free blocks Determine when to defrag */
+    unsigned int last_owner;  /* PID of last process to acquire the lock for this segment */
     size_t       total_size;  /* Total size of shared memory segment */
     size_t       free_size;   /* Bytes left to be allocated */
     size_t       cacheheader1;/* Offset to memory which contains 1st cache_header */
     size_t       cacheheader2;/* Offset to memory which contains 2nd cache header */
-    unsigned int usedcount;   /* Number of used blocks. Determine fragmentation */
-    unsigned int freecount;   /* Number of free blocks Determine when to defrag */
 };
 
 /* Each free block will have following information */
@@ -123,7 +123,7 @@ struct alloc_context
     HANDLE                 hinitdone; /* event to indicate if memory is initialized */
     void *                 memaddr;   /* Shared memory segment which is manipulated */
     size_t                 size;      /* Size of memory segment to be allocated */
-    lock_context *         rwlock;    /* Lock to acquire before manipulating segment */
+    lock_context *         lock;      /* Lock to acquire before manipulating segment */
     alloc_segment_header * header;    /* Address of header for this alloc_context */
     unsigned int           localheap; /* Set to 1 when localheap should be used */
 };

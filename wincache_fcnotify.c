@@ -131,10 +131,12 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
         {
             /* Unregister change notification and set plistener to NULL to */
             /* make system set a new change notification system if required */
-            lock_writelock(pnotify->fclock);
+            lock_lock(pnotify->fclock);
+
             unregister_directory_changes(plistener);
             plistener->pfcnvalue->plistener = NULL;
-            lock_writeunlock(pnotify->fclock);
+
+            lock_unlock(pnotify->fclock);
         }
 
         // TODO: Handle ERROR_NOTIFY_ENUM_DIR - change buffer overflowed & we
@@ -438,7 +440,7 @@ static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * pliste
 {
     if(InterlockedDecrement(&plistener->lrefcount) == 0)
     {
-        lock_writelock(pnotify->fclock);
+        lock_lock(pnotify->fclock);
 
         unregister_directory_changes(plistener);
 
@@ -456,7 +458,7 @@ static void listener_refdec(fcnotify_context * pnotify, fcnotify_listen * pliste
         alloc_pefree(plistener);
         plistener = NULL;
 
-        lock_writeunlock(pnotify->fclock);
+        lock_unlock(pnotify->fclock);
     }
 }
 
@@ -653,7 +655,7 @@ int fcnotify_listenerexists(fcnotify_context *pnotify, const char * folderpath, 
 
     *listenerexists = 0;
 
-    lock_readlock(pnotify->fclock);
+    lock_lock(pnotify->fclock);
 
     /* Look if folder path is present in cache */
     index = utils_getindex(folderpath, pnotify->fcheader->valuecount);
@@ -676,7 +678,7 @@ Finished:
         dprintimportant("failure %d in fcnotify_listenerexists", result);
     }
 
-    lock_readunlock(pnotify->fclock);
+    lock_unlock(pnotify->fclock);
 
     dprintverbose("end fcnotify_listenerexists");
 
@@ -742,7 +744,7 @@ int fcnotify_initialize(fcnotify_context * pnotify, unsigned short islocal, void
         goto Finished;
     }
 
-    result = lock_initialize(pnotify->fclock, "FILE_CHANGE_NOTIFY", 1, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount);
+    result = lock_initialize(pnotify->fclock, "FILE_CHANGE_NOTIFY", 1, locktype, &header->last_owner);
     if(FAILED(result))
     {
         goto Finished;
@@ -832,7 +834,7 @@ void fcnotify_initheader(fcnotify_context * pnotify, unsigned int filecount)
      /* This method is called by aplist_initialize which is */
      /* taking care of blocking other processes */
      /* Also rdcount can be safely set to 0 as lock is not active */
-     pheader->rdcount       = 0;
+     pheader->last_owner    = 0;
      pheader->itemcount     = 0;
      pheader->valuecount    = filecount;
      memset((void *)pheader->values, 0, sizeof(size_t) * filecount);
@@ -939,7 +941,7 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
 
     /* Go through all the entries and remove entries for which refcount is 0 */
     /* Do it only for processes which are dead or if this was the owner pid */
-    lock_writelock(pnotify->fclock);
+    lock_lock(pnotify->fclock);
 
     for(index = 0; index < count; index++)
     {
@@ -959,7 +961,7 @@ static void run_fcnotify_scavenger(fcnotify_context * pnotify)
         }
     }
 
-    lock_writeunlock(pnotify->fclock);
+    lock_unlock(pnotify->fclock);
 
     /* Go through pidhandles table and remove entries for dead processes */
     zend_hash_apply(phashtable, pidhandles_apply);
@@ -1072,9 +1074,9 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
     pheader = pnotify->fcheader;
 
-    /* Get a reader lock before reading any values */
-    lock_readlock(pnotify->fclock);
-    flock = 2;
+    /* Acquire lock before reading any values */
+    lock_lock(pnotify->fclock);
+    flock = 1;
 
     if(filepath == NULL)
     {
@@ -1087,19 +1089,11 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         /* If listener in fcnotify_value is rehooked, force a file change check */
         if(pvalue && pvalue->reusecount != *pcount)
         {
-            /* get a write lock and update pcount */
-            lock_readunlock(pnotify->fclock);
-            flock = 0;
-
-            lock_writelock(pnotify->fclock);
-
             /* Recheck after switching to write lock */
             if(pvalue->reusecount != *pcount)
             {
                 *pcount = pvalue->reusecount;
             }
-
-            lock_writeunlock(pnotify->fclock);
 
             result = WARNING_FCNOTIFY_FORCECHECK;
             goto Finished;
@@ -1172,16 +1166,10 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         listenp = 1;
     }
 
-    lock_readunlock(pnotify->fclock);
-    flock = 0;
-
     /* If folder is not there, register for change notification */
     /* and add the folder to the hashtable */
     if(listenp)
     {
-        lock_writelock(pnotify->fclock);
-        flock = 1;
-
         _ASSERT(folderpath != NULL);
 
         /* Check again to make sure no one else already registered */
@@ -1209,7 +1197,6 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         {
             _ASSERT(pvalue == NULL);
 
-            /* Doing create_fcnotify_data inside write lock to keep things simpler */
             result = create_fcnotify_data(pnotify, folderpath, &ptemp);
             if(FAILED(result))
             {
@@ -1229,9 +1216,6 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
         *poffset = ((char *)pvalue - pnotify->fcmemaddr);
         *pcount  = pvalue->reusecount;
-
-        lock_writeunlock(pnotify->fclock);
-        flock = 0;
     }
     else
     {
@@ -1239,21 +1223,22 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         /* offset if this is a first call to fcnotify_check */
         if(pvalue != NULL && filepath != NULL)
         {
-            lock_writelock(pnotify->fclock);
-
             pvalue->refcount++;
 
             *poffset = ((char *)pvalue - pnotify->fcmemaddr);
             *pcount  = pvalue->reusecount;
-
-            lock_writeunlock(pnotify->fclock);
         }
     }
 
     /* Run scavenger every SCAVENGER_FREQUENCY milliseconds */
-    /* scavenger function will take a write lock */
+    /* scavenger function will take a lock */
     if(utils_ticksdiff(0, pnotify->lscavenge) >= SCAVENGER_FREQUENCY)
     {
+        if(flock == 1)
+        {
+            lock_unlock(pnotify->fclock);
+            flock = 0;
+        }
         run_fcnotify_scavenger(pnotify);
     }
 
@@ -1261,13 +1246,7 @@ Finished:
 
     if(flock == 1)
     {
-        lock_writeunlock(pnotify->fclock);
-        flock = 0;
-    }
-
-    if(flock == 2)
-    {
-        lock_readunlock(pnotify->fclock);
+        lock_unlock(pnotify->fclock);
         flock = 0;
     }
 
@@ -1304,8 +1283,7 @@ void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigned int *
     _ASSERT(poffset != NULL);
     _ASSERT(pcount  != NULL);
 
-    /* offset is written under writelock. Use only under readlock */
-    lock_writelock(pnotify->fclock);
+    lock_lock(pnotify->fclock);
     _ASSERT(*poffset > 0);
 
     /* Just decrement the refcount. Scavenger will take care of deleting the entry */
@@ -1318,7 +1296,7 @@ void fcnotify_close(fcnotify_context * pnotify, size_t * poffset, unsigned int *
     *poffset = 0;
     *pcount  = 0;
 
-    lock_writeunlock(pnotify->fclock);
+    lock_unlock(pnotify->fclock);
 
     dprintverbose("end fcnotify_close");
 
@@ -1351,7 +1329,7 @@ int fcnotify_getinfo(fcnotify_context * pnotify, zend_bool summaryonly, fcnotify
         goto Finished;
     }
 
-    lock_readlock(pnotify->fclock);
+    lock_lock(pnotify->fclock);
     flock = 1;
 
     pcinfo->itemcount = pnotify->fcheader->itemcount;
@@ -1416,7 +1394,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pnotify->fclock);
+        lock_unlock(pnotify->fclock);
         flock = 0;
     }
 

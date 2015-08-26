@@ -62,7 +62,7 @@ typedef struct rplist_header rplist_header;
 struct rplist_header
 {
     unsigned int       itemcount;  /* Number of valid items */
-    unsigned int       rdcount;    /* Reader count for shared lock */
+    unsigned int       last_owner; /* PID of last owner of lock */
     unsigned int       valuecount; /* Total values starting from last entry */
     size_t             values[1];  /* valuecount rplist_value offsets */
 };
@@ -73,7 +73,7 @@ struct rplist_context
     char *             rpmemaddr;  /* base memory address of rplist */
     rplist_header *    rpheader;   /* rplist cache header */
     filemap_context *  rpfilemap;  /* filemap where rplist is kept */
-    lock_context *     rprwlock;   /* reader writer lock for rplist_header */
+    lock_context *     rplock;     /* lock for rplist_header */
     alloc_context *    rpalloc;    /* alloc context for rplist segment */
 };
 

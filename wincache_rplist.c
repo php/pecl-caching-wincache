@@ -334,7 +334,7 @@ int rplist_create(rplist_context ** ppcache)
     pcache->rpmemaddr = NULL;
     pcache->rpheader  = NULL;
     pcache->rpfilemap = NULL;
-    pcache->rprwlock  = NULL;
+    pcache->rplock    = NULL;
     pcache->rpalloc   = NULL;
 
     *ppcache = pcache;
@@ -428,13 +428,13 @@ int rplist_initialize(rplist_context * pcache, unsigned short islocal, unsigned 
     }
 
     /* Create reader writer lock for the file list */
-    result = lock_create(&pcache->rprwlock);
+    result = lock_create(&pcache->rplock);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    result = lock_initialize(pcache->rprwlock, "RESPATHS_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &pcache->rpheader->rdcount);
+    result = lock_initialize(pcache->rplock, "RESPATHS_CACHE", cachekey, locktype, &pcache->rpheader->last_owner);
     if(FAILED(result))
     {
         goto Finished;
@@ -469,9 +469,9 @@ void rplist_initheader(rplist_context * pcache, unsigned int filecount)
 
      /* This method is called by aplist_initialize which is */
      /* taking care of blocking other processes */
-     /* Also rdcount can be safely set to 0 as lock is not active */
+     /* Also last_owner can be safely set to 0 as lock is not active */
      rpheader->itemcount  = 0;
-     rpheader->rdcount    = 0;
+     rpheader->last_owner = 0;
      rpheader->valuecount = filecount;
      memset((void *)rpheader->values, 0, sizeof(size_t) * filecount);
 
@@ -502,12 +502,12 @@ void rplist_terminate(rplist_context * pcache)
             pcache->rpfilemap = NULL;
         }
 
-        if(pcache->rprwlock != NULL)
+        if(pcache->rplock != NULL)
         {
-            lock_terminate(pcache->rprwlock);
-            lock_destroy(pcache->rprwlock);
+            lock_terminate(pcache->rplock);
+            lock_destroy(pcache->rplock);
 
-            pcache->rprwlock = NULL;
+            pcache->rplock = NULL;
         }
 
         pcache->rpheader = NULL;
@@ -547,9 +547,10 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
         goto Finished;
     }
 
-    lock_readlock(pcache->rprwlock);
+    lock_lock(pcache->rplock);
+    flock = 1;
+
     result = findrpath_in_cache(pcache, filename, cwdcexec, findex, &pvalue);
-    lock_readunlock(pcache->rprwlock);
 
     if(FAILED(result))
     {
@@ -565,33 +566,10 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
             goto Finished;
         }
 
-        lock_writelock(pcache->rprwlock);
-        flock = 1;
+        pvalue = pnewval;
+        pnewval = NULL;
 
-        /* Check if entry is still missing after getting write lock */
-        result = findrpath_in_cache(pcache, filename, cwdcexec, findex, &pvalue);
-        if(FAILED(result))
-        {
-            goto Finished;
-        }
-
-        if(pvalue != NULL)
-        {
-            /* Some other process added the entry before this */
-            /* process could do. Destroy new entry and use existing entry */
-            destroy_rplist_data(pcache, pnewval);
-            pnewval = NULL;
-        }
-        else
-        {
-            pvalue = pnewval;
-            pnewval = NULL;
-
-            add_rplist_entry(pcache, findex, pvalue);
-        }
-
-        lock_writeunlock(pcache->rprwlock);
-        flock = 0;
+        add_rplist_entry(pcache, findex, pvalue);
     }
 
     _ASSERT(pvalue != NULL);
@@ -605,7 +583,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->rprwlock);
+        lock_unlock(pcache->rplock);
         flock = 0;
     }
 
@@ -636,7 +614,7 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
     _ASSERT(absentry != 0);
 
     /* Acquire write lock before changing absentry */
-    lock_writelock(pcache->rprwlock);
+    lock_lock(pcache->rplock);
 
     pvalue->absentry   = absentry;
 
@@ -648,7 +626,7 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
         pvalue->same_value = prevsame;
     }
 
-    lock_writeunlock(pcache->rprwlock);
+    lock_unlock(pcache->rplock);
 
     dprintverbose("end rplist_setabsval");
     return;
@@ -665,7 +643,7 @@ void rplist_deleteval(rplist_context * pcache, size_t valoffset)
     _ASSERT(pcache    != NULL);
     _ASSERT(valoffset != 0);
 
-    lock_writelock(pcache->rprwlock);
+    lock_lock(pcache->rplock);
 
     pvalue = RPLIST_VALUE(pcache->rpalloc, valoffset);
     while(pvalue != NULL)
@@ -682,7 +660,7 @@ void rplist_deleteval(rplist_context * pcache, size_t valoffset)
         remove_rplist_entry(pcache, index, ptemp);
     }
 
-    lock_writeunlock(pcache->rprwlock);
+    lock_unlock(pcache->rplock);
 
     dprintverbose("end rplist_deleteval");
     return;
@@ -698,7 +676,7 @@ void rplist_markdeleted(rplist_context * pcache, size_t valoffset)
     _ASSERT(pcache    != NULL);
     _ASSERT(valoffset != 0);
 
-    lock_writelock(pcache->rprwlock);
+    lock_lock(pcache->rplock);
 
     pvalue = RPLIST_VALUE(pcache->rpalloc, valoffset);
     while(pvalue != NULL)
@@ -714,7 +692,7 @@ void rplist_markdeleted(rplist_context * pcache, size_t valoffset)
         pvalue = RPLIST_VALUE(pcache->rpalloc, pvalue->same_value);
     }
 
-    lock_writeunlock(pcache->rprwlock);
+    lock_unlock(pcache->rplock);
 
     dprintverbose("end rplist_markdeleted");
     return;
@@ -746,7 +724,7 @@ int rplist_getinfo(rplist_context * pcache, zend_bool summaryonly, rplist_info *
         goto Finished;
     }
 
-    lock_readlock(pcache->rprwlock);
+    lock_lock(pcache->rplock);
     flock = 1;
 
     pcinfo->itemcount = pcache->rpheader->itemcount;
@@ -811,7 +789,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pcache->rprwlock);
+        lock_unlock(pcache->rplock);
         flock = 0;
     }
 

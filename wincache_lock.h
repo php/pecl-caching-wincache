@@ -46,41 +46,30 @@
 #define LOCK_TYPE_GLOBAL        3     /* Global lock. Use exact name as specified */
 #define LOCK_TYPE_MAXIMUM       7     /* type is a 3 bit field. Max value is 7 */
 
-#define LOCK_USET_INVALID       0     /* Invalid use type */
-#define LOCK_USET_SREAD_XWRITE  1     /* Lock for shared reads exclusive writes */
-#define LOCK_USET_XREAD_XWRITE  2     /* Lock for exclusive reads and writes */
-#define LOCK_USET_MAXIMUM       7     /* usetype is a 3 bit field. Max value is 7 */
-
-#define LOCK_STATE_INVALID      0     /* Invalid state */
-#define LOCK_STATE_UNLOCKED     1     /* Lock is not acquired */
-#define LOCK_STATE_READLOCK     2     /* One or more readers active */
-#define LOCK_STATE_WRITELOCK    3     /* Write lock is active */
-#define LOCK_STATE_MAXIMUM      3     /* state is a 2 bit field. Max value is 3 */
+#define LOCK_STATE_UNLOCKED     0     /* Lock is not acquired */
+#define LOCK_STATE_LOCKED       1     /* Lock is acquired */
+#define LOCK_STATE_MAXIMUM      1     /* state is a 1 bit field. Max value is 1 */
 
 /* lock_context - LOCAL - 32 bytes */
-/* reader count - SHARED */
+/* last_owner - SHARED */
 
 typedef struct lock_context lock_context;
 struct lock_context
 {
     unsigned       id:8;              /* Unique identifier for the lock */
     unsigned       type:3;            /* Type of lock (shared/local/global) */
-    unsigned       usetype:3;         /* Is this lock read/write or write lock */
+    unsigned       unused:3;          /* padding */
     unsigned       state:2;           /* Current state of the lock for debugging */
     unsigned       namelen:16;        /* length of name buffers */
 
     char *         nameprefix;        /* Name prefix to use for named objects */
-    HANDLE         haccess;           /* Handle to mutex to synchronize access to methods */
-    HANDLE         hcanread;          /* Handle to event which tells when read is allowed */
-    HANDLE         hcanwrite;         /* Handle to event which tells when write is allowed */
-    HANDLE         hxwrite;           /* Handle to mutex to prevent multiple writers */
-    unsigned int   last_access;       /* PID of last process to acquire for read */
-    unsigned int   last_writer;       /* PID of last process to acquire for write */
-    unsigned int * prcount;           /* Pointer to shared memory which has reader count */
+    HANDLE         hxlock;            /* Handle to mutex to prevent multiple writers */
+    unsigned int * last_owner;        /* Pointer to shared memory which has the last owner PID */
 };
 
 extern int  lock_create(lock_context ** pplock);
 extern void lock_destroy(lock_context * plock);
+
 extern int lock_get_nameprefix(
     char * name,
     unsigned short cachekey,
@@ -88,14 +77,12 @@ extern int lock_get_nameprefix(
     char **ppnew_prefix,
     size_t * pcchnew_prefix
     );
-extern int  lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned short usetype, unsigned int * prcount);
+extern int  lock_initialize(lock_context * plock, char * name, unsigned short cachekey, unsigned short type, unsigned int * plast_owner);
 extern void lock_terminate(lock_context * plock);
 
-extern void lock_readlock(lock_context * plock);
-extern void lock_readunlock(lock_context * plock);
-extern void lock_writelock(lock_context * plock);
-extern void lock_writeunlock(lock_context * plock);
-extern int  lock_getnewname(lock_context * plock, char * suffix, char * newname, unsigned int length);
+extern void lock_lock(lock_context * plock);
+extern void lock_unlock(lock_context * plock);
+
 extern void lock_runtest();
 
 #endif /* _WINCACHE_LOCK_H_ */

@@ -94,7 +94,7 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
             /* Ignore entries which are marked deleted */
             if(pvalue->is_deleted == 1)
             {
-                /* If this process is good to delete the opcode */
+                /* If this process is good to delete the */
                 /* cache data tell caller to delete it */
                 if(ppdelete != NULL && *ppdelete == NULL &&
                    pcache->apctype == APLIST_TYPE_GLOBAL)
@@ -275,12 +275,12 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
         /* If scavenger is active, run it and try allocating again */
         if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE)
         {
-            lock_writelock(pcache->aprwlock);
+            lock_lock(pcache->aplock);
 
             run_aplist_scavenger(pcache, DO_FULL_SCAVENGER_RUN);
             pcache->apheader->lscavenge = GetTickCount();
 
-            lock_writeunlock(pcache->aprwlock);
+            lock_unlock(pcache->aplock);
 
             pbaseadr = (char *)alloc_smalloc(pcache->apalloc, alloclen);
             if(pbaseadr == NULL)
@@ -411,7 +411,7 @@ Finished:
     return result;
 }
 
-/* Call this method under write lock if resentry can be non-zero so that */
+/* Call this method under lock if resentry can be non-zero so that */
 /* rplist can never have an offset of aplist which is not valid */
 static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
 {
@@ -436,7 +436,7 @@ static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue)
     dprintverbose("end destroy_aplist_data");
 }
 
-/* Call this method under the write lock */
+/* Call this method under the lock */
 static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue)
 {
     aplist_header * header  = NULL;
@@ -481,7 +481,7 @@ static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist
     return;
 }
 
-/* Call this method under write lock */
+/* Call this method under the lock */
 static void remove_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue)
 {
     alloc_context * apalloc = NULL;
@@ -554,7 +554,7 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
     return;
 }
 
-/* Call this method under write lock */
+/* Call this method under the lock */
 static void delete_aplist_fileentry(aplist_context * pcache, const char * filename)
 {
     unsigned int   findex = 0;
@@ -583,7 +583,7 @@ static void delete_aplist_fileentry(aplist_context * pcache, const char * filena
     return;
 }
 
-/* Call this method under write lock */
+/* Call this method under tje lock */
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
 {
     unsigned int    sindex   = 0;
@@ -678,10 +678,9 @@ int aplist_create(aplist_context ** ppcache)
     pcache->apmemaddr   = NULL;
     pcache->apheader    = NULL;
     pcache->apfilemap   = NULL;
-    pcache->aprwlock    = NULL;
+    pcache->aplock      = NULL;
     pcache->apalloc     = NULL;
 
-    pcache->polocal     = NULL;
     pcache->prplist     = NULL;
     pcache->pnotify     = NULL;
     pcache->pfcache     = NULL;
@@ -746,8 +745,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     pcache->apctype = apctype;
     pcache->islocal = pcache->apctype;
 
-    /* Disable scavenger if opcode cache is local only */
-    /* Or if ttlmax value is set to 0 */
+    /* Disable scavenger if ttlmax value is set to 0 */
     pcache->scstatus = SCAVENGER_STATUS_ACTIVE;
     if(ttlmax == 0)
     {
@@ -822,13 +820,13 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     header = pcache->apheader;
 
     /* Create reader writer locks for the aplist */
-    result = lock_create(&pcache->aprwlock);
+    result = lock_create(&pcache->aplock);
     if(FAILED(result))
     {
         goto Finished;
     }
 
-    result = lock_initialize(pcache->aprwlock, "FILELIST_CACHE", cachekey, locktype, LOCK_USET_SREAD_XWRITE, &header->rdcount);
+    result = lock_initialize(pcache->aplock, "FILELIST_CACHE", cachekey, locktype, &header->last_owner);
     if(FAILED(result))
     {
         goto Finished;
@@ -873,7 +871,7 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
     {
         if (initmemory)
         {
-            /* No need to get a write lock as other processes */
+            /* No need to get a lock as other processes */
             /* are blocked waiting for hinitdone event */
 
             /* Initialize resolve path cache header */
@@ -889,11 +887,11 @@ int aplist_initialize(aplist_context * pcache, unsigned short apctype, unsigned 
 
             cticks = GetTickCount();
 
-            /* We can set rdcount to 0 safely as other processes are */
+            /* We can set last_owner to 0 safely as other processes are */
             /* blocked and this process is right now not using lock */
             header->mapcount     = 1;
             header->init_ticks   = cticks;
-            header->rdcount      = 0;
+            header->last_owner   = 0;
             header->itemcount    = 0;
 
             _ASSERT(filecount > PER_RUN_SCAVENGE_COUNT);
@@ -967,12 +965,12 @@ Finished:
             pcache->prplist = NULL;
         }
 
-        if(pcache->aprwlock != NULL)
+        if(pcache->aplock != NULL)
         {
-            lock_terminate(pcache->aprwlock);
-            lock_destroy(pcache->aprwlock);
+            lock_terminate(pcache->aplock);
+            lock_destroy(pcache->aplock);
 
-            pcache->aprwlock = NULL;
+            pcache->aplock = NULL;
         }
 
         if (pcache->apheader != NULL)
@@ -1091,12 +1089,12 @@ void aplist_terminate(aplist_context * pcache)
             pcache->pfcache = NULL;
         }
 
-        if(pcache->aprwlock != NULL)
+        if(pcache->aplock != NULL)
         {
-            lock_terminate(pcache->aprwlock);
-            lock_destroy(pcache->aprwlock);
+            lock_terminate(pcache->aplock);
+            lock_destroy(pcache->aplock);
 
-            pcache->aprwlock = NULL;
+            pcache->aplock = NULL;
         }
 
         if(pcache->apheader != NULL)
@@ -1153,22 +1151,18 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     apheader = pcache->apheader;
     ticks    = GetTickCount();
 
+    lock_lock(pcache->aplock);
+    flock = 1;
+
     /* Check if scavenger is active for this process and if yes run the partual scavenger */
     if(pcache->scstatus == SCAVENGER_STATUS_ACTIVE && (utils_ticksdiff(ticks, apheader->lscavenge) > apheader->scfreq))
     {
-        /* run scavenger under write lock */
-        lock_writelock(pcache->aprwlock);
-
         if(utils_ticksdiff(ticks, apheader->lscavenge) > apheader->scfreq)
         {
             run_aplist_scavenger(pcache, DO_PARTIAL_SCAVENGER_RUN);
             apheader->lscavenge = GetTickCount();
         }
-
-        lock_writeunlock(pcache->aprwlock);
     }
-
-    lock_readlock(pcache->aprwlock);
 
     /* Find file in hashtable and also get any entry for the file if mark deleted */
     result = find_aplist_entry(pcache, filename, findex, DO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
@@ -1180,8 +1174,6 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
             pvalue->use_ticks = ticks;
         }
     }
-
-    lock_readunlock(pcache->aprwlock);
 
     if(FAILED(result))
     {
@@ -1197,16 +1189,21 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
     /* or if the cache entry is stale, create a new entry */
     if(fchange == FILE_IS_CHANGED || pvalue == NULL)
     {
+        /* Must drop lock before calling create_aplist_data */
+        lock_unlock(pcache->aplock);
+        flock = 0;
+
         result = create_aplist_data(pcache, filename, &pnewval);
         if(FAILED(result))
         {
             goto Finished;
         }
 
-        lock_writelock(pcache->aprwlock);
+        /* reaquire lock after creating aplist data */
+        lock_lock(pcache->aplock);
         flock = 1;
 
-        /* Check again after getting write lock to see if something changed */
+        /* Check again after getting lock to see if something changed */
         result = find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, &pdelete);
         if(FAILED(result))
         {
@@ -1248,19 +1245,13 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
 
             add_aplist_entry(pcache, findex, pvalue);
         }
-
-        lock_writeunlock(pcache->aprwlock);
-        flock = 0;
     }
 
     /* If an entry is to be deleted and is not already */
     /* deleted while creating new value, delete it now */
     if(pdelete != NULL)
     {
-        lock_writelock(pcache->aprwlock);
-        flock = 1;
-
-        /* Check again to see if anything changed before getting write lock */
+        /* Check again to see if anything changed before getting lock */
         result = find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pdummy, &pdelete);
         if(FAILED(result))
         {
@@ -1273,9 +1264,6 @@ int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int
             remove_aplist_entry(pcache, findex, pdelete);
             pdelete = NULL;
         }
-
-        lock_writeunlock(pcache->aprwlock);
-        flock = 0;
     }
 
     _ASSERT(pvalue != NULL);
@@ -1287,7 +1275,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->aprwlock);
+        lock_unlock(pcache->aplock);
         flock = 0;
     }
 
@@ -1324,8 +1312,8 @@ int aplist_force_fccheck(aplist_context * pcache, zval * filelist)
     _ASSERT(pcache   != NULL);
     _ASSERT(filelist == NULL || Z_TYPE_P(filelist) == IS_STRING || Z_TYPE_P(filelist) == IS_ARRAY);
 
-    /* Get the write lock once instead of taking the lock for each file */
-    lock_writelock(pcache->aprwlock);
+    /* Get the lock once instead of taking the lock for each file */
+    lock_lock(pcache->aplock);
     flock = 1;
 
     /* Always make currently executing file refresh on next load */
@@ -1413,7 +1401,7 @@ Finished:
 
     if(flock)
     {
-        lock_writeunlock(pcache->aprwlock);
+        lock_unlock(pcache->aplock);
         flock = 0;
     }
 
@@ -1461,7 +1449,7 @@ void aplist_mark_file_changed(aplist_context * pcache, char * filepath)
 
     dprintverbose("start aplist_mark_file_changed");
 
-    lock_readlock(pcache->aprwlock);
+    lock_lock(pcache->aplock);
 
     /* Find the entry for filepath and mark it deleted */
     findex = utils_getindex(filepath, pcache->apheader->valuecount);
@@ -1472,7 +1460,7 @@ void aplist_mark_file_changed(aplist_context * pcache, char * filepath)
         pvalue->is_changed = 1;
     }
 
-    lock_readunlock(pcache->aprwlock);
+    lock_unlock(pcache->aplock);
 
     dprintverbose("end aplist_mark_file_changed");
 
@@ -1528,15 +1516,10 @@ Finished:
     return result;
 }
 
-int aplist_fcache_reset_lastcheck_time(aplist_context * pcache, const char * filename)
-{
-    return set_lastcheck_time(pcache, filename, 0);
-}
-
-/* Used by wincache_resolve_path and wincache_stream_open_function */
+/* Used by wincache_resolve_path and wincache_stream_open_function. */
 /* If ppvalue is passed as null, this function return the standardized form of */
-/* filename which can include resolve path to absolute path mapping as well */
-/* Make sure this function is called without write lock when ppvalue is non-null */
+/* filename which can include resolve path to absolute path mapping as well. */
+/* Make sure this function is called without lock when ppvalue is non-null. */
 int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue)
 {
     int              result   = NONFATAL;
@@ -1561,12 +1544,15 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
 
     _ASSERT(pcache->prplist != NULL);
 
+    if (ppvalue != NULL)
+    {
+        lock_lock(pcache->aplock);
+        flock = 1;
+    }
+
     /* Look for absolute path in resolve path cache first */
     /* All paths in resolve path cache are resolved using */
     /* include_path and don't need checks against open_basedir */
-    lock_readlock(pcache->aprwlock);
-    flock = 1;
-
     result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry);
     if(FAILED(result))
     {
@@ -1628,10 +1614,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             {
                 addticks = pvalue->add_ticks;
 
-                lock_readunlock(pcache->aprwlock);
-                lock_writelock(pcache->aprwlock);
-                flock = 2;
-
                 /* If the entry is unchanged during lock change, remove it from hashtable */
                 /* Deleting the aplist entry will delete rplist entries as well */
                 if(pvalue->add_ticks == addticks)
@@ -1644,9 +1626,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
                 pvalue   = NULL;
                 rpvalue  = NULL;
                 resentry = 0;
-
-                lock_writeunlock(pcache->aprwlock);
-                flock = 0;
             }
         }
 
@@ -1662,14 +1641,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             dprintverbose("stored fullpath in aplist is %s", fullpath);
         }
     }
-
-    if(flock == 1)
-    {
-        lock_readunlock(pcache->aprwlock);
-        flock = 0;
-    }
-
-    _ASSERT(flock == 0);
 
     /* If no valid absentry is found so far, get the fullpath from php-core */
     if(pvalue == NULL)
@@ -1712,19 +1683,30 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     {
         findex = utils_getindex(fullpath, pcache->apheader->valuecount);
 
+        _ASSERT(flock == 1);
+        lock_unlock(pcache->aplock);
+        flock = 0;
+
         result = aplist_getentry(pcache, fullpath, findex, &pvalue);
         if(FAILED(result))
         {
             goto Finished;
         }
-    }
 
-    lock_readlock(pcache->aprwlock);
-    flock = 1;
+        _ASSERT(ppvalue);
+        lock_lock(pcache->aplock);
+        flock = 1;
+    }
 
     if(pvalue->fcacheval == 0)
     {
-        lock_readunlock(pcache->aprwlock);
+        /*
+         * Unlock here, since the fcache_createval will read the entire file
+         * into memory. Also, the original_stream_open_function could take a
+         * long time with all the file I/O.
+         */
+        _ASSERT(flock == 1);
+        lock_unlock(pcache->aplock);
         flock = 0;
 
         if(usesopen == USE_STREAM_OPEN_CHECK)
@@ -1766,8 +1748,9 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             goto Finished;
         }
 
-        lock_writelock(pcache->aprwlock);
-        flock = 2;
+        _ASSERT(ppvalue);
+        lock_lock(pcache->aplock);
+        flock = 1;
 
         if(pvalue->fcacheval == 0)
         {
@@ -1783,10 +1766,6 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             fcache_destroyval(pcache->pfcache, pfvalue);
             pfvalue = NULL;
         }
-
-        lock_writeunlock(pcache->aprwlock);
-        lock_readlock(pcache->aprwlock);
-        flock = 1;
     }
     else
     {
@@ -1819,21 +1798,13 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     *ppvalue = pfvalue;
     *ppfullpath = fullpath;
 
-    lock_readunlock(pcache->aprwlock);
-    flock = 0;
-
     _ASSERT(SUCCEEDED(result));
 
 Finished:
 
     if(flock == 1)
     {
-        lock_readunlock(pcache->aprwlock);
-        flock = 0;
-    }
-    else if(flock == 2)
-    {
-        lock_writeunlock(pcache->aprwlock);
+        lock_unlock(pcache->aplock);
         flock = 0;
     }
 
@@ -1864,7 +1835,7 @@ int aplist_fcache_delete(aplist_context * pcache, const char * filename)
 
     dprintverbose("start aplist_fcache_delete: (%s)", filename);
 
-    lock_writelock(pcache->aprwlock);
+    lock_lock(pcache->aplock);
 
     result = rplist_getentry(pcache->prplist, filename, &rpvalue, &resentry);
     if(FAILED(result))
@@ -1893,7 +1864,7 @@ int aplist_fcache_delete(aplist_context * pcache, const char * filename)
 
 Finished:
 
-    lock_writeunlock(pcache->aprwlock);
+    lock_unlock(pcache->aplock);
 
     if(FAILED(result))
     {
@@ -1972,7 +1943,7 @@ int aplist_getinfo(aplist_context * pcache, unsigned char type, zend_bool summar
 
     ticks = GetTickCount();
 
-    lock_readlock(pcache->aprwlock);
+    lock_lock(pcache->aplock);
     flock = 1;
 
     pcinfo->initage = utils_ticksdiff(ticks, pcache->apheader->init_ticks) / 1000;
@@ -2081,7 +2052,7 @@ Finished:
 
     if(flock)
     {
-        lock_readunlock(pcache->aprwlock);
+        lock_unlock(pcache->aplock);
         flock = 0;
     }
 
@@ -2197,7 +2168,7 @@ void aplist_runtest()
     _ASSERT(pcache->fchangefreq == fchfreq * 1000);
     _ASSERT(pcache->apheader    != NULL);
     _ASSERT(pcache->apfilemap   != NULL);
-    _ASSERT(pcache->aprwlock    != NULL);
+    _ASSERT(pcache->aplock      != NULL);
     _ASSERT(pcache->apalloc     != NULL);
 
     _ASSERT(pcache->apheader->valuecount == WCG(numfiles));

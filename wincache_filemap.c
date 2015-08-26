@@ -223,7 +223,7 @@ static int create_rwlock(char * lockname, lock_context ** pplock)
         goto Finished;
     }
 
-    result = lock_initialize(plock, lockname, 1, LOCK_TYPE_SHARED, LOCK_USET_XREAD_XWRITE, NULL);
+    result = lock_initialize(plock, lockname, 1, LOCK_TYPE_SHARED, NULL);
     if(FAILED(result))
     {
         goto Finished;
@@ -552,11 +552,11 @@ static int create_information_filemap(filemap_information ** ppinfo)
     pinfo->infonlen  = 0;
     pinfo->header    = NULL;
     pinfo->hinitdone = NULL;
-    pinfo->hrwlock   = NULL;
+    pinfo->hlock     = NULL;
 
     /* First thing to do is create the lock */
     /* As the lock is xread_xwrite, doing this before mapping is fine */
-    result = create_rwlock("FILEMAP_INFO_HRWLOCK", &pinfo->hrwlock);
+    result = create_rwlock("FILEMAP_INFO_HRWLOCK", &pinfo->hlock);
     if(FAILED(result))
     {
         goto Finished;
@@ -656,7 +656,7 @@ static int create_information_filemap(filemap_information ** ppinfo)
     /* Initialize if its not already initialized */
     if(isfirst)
     {
-        lock_writelock(pinfo->hrwlock);
+        lock_lock(pinfo->hlock);
 
         /* This is the first process which got the pointer */
         /* to information filemap. This should initialize header. */
@@ -678,7 +678,7 @@ static int create_information_filemap(filemap_information ** ppinfo)
         ReleaseMutex(pinfo->hinitdone);
         islocked = 0;
 
-        lock_writeunlock(pinfo->hrwlock);
+        lock_unlock(pinfo->hlock);
     }
     else
     {
@@ -715,12 +715,12 @@ Finished:
                 pinfo->hinfomap = NULL;
             }
 
-            if(pinfo->hrwlock != NULL)
+            if(pinfo->hlock != NULL)
             {
-                lock_terminate(pinfo->hrwlock);
-                lock_destroy(pinfo->hrwlock);
+                lock_terminate(pinfo->hlock);
+                lock_destroy(pinfo->hlock);
 
-                pinfo->hrwlock = NULL;
+                pinfo->hlock = NULL;
             }
 
             if(pinfo->infoname != NULL)
@@ -768,12 +768,12 @@ static void destroy_information_filemap(filemap_information * pinfo)
             pinfo->hinfomap = NULL;
         }
 
-        if(pinfo->hrwlock != NULL)
+        if(pinfo->hlock != NULL)
         {
-            lock_terminate(pinfo->hrwlock);
-            lock_destroy(pinfo->hrwlock);
+            lock_terminate(pinfo->hlock);
+            lock_destroy(pinfo->hlock);
 
-            pinfo->hrwlock = NULL;
+            pinfo->hlock = NULL;
         }
 
         if(pinfo->infoname != NULL)
@@ -999,7 +999,7 @@ int filemap_initialize(filemap_context * pfilemap, unsigned short fmaptype, unsi
     if(fmclass != FILEMAP_MAP_LRANDOM)
     {
         /* Check if fmaptype is already there in the list of filemaps available */
-        lock_writelock(pinfo->hrwlock);
+        lock_lock(pinfo->hlock);
         flock = 1;
 
         pentry = (filemap_information_entry *)((char *)pinfoh + FILEMAP_INFO_HEADER_SIZE);
@@ -1191,7 +1191,7 @@ Finished:
             }
         }
 
-        lock_writeunlock(pinfo->hrwlock);
+        lock_unlock(pinfo->hlock);
         flock = 0;
     }
 
@@ -1251,7 +1251,7 @@ void filemap_terminate(filemap_context * pfilemap)
         {
             if(!pfilemap->islocal)
             {
-                lock_writelock(WCG(fmapgdata)->info->hrwlock);
+                lock_lock(WCG(fmapgdata)->info->hlock);
 
                 /* Decrement the mapcount */
                 pfilemap->infoentry->mapcount--;
@@ -1275,7 +1275,7 @@ void filemap_terminate(filemap_context * pfilemap)
                     }
                 }
 
-                lock_writeunlock(WCG(fmapgdata)->info->hrwlock);
+                lock_unlock(WCG(fmapgdata)->info->hlock);
             }
             else
             {
@@ -1330,9 +1330,11 @@ size_t filemap_getsize(filemap_context * pfilemap)
 
     _ASSERT(pfilemap != NULL);
 
-    lock_readlock(WCG(fmapgdata)->info->hrwlock);
+    lock_lock(WCG(fmapgdata)->info->hlock);
+
     size = pfilemap->infoentry->size;
-    lock_readunlock(WCG(fmapgdata)->info->hrwlock);
+
+    lock_unlock(WCG(fmapgdata)->info->hlock);
 
     dprintverbose("end filemap_getsize");
     return size;
@@ -1346,9 +1348,11 @@ unsigned int filemap_getcpid(filemap_context * pfilemap)
 
     _ASSERT(pfilemap != NULL);
 
-    lock_readlock(WCG(fmapgdata)->info->hrwlock);
+    lock_lock(WCG(fmapgdata)->info->hlock);
+
     cpid = pfilemap->infoentry->cpid;
-    lock_readunlock(WCG(fmapgdata)->info->hrwlock);
+
+    lock_unlock(WCG(fmapgdata)->info->hlock);
 
     dprintverbose("end filemap_getcpid");
 
@@ -1396,7 +1400,7 @@ void filemap_runtest()
     _ASSERT(pinfo->hinfomap != NULL);
     _ASSERT(pinfo->infonlen == strlen(pinfo->infoname));
     _ASSERT(pinfo->header   != NULL);
-    _ASSERT(pinfo->hrwlock  != NULL);
+    _ASSERT(pinfo->hlock    != NULL);
 
     pinfoh = pinfo->header;
     _ASSERT(pinfoh != NULL);
