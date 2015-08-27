@@ -94,7 +94,7 @@ BEGIN
 END
 
 #pragma message("Including ETW RC")
-#include "..\pecl\wincache\wincache_etw.rc"
+#include "wincache_etw.rc"
 
 #ifdef MC_INCLUDE
 #include MC_INCLUDE

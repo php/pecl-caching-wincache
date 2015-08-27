@@ -29,9 +29,9 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2015-03-23</date>
+  <date>2015-08-27</date>
   <version>
-    <release>1.3.7.4</release>
+    <release>1.3.7.7</release>
     <api>1.3.0</api>
   </version>
   <stability>
@@ -40,26 +40,26 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-1.3.7.4:
-- Fix uninitialized variable issue that leads to av (null zend_error_cb).
-- Increase the timeout used to wait for other processes to finish initialization.
-- Re-order initialization such that User Cache will still work even if file cache fails to init.
-- Remove noisy ASSERTs.
-- Improve error checking in shared memory heap management functions.
-- Fix alloc bug in wincache_file_get_contents.
-- Enable setting of debuglevel and reroute_enabled from .user.ini.
-- Move shared memory segments out of the Windows System Pagefile. Added new configuration setting wincache.filemapdir to control where the temp files are created.
-- Refine VM base address selection for shared memory maps.
-- Ensure all named objects created with Global prefix when apppoolid is set.
+1.3.7.7:
+- Fix crash when user/session cache encounters error during creation.
+- Fix error if session fails during creation and using SessionHandler class
+- Bug Fix: Add space for null terminator for PHP 5.4 and above.
+- Bug Fix: Don't copy the key name in zvcache if there isn't a key name.
+- Fixed metrics on shared memory segments
+- Add ETW tracing
+- Convert init event to a mutex (improve stability if something gets killed while holding the event)
+- Bug 69609: rmdir/unlink function reroutes do not clear resolve path cache
   </notes>
   <contents>
     <dir name="/">
       <file role="doc" name="config.w32"/>
       <file role="doc" name="INSTALL"/>
       <file role="doc" name="LICENSE"/>
+      <file role="data" name="MSG00001.bin"/>
       <file role="src" name="php_wincache.c"/>
       <file role="src" name="php_wincache.h"/>
       <file role="src" name="precomp.h"/>
+      <file role="doc" name="README.TXT"/>
       <file role="src" name="template.rc"/>
       <file role="src" name="wincache_alloc.c"/>
       <file role="src" name="wincache_alloc.h"/>
@@ -67,8 +67,13 @@
       <file role="src" name="wincache_aplist.h"/>
       <file role="src" name="wincache_debug.c"/>
       <file role="src" name="wincache_debug.h"/>
+      <file role="src" name="wincache_dummy_etw.h"/>
       <file role="src" name="wincache_error.c"/>
       <file role="src" name="wincache_error.h"/>
+      <file role="src" name="wincache_etw.h"/>
+      <file role="src" name="wincache_etw.man"/>
+      <file role="src" name="wincache_etw.rc"/>
+      <file role="data" name="wincache_etwTEMP.bin"/>
       <file role="src" name="wincache_fcache.c"/>
       <file role="src" name="wincache_fcache.h"/>
       <file role="src" name="wincache_fcnotify.c"/>
@@ -92,6 +97,25 @@
       <file role="src" name="wincache_zvcache.h"/>
       <file role="src" name="wincache_zvcache.c"/>
       <file role="php" name="wincache.php"/>
+      <dir role="test" name="tests">
+        <file role="test" name="skipif.inc"/>
+        <file role="test" name="wincache_001.phpt"/>
+        <file role="test" name="wincache_002.phpt"/>
+        <file role="test" name="wincache_003.phpt"/>
+        <file role="test" name="wincache_004.phpt"/>
+        <file role="test" name="wincache_004_require.php"/>
+        <file role="test" name="wincache_005.phpt"/>
+        <file role="test" name="wincache_006.phpt"/>
+        <file role="test" name="wincache_007.phpt"/>
+        <file role="test" name="wincache_require.php"/>
+        <file role="test" name="wincache_reroute.phpt"/>
+        <dir role="test" name="bar">
+          <file role="test" name="wincache_005_2.php"/>
+        </dir>
+        <dir role="test" name="foo">
+          <file role="test" name="wincache_005_1.php"/>
+        </dir>
+      </dir>
     </dir>
   </contents>
   <dependencies>
@@ -108,6 +132,51 @@
   <extsrcrelease/>
 
   <changelog>
+<!-- Cut and paste from this blank item, and then copy in the stuff from the
+     current package (above). --E.
+
+    <release>
+      <date>1980-01-01</date>
+      <version>
+        <release>0.0.0.0</release>
+        <api>0.0.0</api>
+      </version>
+      <stability>
+        <release>stable|beta|experimental</release>
+        <api>stable|beta|experimental</api>
+      </stability>
+      <notes>
+0.0.0.0:
+- Item one
+- Item two
+      </notes>
+    </release>
+-->
+    <release>
+      <date>2015-03-23</date>
+      <version>
+        <release>1.3.7.4</release>
+        <api>1.3.0<</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+1.3.7.4:
+- Fix uninitialized variable issue that leads to av (null zend_error_cb).
+- Increase the timeout used to wait for other processes to finish initialization.
+- Re-order initialization such that User Cache will still work even if file cache fails to init.
+- Remove noisy ASSERTs.
+- Improve error checking in shared memory heap management functions.
+- Fix alloc bug in wincache_file_get_contents.
+- Enable setting of debuglevel and reroute_enabled from .user.ini.
+- Move shared memory segments out of the Windows System Pagefile. Added new configuration setting wincache.filemapdir to control where the temp files are created.
+- Refine VM base address selection for shared memory maps.
+- Ensure all named objects created with Global prefix when apppoolid is set.
+      </notes>
+    </release>
+
     <release>
       <date>2015-01-10</date>
       <version>
@@ -126,6 +195,7 @@
 - Add configuration to enable/disable rerouted functions (on/off)
       </notes>
     </release>
+
     <release>
       <date>2014-06-18</date>
       <version>
@@ -142,6 +212,7 @@
 - BUG #67466: Mapping error during startup leads to unpredictable AV in opcode cache
       </notes>
     </release>
+
     <release>
       <date>2014-03-28</date>
       <version>
@@ -157,6 +228,7 @@
 - Fixed several potential AVs while holding cross-process locks
       </notes>
     </release>
+
     <release>
     <date>2013-08-20</date>
     <version>
@@ -174,6 +246,7 @@
 - Added support for traits and trait aliases
     </notes>
   </release>
+
   <release>
     <date>2012-05-24</date>
     <version>
@@ -190,6 +263,7 @@
 - Fixed issue with rmdir
     </notes>
   </release>
+
   <release>
     <date>2012-04-24</date>
     <version>
@@ -211,6 +285,7 @@
 - Cleaned up random comments to make them PECL coding standards conformant.
     </notes>
   </release>
+
   <release>
     <date>2010-06-30</date>
     <version>
@@ -236,6 +311,7 @@
 - Fixed an access violation bug caused by naming collision when creating mutex objects
     </notes>
   </release>
+
   <release>
     <stability>
      <release>stable</release>
@@ -255,6 +331,7 @@
 - Updated build number for RTW release. Removed rerouteini config property.
     </notes>
    </release>
+
    <release>
     <stability>
      <release>beta</release>
@@ -289,6 +366,7 @@
 - Fixed fcnotify refcount bug and updated version number for beta2 release.
     </notes>
    </release>
+
    <release>
     <stability>
      <release>beta</release>
@@ -308,6 +386,7 @@
 - Updated the wincache.php page to show the informaiton about user and session cache.
     </notes>
    </release>
+
    <release>
     <stability>
      <release>stable</release>
@@ -329,6 +408,7 @@
 - Changed wincache.php to use resolve_path instead of relative_path
     </notes>
    </release>
+
    <release>
      <stability>
        <release>stable</release>

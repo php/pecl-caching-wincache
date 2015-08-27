@@ -34,39 +34,42 @@
 ARG_ENABLE("wincache", "Windows PHP Cache", "no");
 
 if (PHP_WINCACHE != "no") {
+    if (PHP_ZTS != "no") {
+        WARNING("WinCache module requires --disable-zts build of PHP on windows");
+    } else {
+        EXTENSION('wincache', "php_wincache.c wincache_utils.c wincache_error.c         \
+                               wincache_debug.c wincache_lock.c wincache_filemap.c      \
+                               wincache_alloc.c wincache_ocache.c wincache_opcopy.c     \
+                               wincache_fcache.c wincache_rplist.c wincache_aplist.c    \
+                               wincache_zvcache.c wincache_session.c                    \
+                               wincache_fcnotify.c wincache_string.c");
 
-    EXTENSION('wincache', "php_wincache.c wincache_utils.c wincache_error.c         \
-                           wincache_debug.c wincache_lock.c wincache_filemap.c      \
-                           wincache_alloc.c wincache_ocache.c wincache_opcopy.c     \
-                           wincache_fcache.c wincache_rplist.c wincache_aplist.c    \
-                           wincache_zvcache.c wincache_session.c                    \
-                           wincache_fcnotify.c wincache_string.c");
+        ADD_EXTENSION_DEP('wincache', 'session');
+        AC_DEFINE('HAVE_WINCACHE', 1);
 
-    ADD_EXTENSION_DEP('wincache', 'session');
-    AC_DEFINE('HAVE_WINCACHE', 1);
+        DEFINE('WINCACHE_ETW_RC', configure_module_dirname + '\\wincache_etw.rc');
 
-    DEFINE('WINCACHE_ETW_RC', '..\\pecl\\wincache\\wincache_etw.rc');
-
-    ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
-    if (!X64) {
-        ADD_FLAG('LDFLAGS_WINCACHE', '/SAFESEH');
-    }
-
-    ADD_FLAG('CFLAGS_WINCACHE', '/GS');
-    ADD_FLAG('CFLAGS_WINCACHE', '/I$(BUILD_DIR)\\pecl\\wincache\\ ');
-
-    if (PHP_DEBUG == "yes") {
-        ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
-        ADD_FLAG('CFLAGS_WINCACHE', '/D WINCACHE_DEBUG');
-        if (VCVERS >= 1700) {
-            ADD_FLAG('CFLAGS_WINCACHE', '/ZI');
-        } else {
-            ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
+        ADD_FLAG('LDFLAGS_WINCACHE', '/NXCOMPAT');
+        if (!X64) {
+            ADD_FLAG('LDFLAGS_WINCACHE', '/SAFESEH');
         }
-        ADD_FLAG('CFLAGS_WINCACHE', '/WX');
+
+        ADD_FLAG('CFLAGS_WINCACHE', '/GS');
+        ADD_FLAG('CFLAGS_WINCACHE', '/I' + configure_module_dirname + ' ');
+
+        if (PHP_DEBUG == "yes") {
+            ADD_FLAG('LDFLAGS_WINCACHE', '/debug /debugtype:cv,fixup');
+            ADD_FLAG('CFLAGS_WINCACHE', '/D WINCACHE_DEBUG');
+            if (VCVERS >= 1700) {
+                ADD_FLAG('CFLAGS_WINCACHE', '/ZI');
+            } else {
+                ADD_FLAG('CFLAGS_WINCACHE', '/Zi');
+            }
+            ADD_FLAG('CFLAGS_WINCACHE', '/WX');
+        }
+
+        ADD_FLAG('DEPS_WINCACHE', configure_module_dirname + '\\wincache_etw.rc');
+
+        CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
     }
-
-    ADD_FLAG('DEPS_WINCACHE', '..\\pecl\\wincache\\wincache_etw.rc');
-
-    CHECK_LIB("Kernel32.lib", "wincache", PHP_WINCACHE);
 }
