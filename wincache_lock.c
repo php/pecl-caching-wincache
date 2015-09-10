@@ -353,7 +353,7 @@ void lock_lock(lock_context * plock)
     uint   lineno;
     unsigned int last_owner = 0;
 
-    dprintverbose("start lock_lock");
+    dprintverbose("start lock_lock   %p", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxlock  != NULL);
@@ -397,16 +397,14 @@ void lock_lock(lock_context * plock)
 
 Finished:
 
-    dprintverbose("end lock_lock");
+    dprintverbose("end lock_lock     %p", plock);
     return;
 }
 
 /* Release write lock */
 void lock_unlock(lock_context * plock)
 {
-    DWORD  ret       = 0;
-
-    dprintverbose("start lock_unlock");
+    dprintverbose("start lock_unlock %p", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxlock  != NULL);
@@ -416,7 +414,7 @@ void lock_unlock(lock_context * plock)
     plock->state = LOCK_STATE_UNLOCKED;
     ReleaseMutex(plock->hxlock);
 
-    dprintverbose("end lock_writeunlock");
+    dprintverbose("end lock_unlock   %p", plock);
     return;
 }
 
