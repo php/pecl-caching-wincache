@@ -1164,12 +1164,10 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
 
     /* If folder is not there, register for change notification */
     /* and add the folder to the hashtable */
-    if(listenp)
+    if(listenp && folderpath != NULL)
     {
         lock_writelock(pnotify->fclock);
         flock = 1;
-
-        _ASSERT(folderpath != NULL);
 
         /* Check again to make sure no one else already registered */
         result = findfolder_in_cache(pnotify, folderpath, index, &ptemp);
