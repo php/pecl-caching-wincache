@@ -904,7 +904,8 @@ Finished:
 
  Returns:
 
-    HRESULT
+    NONFATAL - Success
+    FATAL_ACL_FAILED - Could not set the ACL on the file.
 
 *****************************************************************************/
 int
@@ -913,17 +914,33 @@ SetFileDacl(
     PSTR pszFilePath
     )
 {
-    int ret = S_OK;
+    int ret = NONFATAL;
     SECURITY_ATTRIBUTES secAttr;
     BOOL fDaclPresent = FALSE;
     BOOL fDaclDefaulted = FALSE;
     PACL pAcl = NULL;
     DWORD dwStatus = 0;
+    WCHAR pwszSddl[1024];
 
     SecureZeroMemory( &secAttr, sizeof(secAttr) );
 
-    if ( ! ConvertStringSecurityDescriptorToSecurityDescriptorA(
-            pszSddl,
+    ret = MultiByteToWideChar( CP_UTF8,
+                               MB_ERR_INVALID_CHARS,
+                               pszSddl,
+                               -1,
+                               pwszSddl,
+                               1024 );
+    if (0 == ret)
+    {
+        error_setlasterror();
+        ret = FATAL_ACL_FAILED;
+        goto Finished;
+    }
+
+    ret = NONFATAL;
+
+    if ( ! ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            pwszSddl,
             SDDL_REVISION_1,
             &(secAttr.lpSecurityDescriptor),
             NULL ) )

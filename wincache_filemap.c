@@ -296,6 +296,8 @@ static int create_file_mapping(
     _ASSERT(size >  0);
     _ASSERT(pmap != NULL);
 
+    li.QuadPart = (ULONGLONG)size; /* safely handle size_t on x64 */
+
     /* If a shmfilepath is passed, map the file pointed by path */
     if(shmfilepath != NULL)
     {
@@ -319,12 +321,27 @@ static int create_file_mapping(
             goto Finished;
         }
 
-        /* If file already exists, mark existing so that initialization is skipped */
+        /* If file already exists, and is valid, mark existing so that initialization is skipped */
         if(GetLastError() == ERROR_ALREADY_EXISTS)
         {
-            isexisting = 1;
+            BY_HANDLE_FILE_INFORMATION byFileInfo;
 
-            /* TBD?? Check file size and error out if its greater than size */
+            if (!GetFileInformationByHandle(filehandle, &byFileInfo))
+            {
+                dprintimportant("error while validating existing file: %d", GetLastError());
+                goto Finished;
+            }
+
+            if (byFileInfo.nFileSizeHigh == li.HighPart &&
+                byFileInfo.nFileSizeLow  == li.LowPart)
+            {
+                isexisting = 1;
+            }
+            else
+            {
+                dprintverbose("existing file size is incorrect.  re-initalizing");
+            }
+
             /* TBD?? If file never got initialized properly, mark isexisting = 0 */
             /* TBD?? Detect memory corruption. Mark isexisting = 0 */
         }
@@ -337,6 +354,7 @@ static int create_file_mapping(
                 /* TODO: If the ACL'ing fails, we should close the file and fall */
                 /* back to using the system page file. */
                 CloseHandle(filehandle);
+                (void)DeleteFile(shmfilepath);
                 filehandle = INVALID_HANDLE_VALUE;
 
                 dprintimportant( "create_file_mapping[%d]: failed to set acl on %s (%d).",
@@ -359,7 +377,6 @@ static int create_file_mapping(
     }
 
     /* Call CreateFileMapping to create new or open existing file mapping object */
-    li.QuadPart = (ULONGLONG)size; /* safely handle size_t on x64 */
     maphandle = CreateFileMapping(filehandle, NULL, PAGE_READWRITE, li.HighPart, li.LowPart, name);
 
     /* handle value null means a fatal error */

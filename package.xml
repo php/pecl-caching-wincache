@@ -29,14 +29,14 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2015-08-26</date>
+  <date>2015-10-30</date>
   <version>
-    <release>2.0.0.0</release>
+    <release>2.0.0.2</release>
     <api>2.0.0</api>
   </version>
   <stability>
-    <release>alpha</release>
-    <api>alpha</api>
+    <release>beta</release>
+    <api>stable</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
@@ -121,7 +121,7 @@
   <dependencies>
     <required>
       <php>
-        <min>7.0.0</min>
+        <min>7.0.0RC3</min>
       </php>
       <pearinstaller>
         <min>1.4.0</min>
