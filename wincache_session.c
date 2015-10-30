@@ -411,7 +411,7 @@ PS_DESTROY_FUNC(wincache)
     if(FAILED(result))
     {
         /* Entry not found is not a fatal error */
-        if(result = WARNING_ZVCACHE_EMISSING)
+        if(result == WARNING_ZVCACHE_EMISSING)
         {
             result = NONFATAL;
         }
