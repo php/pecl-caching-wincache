@@ -111,7 +111,7 @@ static int copyin_memory(zvcopy_context * pcopy, HashTable * phtable, void * src
 
     if(phtable != NULL && phtable->nTableSize)
     {
-        /* Check if zval is already copied */
+        /* Check if memory is already copied */
         if((pdest = zend_hash_index_find_ptr(phtable, (zend_ulong)src)) != NULL)
         {
             *ppdest = pdest;
@@ -300,9 +300,10 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             }
 
             /* fix up the flags on the copied in zval */
-            Z_TYPE_FLAGS_P(pnewzv) = IS_TYPE_IMMUTABLE;
-            GC_REFCOUNT(Z_COUNTED_P(pnewzv)) = 2;
-            GC_FLAGS(Z_COUNTED_P(pnewzv)) |= IS_ARRAY_IMMUTABLE;
+            Z_TYPE_FLAGS_P(pnewzv) |= IS_TYPE_IMMUTABLE;
+            GC_REFCOUNT(phashtable) = 2;
+            GC_INFO(phashtable) = 0;
+            GC_FLAGS(phashtable) |= IS_ARRAY_IMMUTABLE;
 
             /* Keep offset so that freeing shared memory is easy */
             table_tracker->hoff = offset;
@@ -744,6 +745,17 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     _ASSERT(pcached   != NULL);
     _ASSERT(ppcopied  != NULL);
 
+    /* check table to see if we've already copied this item out*/
+    if(phtable != NULL && phtable->nTableSize)
+    {
+        if((pnew_table = zend_hash_index_find_ptr(phtable, (zend_ulong)pcached)) != NULL)
+        {
+            ++GC_REFCOUNT(pnew_table);
+            *ppcopied = pnew_table;
+            goto Finished;
+        }
+    }
+
     /* Allocate memory for HashTable as required */
     if(*ppcopied == NULL)
     {
@@ -760,6 +772,12 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     else
     {
         pnew_table = *ppcopied;
+    }
+
+    /* update the table */
+    if(phtable != NULL && phtable->nTableSize)
+    {
+        zend_hash_index_update_ptr(phtable, (zend_ulong)pcached, (void *)pnew_table);
     }
 
     /* initalize from cached entry */
@@ -893,6 +911,7 @@ static int copyin_reference(zvcache_context * pcache, zvcopy_context * pcopy, Ha
         pnew_zval = &pzref->val;
         result = copyin_zval(pcache, pcopy, phtable, pnew_zval, &pnew_zval);
         GC_REFCOUNT(pzref) = 2;
+        GC_INFO(pzref) = 0;
     }
 
     *new_ref = pzref;
@@ -920,6 +939,7 @@ static int copyout_reference(zvcache_context * pcache, zvcopy_context * pcopy, H
     {
         if((pzref = zend_hash_index_find_ptr(phtable, (zend_ulong)pcached)) != NULL)
         {
+            ++GC_REFCOUNT(pzref);
             *ppnew_ref = pzref;
             goto Finished;
         }
