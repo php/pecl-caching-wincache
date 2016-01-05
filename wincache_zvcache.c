@@ -484,7 +484,6 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             ptmp_str = (zend_string *)ZVALUE(pcache->incopy, (size_t)Z_STR_P(pcached));
             Z_STR_P(pnewzv) = zend_string_alloc(ZSTR_LEN(ptmp_str), 0);
             memcpy(ZSTR_VAL(Z_STR_P(pnewzv)), ZSTR_VAL(ptmp_str), ZSTR_LEN(ptmp_str)+1);
-            Z_TYPE_INFO_P(pnewzv) = IS_STRING_EX;
             break;
 
         case IS_ARRAY:
@@ -871,12 +870,8 @@ static int copyin_string(zvcopy_context * pcopy, HashTable *phtable, zend_string
     if (allocated)
     {
         *(((char *)pzstr) + size - 1) = 0;
-        zend_string_hash_val(pzstr);
-        /*
-         * Fetched values will point at the cached zend_string, so we must
-         * mark the string as read only, with copy-on-write semantics.
-         */
-        GC_FLAGS(pzstr) = IS_STR_INTERNED | IS_STR_PERMANENT;
+        zend_string_forget_hash_val(pzstr);
+        GC_FLAGS(pzstr) &= ~(IS_STR_INTERNED | IS_STR_PERMANENT | IS_STR_PERSISTENT);
     }
 
     *new_string = pzstr;
