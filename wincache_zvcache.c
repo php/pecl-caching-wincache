@@ -812,6 +812,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
             ptmp_str = (zend_string *)ZVALUE(pcache->incopy, (size_t)p->key);
             p->key = zend_string_alloc(ZSTR_LEN(ptmp_str), 0);
             memcpy(ZSTR_VAL(p->key), ZSTR_VAL(ptmp_str), ZSTR_LEN(ptmp_str)+1);
+            ++GC_REFCOUNT(p->key);
         }
 
         /* copy out the data itself */
