@@ -2610,6 +2610,10 @@ PHP_FUNCTION(wincache_ucache_get)
 
     if(success != NULL)
     {
+        while (Z_TYPE_P(success) == IS_REFERENCE) {
+            success = Z_REFVAL_P(success);
+        }
+
         ZVAL_BOOL(success, 0);
     }
 
@@ -3379,6 +3383,10 @@ PHP_FUNCTION(wincache_ucache_inc)
 
     if(success != NULL)
     {
+        while (Z_TYPE_P(success) == IS_REFERENCE) {
+            success = Z_REFVAL_P(success);
+        }
+
         ZVAL_BOOL(success, 0);
     }
 
@@ -3443,6 +3451,10 @@ PHP_FUNCTION(wincache_ucache_dec)
 
     if(success != NULL)
     {
+        while (Z_TYPE_P(success) == IS_REFERENCE) {
+            success = Z_REFVAL_P(success);
+        }
+
         ZVAL_BOOL(success, 0);
     }
 

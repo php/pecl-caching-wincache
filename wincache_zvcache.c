@@ -219,7 +219,11 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             }
 
             /* Fix up the zval type flags */
-            Z_TYPE_FLAGS_P(pnewzv) &= ~(IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE);
+            if (Z_TYPE_P(poriginal) == IS_STRING) {
+                Z_TYPE_FLAGS_P(pnewzv) |= (IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE);
+            } else {
+                Z_TYPE_FLAGS_P(pnewzv) |= (IS_TYPE_CONSTANT | IS_TYPE_REFCOUNTED | IS_TYPE_COPYABLE);
+            }
 
             /* Use offset in cached zval pointer */
             Z_STR_P(pnewzv) = (zend_string *)ZOFFSET(pcopy, pzstr);
@@ -300,10 +304,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
             }
 
             /* fix up the flags on the copied in zval */
-            Z_TYPE_FLAGS_P(pnewzv) |= IS_TYPE_IMMUTABLE;
-            GC_REFCOUNT(phashtable) = 2;
-            GC_INFO(phashtable) = 0;
-            GC_FLAGS(phashtable) |= IS_ARRAY_IMMUTABLE;
+            Z_TYPE_INFO_P(pnewzv) = IS_ARRAY_EX;
 
             /* Keep offset so that freeing shared memory is easy */
             table_tracker->hoff = offset;
@@ -619,8 +620,10 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     pnew_table->pDestructor = NULL;
 
     /* fix up the HashTable flags since we're persisting it */
-    pnew_table->u.flags |= HASH_FLAG_STATIC_KEYS;
-    pnew_table->u.flags &= ~HASH_FLAG_APPLY_PROTECTION;
+    GC_REFCOUNT(pnew_table) = 2;
+    GC_INFO(pnew_table) = 0;
+    GC_FLAGS(pnew_table) &= ~IS_ARRAY_IMMUTABLE;
+    pnew_table->u.flags &= ~HASH_FLAG_PERSISTENT;
 
     /* Uninitalized */
     if (!(pnew_table->u.flags & HASH_FLAG_INITIALIZED)) {
@@ -645,8 +648,12 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
         Bucket *old_buckets = poriginal->arData;
         int32_t hash_size = -(int32_t)poriginal->nTableMask;
 
-        while (hash_size >> 1 > poriginal->nNumUsed) {
-            hash_size >>= 1;
+        if (poriginal->nNumUsed <= HT_MIN_SIZE) {
+            hash_size = HT_MIN_SIZE;
+        } else {
+            while (hash_size >> 1 > poriginal->nNumUsed) {
+                hash_size >>= 1;
+            }
         }
         pnew_table->nTableMask = -hash_size;
         temp_size = (hash_size * sizeof(uint32_t)) + (poriginal->nNumUsed * sizeof(Bucket));
@@ -687,12 +694,20 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
 
         /* persist bucket and key */
         if (p->key) {
+            /* If we have a string key, we're no longer using static keys, since
+             * we have to copy the string into shared memory, thus it won't be
+             * interned.
+             */
+            pnew_table->u.flags &= ~HASH_FLAG_STATIC_KEYS;
             result = copyin_string(pcopy, phtable, p->key, &pzstr);
             if (FAILED(result))
             {
                 goto Finished;
             }
-
+            /* Copy over the key string's hash from the existing hash value in
+             * the bucket.
+             */
+            ZSTR_H(pzstr) = p->h;
             /* Use Offset in copied-in zval */
             p->key = (zend_string *)ZOFFSET(pcopy, pzstr);
             pzstr = NULL;
@@ -797,7 +812,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
         goto Finished;
     }
 
-    pdata_temp = ZVALUE_HT_GET_DATA_ADDR(pcache->incopy,pcached);
+    pdata_temp = ZVALUE_HT_GET_DATA_ADDR(pcache->incopy, pcached);
     memcpy(ptemp, pdata_temp, tmp_size);
     HT_SET_DATA_ADDR(pnew_table, ptemp);
 
@@ -817,11 +832,15 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
 
         /* copy out the data itself */
         pnewzv = &p->val;
-        copyout_zval(pcache, pcopy, phtable, pnewzv, &pnewzv);
+        result = copyout_zval(pcache, pcopy, phtable, pnewzv, &pnewzv);
+        if (FAILED(result)) {
+            goto Finished;
+        }
+        if (Z_REFCOUNTED_P(pnewzv)) { Z_ADDREF_P(pnewzv); }
     }
 
     /* After copying out all the values, reset the destructor */
-    pnew_table->pDestructor = ZVAL_DESTRUCTOR;
+    pnew_table->pDestructor = ZVAL_PTR_DTOR;
 
 Finished:
 

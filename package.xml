@@ -29,9 +29,9 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2015-10-30</date>
+  <date>2016-01-26</date>
   <version>
-    <release>2.0.0.2</release>
+    <release>2.0.0.5</release>
     <api>2.0.0</api>
   </version>
   <stability>
@@ -40,14 +40,9 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-2.0.0.0:
-- PHP7 Support
-- x64 Support
-- Remove opcode cache support
-- Remove custom SRW locking
-- Remove unused settings
-- Enforce NTS-only build
-- Comment clean up
+2.0.0.5:
+- Fix array refcount for user and session caches
+- Fix string refcount for array keys
 - Minor bug fixes and tweaks
   </notes>
   <contents>
@@ -105,10 +100,13 @@
         <file role="test" name="wincache_reroute.phpt"/>
         <file role="test" name="wincache_ucache_array.phpt"/>
         <file role="test" name="wincache_ucache_errors.phpt"/>
+        <file role="test" name="wincache_ucache_inc.phpt"/>
+        <file role="test" name="wincache_ucache_nested_arrays.phpt"/>
         <file role="test" name="wincache_ucache_reference.phpt"/>
         <file role="test" name="wincache_ucache_serialization.phpt"/>
         <file role="test" name="wincache_ucache_set_array.phpt"/>
         <file role="test" name="wincache_ucache_string.phpt"/>
+        <file role="test" name="wincache_ucache_unset_string.phpt"/>
         <dir role="test" name="bar">
           <file role="test" name="wincache_005_2.php"/>
         </dir>
@@ -121,7 +119,7 @@
   <dependencies>
     <required>
       <php>
-        <min>7.0.0RC3</min>
+        <min>7.0.0</min>
       </php>
       <pearinstaller>
         <min>1.4.0</min>
@@ -153,7 +151,28 @@
       </notes>
     </release>
 -->
-
+    <release>
+      <date>2015-10-30</date>
+      <version>
+        <release>2.0.0.2</release>
+        <api>2.0.0</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+2.0.0.0:
+- PHP7 Support
+- x64 Support
+- Remove opcode cache support
+- Remove custom SRW locking
+- Remove unused settings
+- Enforce NTS-only build
+- Comment clean up
+- Minor bug fixes and tweaks
+      </notes>
+    </release>
     <release>
       <date>2015-03-23</date>
       <version>
