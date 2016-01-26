@@ -43,6 +43,7 @@
 2.0.0.5:
 - Fix array refcount for user and session caches
 - Fix string refcount for array keys
+- Fix IS_REFERENCE zvals passed to wincache_ucache_[inc|dec] functions
 - Minor bug fixes and tweaks
   </notes>
   <contents>
@@ -99,6 +100,7 @@
         <file role="test" name="wincache_require.php"/>
         <file role="test" name="wincache_reroute.phpt"/>
         <file role="test" name="wincache_ucache_array.phpt"/>
+        <file role="test" name="wincache_ucache_cas.phpt"/>
         <file role="test" name="wincache_ucache_errors.phpt"/>
         <file role="test" name="wincache_ucache_inc.phpt"/>
         <file role="test" name="wincache_ucache_nested_arrays.phpt"/>
