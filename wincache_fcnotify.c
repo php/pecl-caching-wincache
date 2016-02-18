@@ -113,7 +113,7 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
     char *                    pfname     = NULL;
     unsigned int              fnlength   = 0;
 
-    dprintverbose("start process_change_notification");
+    dprintverbose("start process_change_notification(%p)", plistener);
 
     _ASSERT(plistener   != NULL);
 
@@ -127,6 +127,8 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
 
     if(bytecount == 0)
     {
+        dprintimportant("process_change_notification: [%s] bytecount = 0, dwerror = %d", plistener->folder_path, dwerror);
+
         if(dwerror == ERROR_ACCESS_DENIED)
         {
             /* Unregister change notification and set plistener to NULL to */
@@ -137,6 +139,8 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
             plistener->pfcnvalue->plistener = NULL;
 
             lock_unlock(pnotify->fclock);
+
+            goto Finished;
         }
 
         // TODO: Handle ERROR_NOTIFY_ENUM_DIR - change buffer overflowed & we
@@ -145,8 +149,6 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
         // TODO: invalidating a directory and all files under the directory.
         // TODO: The aplist cache is only designed to lookup full paths. Any
         // TODO: other enumeration would be an O(1) traversal of the cache.
-
-        goto Finished;
     }
     else
     {
@@ -156,34 +158,47 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
             pnitem = pnnext;
             pnnext = (FILE_NOTIFY_INFORMATION *)((char *)pnitem + pnitem->NextEntryOffset);
 
-            fnlength = pnitem->FileNameLength / 2;
-
-            pwchar = (wchar_t *)alloc_pemalloc((fnlength + 1) * sizeof(wchar_t));
-            pfname = (char *)alloc_pemalloc(fnlength + 1);
-            if(pwchar == NULL || pfname == NULL)
+            switch(pnitem->Action)
             {
-                hr = E_OUTOFMEMORY;
-                goto Finished;
-            }
+            case FILE_ACTION_ADDED:
+            case FILE_ACTION_RENAMED_NEW_NAME:
+                /* Ignore added files and new names.  We won't find them in the cache. */
+                break;
 
-            ZeroMemory(pwchar, (fnlength + 1) * sizeof(wchar_t));
-            wcsncpy(pwchar, pnitem->FileName, fnlength);
+            case FILE_ACTION_REMOVED:
+            case FILE_ACTION_MODIFIED:
+            case FILE_ACTION_RENAMED_OLD_NAME:
+            default:
+                fnlength = pnitem->FileNameLength / 2;
 
-            ZeroMemory(pfname, fnlength + 1);
-            if(!WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, pwchar, fnlength, pfname, fnlength, NULL, NULL))
-            {
-                hr = GetLastError();
-                goto Finished;
-            }
+                pwchar = (wchar_t *)alloc_pemalloc((fnlength + 1) * sizeof(wchar_t));
+                pfname = (char *)alloc_pemalloc(fnlength + 1);
+                if(pwchar == NULL || pfname == NULL)
+                {
+                    hr = E_OUTOFMEMORY;
+                    goto Finished;
+                }
 
-            dprintverbose("received change notification for file = %s\\%s", plistener->folder_path, pfname);
-            aplist_mark_changed(pnotify->fcaplist, plistener->folder_path, pfname);
+                ZeroMemory(pwchar, (fnlength + 1) * sizeof(wchar_t));
+                wcsncpy(pwchar, pnitem->FileName, fnlength);
 
-            alloc_pefree(pwchar);
-            pwchar = NULL;
+                ZeroMemory(pfname, fnlength + 1);
+                if(!WideCharToMultiByte(CP_ACP, WC_NO_BEST_FIT_CHARS, pwchar, fnlength, pfname, fnlength, NULL, NULL))
+                {
+                    hr = GetLastError();
+                    goto Finished;
+                }
 
-            alloc_pefree(pfname);
-            pfname = NULL;
+                dprintverbose("received change notification for file = %s\\%s, action = %d", plistener->folder_path, pfname, pnitem->Action);
+                aplist_mark_changed(pnotify->fcaplist, plistener->folder_path, pfname);
+
+                alloc_pefree(pwchar);
+                pwchar = NULL;
+
+                alloc_pefree(pfname);
+                pfname = NULL;
+                break;
+            };
 
             if(pnitem == pnnext)
             {
@@ -192,7 +207,6 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
         }
 
         /* register for change notification again */
-        /* If bytecount was 0, no need to register again */
         register_directory_changes(pnotify, plistener);
     }
 
@@ -210,7 +224,7 @@ Finished:
         pfname = NULL;
     }
 
-    dprintverbose("end process_change_notification");
+    dprintverbose("end process_change_notification(%p)", plistener);
     return;
 }
 
@@ -273,8 +287,8 @@ static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnot
 
     /* file name, last write, attributes and security change should be delivered */
     cflags = FILE_NOTIFY_CHANGE_FILE_NAME  |
-             FILE_NOTIFY_CHANGE_DIR_NAME   |
              FILE_NOTIFY_CHANGE_LAST_WRITE |
+             FILE_NOTIFY_CHANGE_SIZE       |
              FILE_NOTIFY_CHANGE_ATTRIBUTES |
              FILE_NOTIFY_CHANGE_SECURITY;
     result = ReadDirectoryChangesW(plistener->folder_handle, &plistener->fninfo, 1024, FALSE, cflags, &bytecount, &plistener->overlapped, NULL);
@@ -1061,7 +1075,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     fcnotify_value *  pvalue     = NULL;
     fcnotify_value *  ptemp      = NULL;
     fcnotify_value *  pnewval    = NULL;
-    unsigned char     listenp    = 0;
+    unsigned char     listenp    = PROCESS_IS_ALIVE;
     unsigned char     flock      = 0;
     unsigned int      cticks     = 0;
     unsigned int      reusecount = 0;
@@ -1138,7 +1152,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
         /* If not, make the function hook up change notification again */
         if(pvalue->plistener == NULL && folderpath != NULL)
         {
-            listenp = 1;
+            listenp = PROCESS_IS_DEAD;
             reusecount = pvalue->reusecount;
         }
         else
@@ -1152,7 +1166,7 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
                 reusecount = pvalue->reusecount;
                 InterlockedExchange(&pvalue->palivechk, cticks);
 
-                if(listenp && folderpath == NULL)
+                if(listenp != PROCESS_IS_ALIVE && folderpath == NULL)
                 {
                     folderpath = (char *)(pnotify->fcmemaddr + pvalue->folder_path);
                     index = utils_getindex(folderpath, pheader->valuecount);
@@ -1163,12 +1177,12 @@ int fcnotify_check(fcnotify_context * pnotify, const char * filepath, size_t * p
     else
     {
         /* If folder is not even there yet, add process listener */
-        listenp = 1;
+        listenp = PROCESS_IS_DEAD;
     }
 
     /* If folder is not there, register for change notification */
     /* and add the folder to the hashtable */
-    if(listenp && folderpath != NULL)
+    if(listenp != PROCESS_IS_ALIVE && folderpath != NULL)
     {
         /* Check again to make sure no one else already registered */
         result = findfolder_in_cache(pnotify, folderpath, index, &ptemp);

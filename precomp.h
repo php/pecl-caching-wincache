@@ -36,7 +36,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "2.0.0.5"
+#define PHP_WINCACHE_VERSION    "2.0.0.6"
 #define PHP_WINCACHE_VERSION_LEN (sizeof(PHP_WINCACHE_VERSION)-1)
 
 #define GLOBAL_SCOPE_PREFIX     "Global\\"

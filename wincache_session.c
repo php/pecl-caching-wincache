@@ -328,6 +328,12 @@ PS_READ_FUNC(wincache)
     result = zvcache_get(pzcache, ZSTR_VAL(key), &pzval);
     if(FAILED(result))
     {
+        if (result == WARNING_ZVCACHE_EMISSING)
+        {
+            /* Ignore not-found values */
+            result = NONFATAL;
+            *val =  ZSTR_EMPTY_ALLOC();
+        }
         goto Finished;
     }
 

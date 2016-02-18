@@ -29,22 +29,21 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2016-01-26</date>
+  <date>2016-02-18</date>
   <version>
-    <release>2.0.0.5</release>
+    <release>2.0.0.6</release>
     <api>2.0.0</api>
   </version>
   <stability>
-    <release>beta</release>
+    <release>stable</release>
     <api>stable</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-2.0.0.5:
-- Fix array refcount for user and session caches
-- Fix string refcount for array keys
-- Fix IS_REFERENCE zvals passed to wincache_ucache_[inc|dec] functions
-- Minor bug fixes and tweaks
+2.0.0.6:
+- Fix bug 71580 session_regenerate_id(): Failed to create(read) session
+- Code cleanup in file change notification
+- Ignore change notifications for new files, since they won't exist in the file cache
   </notes>
   <contents>
     <dir name="/">
@@ -153,6 +152,24 @@
       </notes>
     </release>
 -->
+    <release>
+      <date>2016-01-26</date>
+      <version>
+        <release>2.0.0.5</release>
+        <api>2.0.0</api>
+      </version>
+      <stability>
+        <release>beta</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+2.0.0.5:
+- Fix array refcount for user and session caches
+- Fix string refcount for array keys
+- Fix IS_REFERENCE zvals passed to wincache_ucache_[inc|dec] functions
+- Minor bug fixes and tweaks
+      </notes>
+    </release>
     <release>
       <date>2015-10-30</date>
       <version>

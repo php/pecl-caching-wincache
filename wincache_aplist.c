@@ -55,7 +55,6 @@ static int  create_aplist_data(aplist_context * pcache, const char * filename, a
 static void destroy_aplist_data(aplist_context * pcache, aplist_value * pvalue);
 static void add_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue);
 static void remove_aplist_entry(aplist_context * pcache, unsigned int index, aplist_value * pvalue);
-static void delete_aplist_fileentry(aplist_context * pcache, const char * filename);
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull);
 static int  set_lastcheck_time(aplist_context * pcache, const char * filename, unsigned int newvalue);
 
@@ -118,7 +117,7 @@ static int find_aplist_entry(aplist_context * pcache, const char * filename, uns
                 }
                 else
                 {
-                    if(pvalue->is_changed == 1)
+                    if(pvalue->is_changed == FILE_IS_CHANGED)
                     {
                         result = FATAL_FCACHE_FILECHANGED;
                     }
@@ -364,7 +363,7 @@ static int create_aplist_data(aplist_context * pcache, const char * filename, ap
     pvalue->use_ticks   = ticks;
     pvalue->last_check  = ticks;
     pvalue->is_deleted  = 0;
-    pvalue->is_changed  = 0;
+    pvalue->is_changed  = FILE_IS_NOT_CHANGED;
 
     pvalue->fcacheval   = 0;
     pvalue->resentry    = 0;
@@ -555,35 +554,6 @@ static void remove_aplist_entry(aplist_context * pcache, unsigned int index, apl
 }
 
 /* Call this method under the lock */
-static void delete_aplist_fileentry(aplist_context * pcache, const char * filename)
-{
-    unsigned int   findex = 0;
-    aplist_value * pvalue = NULL;
-
-    dprintverbose("start delete_aplist_fileentry");
-
-    /* This method should be called to remove file entry from a local cache */
-    /* list when the file is removed the global list to keep them in sync */
-    _ASSERT(pcache          != NULL);
-    _ASSERT(pcache->islocal != 0);
-    _ASSERT(filename        != NULL);
-    _ASSERT(IS_ABSOLUTE_PATH(filename, strlen(filename)));
-
-    findex = utils_getindex(filename, pcache->apheader->valuecount);
-    find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
-
-    /* If an entry is found for this file, remove it */
-    if(pvalue != NULL)
-    {
-        remove_aplist_entry(pcache, findex, pvalue);
-        pvalue = NULL;
-    }
-
-    dprintverbose("end delete_aplist_fileentry");
-    return;
-}
-
-/* Call this method under tje lock */
 static void run_aplist_scavenger(aplist_context * pcache, unsigned char ffull)
 {
     unsigned int    sindex   = 0;
@@ -1457,7 +1427,7 @@ void aplist_mark_file_changed(aplist_context * pcache, char * filepath)
 
     if(pvalue != NULL)
     {
-        pvalue->is_changed = 1;
+        pvalue->is_changed = FILE_IS_CHANGED;
     }
 
     lock_unlock(pcache->aplock);
@@ -1580,7 +1550,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             }
             else
             {
-                if(pvalue->is_changed == 1)
+                if(pvalue->is_changed == FILE_IS_CHANGED)
                 {
                     fchanged = 1;
                 }
