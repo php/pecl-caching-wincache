@@ -2450,7 +2450,7 @@ static int copy_hashtable_bucket(opcopy_context * popcopy, Bucket * poldb, unsig
     {
         result  = wincache_string_pmemcopy(popcopy,
                                            poldb->arKey,
-                                           poldb->nKeyLength+1,
+                                           poldb->nKeyLength,
                                            &pnewb->arKey);
         if (FAILED(result))
         {

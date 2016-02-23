@@ -35,7 +35,7 @@ ARG_ENABLE("wincache", "Windows PHP Cache", "no");
 
 if (PHP_WINCACHE != "no") {
     if (PHP_ZTS != "no") {
-        WARNING("WinCache module requires --disable-zts build of PHP on windows");
+        MESSAGE("WinCache module requires --disable-zts build of PHP on windows");
     } else {
         EXTENSION('wincache', "php_wincache.c wincache_utils.c wincache_error.c         \
                                wincache_debug.c wincache_lock.c wincache_filemap.c      \
