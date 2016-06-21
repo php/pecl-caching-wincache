@@ -1312,9 +1312,11 @@ const char * utils_get_typename(zend_uchar type)
         case IS_CONSTANT_AST:
             valuetype = "constant";
             break;
+#if ZEND_MODULE_API_NO >= 20160303
         case IS_VOID:
             valuetype = "void";
             break;
+#endif /* ZEND_MODULE_API_NO */
         default:
             valuetype = "unknown";
             break;
