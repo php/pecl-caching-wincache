@@ -47,6 +47,7 @@ extern char *       utils_resolve_path(const char *filename, size_t filename_len
 extern char *       utils_build_temp_filename(char * suffix);
 extern void         utils_get_filename_and_line(const char **filename, uint *linenumber);
 extern void         utils_wait_for_listener(const char * respath, unsigned int timeout);
+extern unsigned int utils_get_prime_less_than(size_t num);
 
 extern int
 utils_create_init_event(

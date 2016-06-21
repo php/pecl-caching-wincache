@@ -138,7 +138,6 @@ extern int  zvcache_initialize(
     unsigned int issession,
     unsigned short islocal,
     unsigned short cachekey,
-    unsigned int zvcount,
     unsigned int cachesize,
     char * shmfilepath
     );

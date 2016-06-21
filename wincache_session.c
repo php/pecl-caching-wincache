@@ -207,7 +207,7 @@ PS_OPEN_FUNC(wincache)
         }
 
         /* issession = 1, islocal = 0, zvcount = 256 */
-        result = zvcache_initialize(pzcache, 1, 0, (unsigned short)cachekey, 256, WCG(scachesize), filepath);
+        result = zvcache_initialize(pzcache, 1, 0, (unsigned short)cachekey, WCG(scachesize), filepath);
         if(FAILED(result))
         {
             goto Finished;

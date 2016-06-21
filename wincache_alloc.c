@@ -161,6 +161,17 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     while(freeh->is_free != BLOCK_ISFREE_LAST)
     {
         _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE);
+        if (freeh->is_free != BLOCK_ISFREE_FREE)
+        {
+            dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE");
+            result = FATAL_ALLOC_SEGMENT_CORRUPT;
+
+            utils_get_filename_and_line(&filename, &lineno);
+            EventWriteMemFreeListCorrupt(freeh, palloc, filename, lineno);
+
+            goto Finished;
+        }
+
         if(freeh->size >= size)
         {
             break;
@@ -177,16 +188,6 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     }
 
     _ASSERT(freeh->is_free == BLOCK_ISFREE_FREE);
-    if (freeh->is_free != BLOCK_ISFREE_FREE)
-    {
-        dprintcritical("allocate_memory: Free block is not BLOCK_ISFREE_FREE");
-        result = FATAL_ALLOC_SEGMENT_CORRUPT;
-
-        utils_get_filename_and_line(&filename, &lineno);
-        EventWriteMemFreeListCorrupt(freeh, palloc, filename, lineno);
-
-        goto Finished;
-    }
 
     /* Got a free block with sufficient free memory. Now */
     /* see if block size is big enough to be broken into two */

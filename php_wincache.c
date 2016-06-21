@@ -605,8 +605,8 @@ PHP_MINIT_FUNCTION(wincache)
         goto Finished;
     }
 
-    /* issession = 0, islocal = 0, cachekey = 1, zvcount = 256, shmfilepath = NULL */
-    result = zvcache_initialize(pzcache, 0, 0, 1, 256, WCG(ucachesize), NULL);
+    /* issession = 0, islocal = 0, cachekey = 1, shmfilepath = NULL */
+    result = zvcache_initialize(pzcache, 0, 0, 1, WCG(ucachesize), NULL);
     if(FAILED(result))
     {
         goto Finished;
