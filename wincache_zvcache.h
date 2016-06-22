@@ -181,7 +181,7 @@ struct zvcache_info_entry
 
 extern int  zvcache_create(zvcache_context ** ppcache);
 extern void zvcache_destroy(zvcache_context * pcache);
-extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
+extern int  zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, char * shmfilepath TSRMLS_DC);
 extern void zvcache_terminate(zvcache_context * pcache);
 
 extern int  zvcache_get(zvcache_context * pcache, const char * key, zval ** pvalue TSRMLS_DC);

@@ -45,6 +45,7 @@ extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
 extern char *       utils_resolve_path(const char *filename, int filename_length, const char *path TSRMLS_DC);
 extern char *       utils_build_temp_filename(char * suffix);
 extern void         utils_get_filename_and_line(const char **filename, uint *linenumber);
+extern unsigned int utils_get_prime_less_than(size_t num);
 
 extern int
 utils_create_init_event(

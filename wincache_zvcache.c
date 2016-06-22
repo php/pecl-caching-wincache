@@ -1474,13 +1474,14 @@ void zvcache_destroy(zvcache_context * pcache)
     return;
 }
 
-int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int zvcount, unsigned int cachesize, char * shmfilepath TSRMLS_DC)
+int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigned short islocal, unsigned short cachekey, unsigned int cachesize, char * shmfilepath TSRMLS_DC)
 {
     int              result    = NONFATAL;
     size_t           segsize   = 0;
     zvcache_header * header    = NULL;
     unsigned int     msize     = 0;
 
+    unsigned int    zvcount   = 256;
     unsigned int    cticks     = 0;
     unsigned short  mapclass   = FILEMAP_MAP_SRANDOM;
     unsigned short  locktype   = LOCK_TYPE_SHARED;
@@ -1495,8 +1496,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     dprintverbose("start zvcache_initialize %p", pcache);
 
     _ASSERT(pcache    != NULL);
-    _ASSERT(zvcount   >= 128 && zvcount   <= 1024);
-    _ASSERT(cachesize >= 2   && cachesize <= 64);
+    _ASSERT(cachesize >= 2   && cachesize <= 1024);
 
     pcache->issession = issession;
 
@@ -1542,6 +1542,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
 
     pcache->zvmemaddr = (char *)pcache->zvfilemap->mapaddr;
     segsize = filemap_getsize(pcache->zvfilemap TSRMLS_CC);
+    _ASSERT(segsize != 0);
     initmemory = (pcache->zvfilemap->existing == 0);
 
     /* Create allocator for file list segment */
@@ -1558,6 +1559,7 @@ int zvcache_initialize(zvcache_context * pcache, unsigned int issession, unsigne
     }
 
     /* Get memory for cache header */
+    zvcount = utils_get_prime_less_than(segsize / (32 * 1024));
     msize = sizeof(zvcache_header) + ((zvcount - 1) * sizeof(size_t));
     pcache->zvheader = (zvcache_header *)alloc_get_cacheheader(pcache->zvalloc, msize, ((issession) ? CACHE_TYPE_SESSZVALS : CACHE_TYPE_USERZVALS));
     if(pcache->zvheader == NULL)

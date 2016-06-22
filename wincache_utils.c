@@ -1250,3 +1250,59 @@ void utils_get_filename_and_line(
     *linenumber = error_lineno;
 }
 
+/*
+ * static array of primes.  Each prime number is at least twice as large
+ * as the previous.
+ */
+static unsigned int g_pdwPrimes[] =
+{
+    11,         23,         47,         97,
+    197,        397,        797,        1597,
+    3203,       6421,       12853,      25717,
+    51437,      102877,     205759,     411527,
+    823117,     1646237,    3292489,    6584983,
+    13169977,   26339969,   52679969,   105359939,
+    210719881,  421439783,  842879579,  1685759167,
+    3371518343
+};
+
+#define PRIMES_COUNT (sizeof( g_pdwPrimes ) / sizeof( unsigned int ) )
+
+/* Binary search to find appropriate prime that is less than value */
+unsigned int utils_get_prime_less_than(size_t value)
+{
+    unsigned int ret;
+    int low, high, current, delta;
+    int done = 0;
+
+    low = 0;
+    high = PRIMES_COUNT;
+    current = high / 2;
+    while (!done)
+    {
+        if (value == g_pdwPrimes[current]) /* perfect! */
+        {
+            ret = g_pdwPrimes[current];
+            done = 1;
+        }
+        else if (value < g_pdwPrimes[current]) /* lower */
+        {
+            high = current;
+            delta = -((high - low) / 2);
+        }
+        else /* higher */
+        {
+            low = current;
+            delta = ((high - low) / 2);
+        }
+
+        if (delta == 0)
+        {
+            ret = g_pdwPrimes[low];
+            done = 1;
+        }
+        current += delta;
+    }
+
+    return ret;
+}
