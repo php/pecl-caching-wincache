@@ -29,9 +29,9 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2016-02-18</date>
+  <date>2016-06-21</date>
   <version>
-    <release>2.0.0.6</release>
+    <release>2.0.0.7</release>
     <api>2.0.0</api>
   </version>
   <stability>
@@ -40,10 +40,9 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-2.0.0.6:
-- Fix bug 71580 session_regenerate_id(): Failed to create(read) session
-- Code cleanup in file change notification
-- Ignore change notifications for new files, since they won't exist in the file cache
+2.0.0.7:
+- choose better user cache table size at startup
+- improve detection of wincache segment corruption during allocate_memory
   </notes>
   <contents>
     <dir name="/">
@@ -152,6 +151,23 @@
       </notes>
     </release>
 -->
+    <release>
+      <date>2016-02-18</date>
+      <version>
+        <release>2.0.0.6</release>
+        <api>2.0.0</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+2.0.0.6:
+- Fix bug 71580 session_regenerate_id(): Failed to create(read) session
+- Code cleanup in file change notification
+- Ignore change notifications for new files, since they won't exist in the file cache
+      </notes>
+    </release>
     <release>
       <date>2016-01-26</date>
       <version>
