@@ -597,7 +597,7 @@ int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value
     _ASSERT(pvalue != NULL);
 
     *ppvalue = pvalue;
-    *poffset = ((char *)pvalue - pcache->rpmemaddr);
+    *poffset = alloc_get_valueoffset(pcache->rpalloc, pvalue);
 
     _ASSERT(SUCCEEDED(result));
 
@@ -642,7 +642,7 @@ void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t abs
 
     /* Set same_value to make a list only if */
     /* prevsame is pointing to a different entry */
-    coffset = (char *)pvalue - pcache->rpmemaddr;
+    coffset = alloc_get_valueoffset(pcache->rpalloc, pvalue);
     if(coffset != prevsame)
     {
         pvalue->same_value = prevsame;
@@ -766,7 +766,7 @@ int rplist_getinfo(rplist_context * pcache, zend_bool summaryonly, rplist_info *
             continue;
         }
 
-        pvalue = (rplist_value *)alloc_get_cachevalue(pcache->rpalloc, offset);
+        pvalue = RPLIST_VALUE(pcache->rpalloc, offset);
         while(pvalue != NULL)
         {
             ptemp = (rplist_entry_info *)alloc_emalloc(sizeof(rplist_entry_info));
@@ -800,7 +800,7 @@ int rplist_getinfo(rplist_context * pcache, zend_bool summaryonly, rplist_info *
                 break;
             }
 
-            pvalue = (rplist_value *)alloc_get_cachevalue(pcache->rpalloc, offset);
+            pvalue = RPLIST_VALUE(pcache->rpalloc, offset);
         }
     }
 
@@ -819,42 +819,11 @@ Finished:
     {
         dprintimportant("failure %d in rplist_getinfo", result);
 
-        if(pcinfo != NULL)
-        {
-            peinfo = pcinfo->entries;
-            while(peinfo != NULL)
-            {
-                ptemp = peinfo;
-                peinfo = peinfo->next;
-
-                if(ptemp->pathkey != NULL)
-                {
-                    alloc_efree(ptemp->pathkey);
-                    ptemp->pathkey = NULL;
-                }
-
-                if(ptemp->subkey != NULL)
-                {
-                    alloc_efree(ptemp->subkey);
-                    ptemp->subkey = NULL;
-                }
-
-                if(ptemp->abspath != NULL)
-                {
-                    alloc_efree(ptemp->abspath);
-                    ptemp->abspath = NULL;
-                }
-
-                alloc_efree(ptemp);
-                ptemp = NULL;
-            }
-
-            alloc_efree(pcinfo);
-            pcinfo = NULL;
-        }
+        rplist_freeinfo(pcinfo);
+        pcinfo = NULL;
     }
 
-    dprintverbose("start rplist_getinfo");
+    dprintverbose("end rplist_getinfo");
 
     return result;
 }

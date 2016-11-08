@@ -1999,14 +1999,14 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    dprintverbose("wincache_file_exists - %s", filename);
-
     result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
     if(FAILED(result))
     {
+        dprintverbose("wincache_file_exists - NOT CACHED: %s", filename);
         goto Finished;
     }
 
+    dprintverbose("wincache_file_exists - CACHED: %s", filename);
     retval = 1;
 
     if(respath != NULL)

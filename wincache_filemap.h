@@ -93,11 +93,11 @@
 #define FILEMAP_SESSZVALS_PREFIX                "WINCACHE_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_FILEMAP_SESSZVALS"
 #define FILEMAP_SESSZVALS_PREFIX_LENGTH         (sizeof(FILEMAP_SESSZVALS_PREFIX))
 
-/* filemap_information_header - SHARED - 16 bytes */
-/* filemap_information_entry  - SHARED - 276 bytes */
-/* filemap_global_context     - LOCAL -  8 bytes */
-/* filemap_information        - LOCAL -  20 bytes */
-/* filemap_context            - LOCAL -  14 bytes (not aligned at 4 bytes) */
+/* filemap_information_header - SHARED - 16/20 bytes */
+/* filemap_information_entry  - SHARED - 284/292 bytes */
+/* filemap_context            - LOCAL -  24/48 bytes */
+/* filemap_information        - LOCAL -  24/48 bytes */
+/* filemap_global_context     - LOCAL -  12/16 bytes */
 
 typedef struct filemap_information_header filemap_information_header;
 struct filemap_information_header

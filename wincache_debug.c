@@ -60,9 +60,10 @@ void dprintsetlevel(unsigned int level)
 void dprintmessage(char * format, va_list args)
 {
     char debug_message[255];
+    int len;
 
-    sprintf_s(debug_message, 255, "WINCACHE: ");
-    vsprintf_s(debug_message + 10, 245, format, args);
+    len = sprintf_s(debug_message, 255, "WINCACHE[%d]: ", GetCurrentThreadId());
+    vsprintf_s(debug_message + len, 255 - len, format, args);
 
     OutputDebugStringA(debug_message);
     if(IsDebuggerPresent())
