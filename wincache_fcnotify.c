@@ -205,10 +205,10 @@ static void WINAPI process_change_notification(fcnotify_context * pnotify, fcnot
                 break;
             }
         }
-
-        /* register for change notification again */
-        register_directory_changes(pnotify, plistener);
     }
+
+    /* register for change notification again */
+    register_directory_changes(pnotify, plistener);
 
 Finished:
 
@@ -295,6 +295,8 @@ static unsigned int register_directory_changes(fcnotify_context * pnotify, fcnot
 
     if(!result)
     {
+        error_setlasterror();
+        dprintverbose("register_directory_changes: failed to register for changes in directory %s (%d)", plistener->folder_path, WCG(lasterror));
         listener_refdec(pnotify, plistener);
     }
 

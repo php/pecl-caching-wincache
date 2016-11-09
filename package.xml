@@ -29,9 +29,9 @@
     <email>ericsten@php.net</email>
     <active>yes</active>
   </lead>
-  <date>2016-06-21</date>
+  <date>2016-11-09</date>
   <version>
-    <release>2.0.0.7</release>
+    <release>2.0.0.8</release>
     <api>2.0.0</api>
   </version>
   <stability>
@@ -40,9 +40,9 @@
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-2.0.0.7:
-- choose better user cache table size at startup
-- improve detection of wincache segment corruption during allocate_memory
+2.0.0.8:
+- Revert "Global\" prefix for named objects.  It breaks IIS Express.
+- Improve tracing by adding thread ID to debug trace logs
   </notes>
   <contents>
     <dir name="/">
@@ -138,7 +138,7 @@
       <date>1980-01-01</date>
       <version>
         <release>0.0.0.0</release>
-        <api>0.0.0</api>
+        <api>2.0.0</api>
       </version>
       <stability>
         <release>stable|beta|alpha|devl|snapshot</release>
@@ -151,6 +151,22 @@
       </notes>
     </release>
 -->
+    <release>
+      <date>2016-06-21</date>
+      <version>
+        <release>2.0.0.7</release>
+        <api>2.0.0</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+2.0.0.7:
+- choose better user cache table size at startup
+- improve detection of wincache segment corruption during allocate_memory
+      </notes>
+    </release>
     <release>
       <date>2016-02-18</date>
       <version>
