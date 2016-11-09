@@ -125,7 +125,6 @@ int lock_get_nameprefix(
     int    namelen = 0;
     int    pid     = 0;
     int    ppid    = 0;
-    char * scopePrefix = "";
 
     /* Get the initial length of name prefix */
     namelen = strlen(name);
@@ -162,14 +161,6 @@ int lock_get_nameprefix(
     namelen += sizeof(STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION));
     namelen += PHP_WINCACHE_VERSION_LEN;
 
-    /* If we're on an app pool, we need to create all named objects in */
-    /* the Global scope.  */
-    if (WCG(apppoolid))
-    {
-        scopePrefix = GLOBAL_SCOPE_PREFIX;
-        namelen += GLOBAL_SCOPE_PREFIX_LEN;
-    }
-
     /* Add 2 for lock-type padding.  The buffer will be used to tack on
      * an extra char for the lock type by the caller. */
     namelen += 2;
@@ -193,11 +184,11 @@ int lock_get_nameprefix(
     /* Create nameprefix as name_pid_ppid_ */
     if(WCG(namesalt) == NULL)
     {
-        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%u_%u_", scopePrefix, name, cachekey, pid, ppid);
+        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%u_%u_", name, cachekey, pid, ppid);
     }
     else
     {
-        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%s_%u_%u_", scopePrefix, name, cachekey, WCG(namesalt), pid, ppid);
+        namelen = _snprintf_s(objname, namelen + 1, namelen, "%s_" STRVER2(PHP_MAJOR_VERSION, PHP_MINOR_VERSION) "_" PHP_WINCACHE_VERSION "_%u_%s_%u_%u_", name, cachekey, WCG(namesalt), pid, ppid);
     }
 
     if (-1 == namelen)

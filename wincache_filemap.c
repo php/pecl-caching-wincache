@@ -278,7 +278,6 @@ static int create_file_mapping(
     unsigned int    attributes = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_RANDOM_ACCESS;
     unsigned int    sharemode  = FILE_SHARE_READ | FILE_SHARE_WRITE;
     unsigned int    access     = GENERIC_READ | GENERIC_WRITE;
-    unsigned char   globalName[MAX_PATH+1];
     ULARGE_INTEGER  li         = { 0 };
 
     dprintverbose("start create_file_mapping");
@@ -354,17 +353,6 @@ static int create_file_mapping(
                                  aclRet);
             }
         }
-    }
-
-    if (WCG(apppoolid))
-    {
-        /* prefix the name with "Global\", to ensure the named filemap is in the global space. */
-        if ( -1 == sprintf_s(globalName, MAX_PATH+1, GLOBAL_SCOPE_PREFIX "%s", name) )
-        {
-            result = FATAL_FILEMAP_CREATEFILEMAP;
-            goto Finished;
-        }
-        name = globalName;
     }
 
     /* Call CreateFileMapping to create new or open existing file mapping object */
@@ -537,8 +525,6 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     unsigned char               islocked    = 0;
     unsigned int                isexisting  = 0;
     DWORD                       ret         = 0;
-    char *                      scopePrefix = "";
-    char *                      sectionName = NULL;
 
     dprintverbose("start create_information_filemap");
 
@@ -580,14 +566,6 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
         namelen += strlen(WCG(namesalt)) + 1;
     }
 
-    /* If we're on an app pool, we need to create all named objects in */
-    /* the Global scope. */
-    if (WCG(apppoolid))
-    {
-        scopePrefix = GLOBAL_SCOPE_PREFIX;
-        namelen += GLOBAL_SCOPE_PREFIX_LEN;
-    }
-
     /* Allocate memory to keep name of the information filemap */
     pinfo->infoname = (char *)alloc_pemalloc(namelen);
     if(pinfo->infoname == NULL)
@@ -601,11 +579,11 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     /* Create name as FILE_INFORMATION_PREFIX_<ppid> */
     if(WCG(namesalt) == NULL)
     {
-        _snprintf_s(pinfo->infoname, namelen, namelen - 1, "%s%s_%u", scopePrefix, FILEMAP_INFORMATION_PREFIX, WCG(fmapgdata)->ppid);
+        _snprintf_s(pinfo->infoname, namelen, namelen - 1, "%s_%u", FILEMAP_INFORMATION_PREFIX, WCG(fmapgdata)->ppid);
     }
     else
     {
-        _snprintf_s(pinfo->infoname, namelen, namelen - 1, "%s%s_%s_%u", scopePrefix, FILEMAP_INFORMATION_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
+        _snprintf_s(pinfo->infoname, namelen, namelen - 1, "%s_%s_%u", FILEMAP_INFORMATION_PREFIX, WCG(namesalt), WCG(fmapgdata)->ppid);
     }
 
     pinfo->infonlen = strlen(pinfo->infoname);
@@ -623,18 +601,8 @@ static int create_information_filemap(filemap_information ** ppinfo TSRMLS_DC)
     /* Adding two aligned qwords sizes will produce qword */
     size = FILEMAP_INFO_HEADER_SIZE + (FILEMAP_MAX_COUNT * FILEMAP_INFO_ENTRY_SIZE);
 
-    if (WCG(apppoolid))
-    {
-        /* NOTE: We need to pass the un-Global'd prefixed name to create_file_mapping. */
-        sectionName = &pinfo->infoname[GLOBAL_SCOPE_PREFIX_LEN];
-    }
-    else
-    {
-        sectionName = pinfo->infoname;
-    }
-
     /* shmfilepath = NULL, pfilehandle = NULL, pexisting = NULL */
-    result = create_file_mapping(sectionName, NULL, isfirst, size, NULL, &isexisting, &pinfo->hinfomap);
+    result = create_file_mapping(pinfo->infoname, NULL, isfirst, size, NULL, &isexisting, &pinfo->hinfomap);
     if(FAILED(result))
     {
         goto Finished;

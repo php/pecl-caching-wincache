@@ -35,11 +35,8 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "1.3.7.11"
+#define PHP_WINCACHE_VERSION    "1.3.7.12"
 #define PHP_WINCACHE_VERSION_LEN (sizeof(PHP_WINCACHE_VERSION)-1)
-
-#define GLOBAL_SCOPE_PREFIX     "Global\\"
-#define GLOBAL_SCOPE_PREFIX_LEN (sizeof(GLOBAL_SCOPE_PREFIX)-1)
 
 /* comment following line for release builds */
 /* #define WINCACHE_DEBUG */
