@@ -1210,6 +1210,14 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
 
     if(pfvalue != NULL)
     {
+        if (pfvalue->file_flags & FILE_IS_FOLDER)
+        {
+            result = FATAL_FCACHE_STREAM_ON_DIR;
+            aplist_fcache_close(WCG(lfcache), pfvalue);
+            dprintimportant("wincache_stream_open_function: Can't open stream on a directory");
+            return FAILURE;
+        }
+
         result = aplist_fcache_use(WCG(lfcache), fullpath, pfvalue, &file_handle);
         if(FAILED(result))
         {
@@ -1975,7 +1983,6 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
     int            result   = NONFATAL;
     char *         filename = NULL;
     int            flength  = 0;
-    char *         respath  = NULL;
     fcache_value * pfvalue  = NULL;
     unsigned char  retval   = 0;
 
@@ -1999,8 +2006,8 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
         goto Finished;
     }
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, NULL, &pfvalue TSRMLS_CC);
+    if(FAILED(result) || !pfvalue)
     {
         dprintverbose("wincache_file_exists - NOT CACHED: %s", filename);
         goto Finished;
@@ -2008,12 +2015,6 @@ static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_file_exists - CACHED: %s", filename);
     retval = 1;
-
-    if(respath != NULL)
-    {
-        alloc_efree(respath);
-        respath = NULL;
-    }
 
     if(pfvalue != NULL)
     {
@@ -2147,7 +2148,6 @@ static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
     int            result       = NONFATAL;
     char *         filename     = NULL;
     int            filename_len = 0;
-    char *         respath      = NULL;
     fcache_value * pfvalue      = NULL;
     unsigned char  iscached     = 0;
 
@@ -2174,8 +2174,8 @@ static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_filesize - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, NULL, &pfvalue TSRMLS_CC);
+    if(FAILED(result) || !pfvalue)
     {
         goto Finished;
     }
@@ -2185,12 +2185,6 @@ static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
     RETVAL_LONG(pfvalue->file_size);
 
 Finished:
-
-    if(respath != NULL)
-    {
-        alloc_efree(respath);
-        respath = NULL;
-    }
 
     if(pfvalue != NULL)
     {
@@ -2337,8 +2331,8 @@ static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_is_readable - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue)
     {
         goto Finished;
     }
@@ -2493,8 +2487,8 @@ static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_is_writable - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, &respath, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue)
     {
         goto Finished;
     }
@@ -2605,7 +2599,6 @@ static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
     int            result       = NONFATAL;
     char *         filename     = NULL;
     int            filename_len = 0;
-    char *         respath      = NULL;
     fcache_value * pvalue       = NULL;
     unsigned char  retval       = 0;
     unsigned char  iscached     = 0;
@@ -2633,8 +2626,8 @@ static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_is_file - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, NULL, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue)
     {
         goto Finished;
     }
@@ -2647,11 +2640,6 @@ static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
     }
 
 Finished:
-    if(respath != NULL)
-    {
-        alloc_efree(respath);
-        respath = NULL;
-    }
 
     if(pvalue != NULL)
     {
@@ -2684,7 +2672,6 @@ static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
     int            result       = NONFATAL;
     char *         filename     = NULL;
     int            filename_len = 0;
-    char *         respath      = NULL;
     fcache_value * pvalue       = NULL;
     unsigned char  retval       = 0;
     unsigned char  iscached     = 0;
@@ -2712,26 +2699,20 @@ static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_is_dir - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, NULL, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue)
     {
         goto Finished;
     }
 
     iscached = 1;
 
-    if(pvalue != NULL && (pvalue->file_flags & FILE_IS_FOLDER) == 1)
+    if((pvalue->file_flags & FILE_IS_FOLDER) == 1)
     {
         retval = 1;
     }
 
 Finished:
-
-    if(respath != NULL)
-    {
-        alloc_efree(respath);
-        respath = NULL;
-    }
 
     if(pvalue != NULL)
     {
@@ -2804,8 +2785,8 @@ WINCACHE_FUNC(wincache_rmdir)
         }
     }
 
-    result = aplist_fcache_get(WCG(lfcache), fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), fullpath, &respath, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue || !respath)
     {
         goto Finished;
     }
@@ -2923,8 +2904,8 @@ static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS)
 
     dprintverbose("wincache_realpath - %s", filename);
 
-    result = aplist_fcache_get(WCG(lfcache), filename, SKIP_STREAM_OPEN_CHECK, &respath, &pfvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), filename, &respath, &pfvalue TSRMLS_CC);
+    if(FAILED(result) || !pfvalue || !respath)
     {
         goto Finished;
     }
@@ -3003,8 +2984,8 @@ static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
         }
     }
 
-    result = aplist_fcache_get(WCG(lfcache), fullpath, SKIP_STREAM_OPEN_CHECK, &respath, &pvalue TSRMLS_CC);
-    if(FAILED(result))
+    result = aplist_fcache_lookup(WCG(lfcache), fullpath, &respath, &pvalue TSRMLS_CC);
+    if(FAILED(result) || !pvalue || !respath)
     {
         goto Finished;
     }

@@ -63,6 +63,35 @@ unsigned short glcacheid = 1;
 
 /* Private methods */
 
+char * get_fullpath(const char * filename TSRMLS_DC)
+{
+    int             result = NONFATAL;
+    char *          fullpath = NULL;
+    unsigned int    findex = 0;
+    unsigned int    length = 0;
+
+    /* Get fullpath by using copy of php_resolve_path */
+    fullpath = utils_resolve_path(filename, strlen(filename), PG(include_path) TSRMLS_CC);
+    if(fullpath == NULL)
+    {
+        result = WARNING_ORESOLVE_FAILURE;
+        goto Finished;
+    }
+
+    /* Convert to lower case and change / to \\ */
+    length = strlen(fullpath);
+    for(findex = 0; findex < length; findex++)
+    {
+        if(fullpath[findex] == '/')
+        {
+            fullpath[findex] = '\\';
+        }
+    }
+
+Finished:
+    return fullpath;
+}
+
 /* Call this method atleast under a read lock */
 /* If an entry for filename with is_deleted is found, return that in ppdelete */
 static int find_aplist_entry(aplist_context * pcache, const char * filename, unsigned int index, unsigned char docheck, aplist_value ** ppvalue, aplist_value ** ppdelete)
@@ -1311,6 +1340,22 @@ void aplist_setsc_olocal(aplist_context * pcache, aplist_context * plocal)
     return;
 }
 
+/* Look up aplist entry, but do not create a new entry if one doesn't exist. */
+/* Callers must hold at least the aprwlock read lock before calling */
+int aplist_lookup_entry(aplist_context * pcache, const char * filename, aplist_value ** ppvalue)
+{
+    int              result   = NONFATAL;
+    aplist_value *   pvalue   = NULL;
+    unsigned int     findex   = 0;
+
+    findex = utils_getindex(filename, pcache->apheader->valuecount);
+    result = find_aplist_entry(pcache, filename, findex, NO_FILE_CHANGE_CHECK, &pvalue, NULL);
+
+    *ppvalue = pvalue;
+
+    return result;
+}
+
 int aplist_getentry(aplist_context * pcache, const char * filename, unsigned int findex, aplist_value ** ppvalue)
 {
     int              result   = NONFATAL;
@@ -1831,8 +1876,12 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
                 /* Deleting the aplist entry will delete rplist entries as well */
                 if(pvalue->add_ticks == addticks)
                 {
-                    findex = utils_getindex(pcache->apmemaddr + pvalue->file_path, pcache->apheader->valuecount);
-                    remove_aplist_entry(pcache, findex, pvalue);
+                    char *fpath = (char *)alloc_get_cachevalue(pcache->apalloc, pvalue->file_path);
+                    if (fpath)
+                    {
+                        findex = utils_getindex(fpath, pcache->apheader->valuecount);
+                        remove_aplist_entry(pcache, findex, pvalue);
+                    }
                 }
 
                 /* These values should not be used as they belong to changed file */
@@ -1869,22 +1918,11 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
     /* If no valid absentry is found so far, get the fullpath from php-core */
     if(pvalue == NULL)
     {
-        /* Get fullpath by using copy of php_resolve_path */
-        fullpath = utils_resolve_path(filename, strlen(filename), PG(include_path) TSRMLS_CC);
-        if(fullpath == NULL)
+        fullpath = get_fullpath(filename TSRMLS_CC);
+        if (!fullpath)
         {
             result = WARNING_ORESOLVE_FAILURE;
             goto Finished;
-        }
-
-        /* Convert to lower case and change / to \\ */
-        length = strlen(fullpath);
-        for(findex = 0; findex < length; findex++)
-        {
-            if(fullpath[findex] == '/')
-            {
-                fullpath[findex] = '\\';
-            }
         }
     }
 
@@ -2049,6 +2087,108 @@ Finished:
     }
 
     dprintverbose("end aplist_fcache_get");
+
+    return result;
+}
+
+/* Lookup fcache_value without create */
+/* if ppfullpath is non-null, caller must use alloc_efree on returned fullpath */
+/* caller must use aplist_fcache_close on returned *ppfvalue */
+int aplist_fcache_lookup(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppfvalue TSRMLS_DC)
+{
+    int              result   = NONFATAL;
+    unsigned int     length   = 0;
+    unsigned int     findex   = 0;
+    unsigned int     addticks = 0;
+    unsigned char    fchanged = 0;
+    unsigned char    flock    = 0;
+
+    aplist_value *   pvalue   = NULL;
+    fcache_value *   pfvalue  = NULL;
+    rplist_value *   rpvalue  = NULL;
+    size_t           resentry = 0;
+    char *           fullpath = NULL;
+    zend_file_handle fhandle  = {0};
+
+    dprintverbose("start aplist_fcache_lookup (%s)", filename);
+
+    _ASSERT(pcache     != NULL);
+    _ASSERT(filename   != NULL);
+    _ASSERT(pcache->prplist != NULL);
+
+    /* Look for absolute path in resolve path cache first */
+    /* All paths in resolve path cache are resolved using */
+    /* include_path and don't need checks against open_basedir */
+    lock_readlock(pcache->aprwlock);
+    flock = 1;
+
+    result = rplist_lookup_entry(pcache->prplist, filename, &rpvalue, &resentry TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    /* If found, use new path to look into absolute path cache */
+    if(rpvalue && rpvalue->absentry != 0)
+    {
+        pvalue = APLIST_VALUE(pcache->apalloc, rpvalue->absentry);
+        if (ppfullpath)
+        {
+            fullpath = alloc_estrdup(pcache->apmemaddr + pvalue->file_path);
+        }
+    }
+    else
+    {
+        /* If no valid absentry is found so far, get the fullpath from php-core */
+        fullpath = get_fullpath(filename TSRMLS_CC);
+        if (!fullpath)
+        {
+            result = WARNING_ORESOLVE_FAILURE;
+            goto Finished;
+        }
+
+        result = aplist_lookup_entry(pcache, fullpath, &pvalue);
+        if(FAILED(result))
+        {
+            goto Finished;
+        }
+    }
+
+    if (pvalue && pvalue->fcacheval)
+    {
+        pfvalue = fcache_getvalue(pcache->pfcache, pvalue->fcacheval);
+        /* Increment refcount while holding aplist readlock */
+        fcache_refinc(pcache->pfcache, pfvalue);
+    }
+
+    *ppfvalue = pfvalue;
+    if (ppfullpath)
+    {
+        *ppfullpath = fullpath;
+        /* caller must use alloc_efree on returned fullpath */
+        fullpath = NULL;
+    }
+
+Finished:
+
+    if(fullpath != NULL)
+    {
+        alloc_efree(fullpath);
+        fullpath = NULL;
+    }
+
+    if(flock == 1)
+    {
+        lock_readunlock(pcache->aprwlock);
+        flock = 0;
+    }
+
+    if(FAILED(result))
+    {
+        dprintverbose("failure %d in aplist_fcache_lookup(%d)", result);
+    }
+
+    dprintverbose("end aplist_fcache_lookup");
 
     return result;
 }

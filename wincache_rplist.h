@@ -100,6 +100,7 @@ extern void rplist_initheader(rplist_context * pcache, unsigned int filecount);
 extern void rplist_terminate(rplist_context * pcache);
 
 extern int  rplist_getentry(rplist_context * pcache, const char * filename, rplist_value ** ppvalue, size_t * poffset TSRMLS_DC);
+extern int  rplist_lookup_entry(rplist_context * pcache, const char * filename, rplist_value ** ppvalue, size_t * poffset TSRMLS_DC);
 extern void rplist_setabsval(rplist_context * pcache, rplist_value * pvalue, size_t absentry, size_t prevsame);
 extern void rplist_deleteval(rplist_context * pcache, size_t valoffset);
 extern void rplist_markdeleted(rplist_context * pcache, size_t valoffset);

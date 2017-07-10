@@ -517,6 +517,52 @@ void rplist_terminate(rplist_context * pcache)
     return;
 }
 
+/* Lookup without creation */
+int rplist_lookup_entry(rplist_context * pcache, const char * filename, rplist_value ** ppvalue, size_t * poffset TSRMLS_DC)
+{
+    int             result   = NONFATAL;
+    unsigned int    findex   = 0;
+    char            cwdcexec[  MAX_PATH * 2];
+
+    rplist_value *  pvalue   = NULL;
+    rplist_header * rpheader = NULL;
+
+    dprintverbose("start rplist_lookupentry");
+
+    _ASSERT(pcache   != NULL);
+    _ASSERT(filename != NULL);
+    _ASSERT(ppvalue  != NULL);
+    _ASSERT(poffset  != NULL);
+
+    *ppvalue = NULL;
+    *poffset = 0;
+
+    rpheader = pcache->rpheader;
+    findex = utils_getindex(filename, rpheader->valuecount);
+
+    result = utils_cwdcexec(cwdcexec, MAX_PATH * 2 TSRMLS_CC);
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    lock_readlock(pcache->rprwlock);
+    result = findrpath_in_cache(pcache, filename, cwdcexec, findex, &pvalue TSRMLS_CC);
+    lock_readunlock(pcache->rprwlock);
+
+    if(FAILED(result))
+    {
+        goto Finished;
+    }
+
+    *ppvalue = pvalue;
+    *poffset = alloc_get_valueoffset(pcache->rpalloc, pvalue);
+
+Finished:
+    dprintverbose("end rplist_lookupentry");
+    return result;
+}
+
 int rplist_getentry(rplist_context * pcache, const char * filename, rplist_value ** ppvalue, size_t * poffset TSRMLS_DC)
 {
     int             result   = NONFATAL;

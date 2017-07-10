@@ -142,6 +142,7 @@ extern void aplist_mark_file_changed(aplist_context * pcache, char * filepath);
 
 extern int  aplist_fcache_initialize(aplist_context * plcache, unsigned int size, unsigned int maxfilesize TSRMLS_DC);
 extern int  aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned char usesopen, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
+extern int  aplist_fcache_lookup(aplist_context * pcache, const char * filename, char ** ppfullpath, fcache_value ** ppvalue TSRMLS_DC);
 extern int  aplist_fcache_use(aplist_context * pcache, const char * fullpath, fcache_value * pvalue, zend_file_handle ** pphandle);
 extern void aplist_fcache_close(aplist_context * pcache, fcache_value * pvalue);
 extern int  aplist_fcache_delete(aplist_context * pcache, const char * filename TSRMLS_DC);

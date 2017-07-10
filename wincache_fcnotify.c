@@ -207,7 +207,7 @@ static int findfolder_in_cache(fcnotify_context * pnotify, const char * folderpa
     fcnotify_header * pheader = NULL;
     fcnotify_value *  pvalue  = NULL;
 
-    dprintverbose("start findfolder_in_cache");
+    dprintverbose("start findfolder_in_cache (%s, %d)", folderpath, index);
 
     _ASSERT(pnotify    != NULL);
     _ASSERT(folderpath != NULL);
@@ -229,7 +229,7 @@ static int findfolder_in_cache(fcnotify_context * pnotify, const char * folderpa
         pvalue = FCNOTIFY_VALUE(pnotify->fcalloc, pvalue->next_value);
     }
 
-    dprintverbose("end findfolder_in_cache");
+    dprintverbose("end findfolder_in_cache (%p)", pvalue);
 
     return result;
 }

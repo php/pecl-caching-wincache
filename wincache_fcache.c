@@ -739,13 +739,13 @@ Finished:
 fcache_value * fcache_getvalue(fcache_context * pfcache, size_t offset)
 {
     _ASSERT(pfcache != NULL);
-    return ((offset != 0) ? ((fcache_value *)(pfcache->memaddr + offset)) : NULL);
+    return (fcache_value *)alloc_get_cachevalue(pfcache->palloc, offset);
 }
 
 size_t fcache_getoffset(fcache_context * pfcache, fcache_value * pvalue)
 {
     _ASSERT(pfcache != NULL);
-    return ((pvalue != NULL) ? ((char *)pvalue - pfcache->memaddr) : 0);
+    return alloc_get_valueoffset(pfcache->palloc, pvalue);
 }
 
 void fcache_refinc(fcache_context * pfcache, fcache_value * pvalue)

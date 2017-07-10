@@ -113,6 +113,7 @@
 #define FATAL_FCACHE_INIT_EVENT             FATAL_FCACHE_BASE + 9
 #define FATAL_FCACHE_ORIGINAL_OPEN          FATAL_FCACHE_BASE + 10
 #define FATAL_FCACHE_BYHANDLE_INFO          FATAL_FCACHE_BASE + 11
+#define FATAL_FCACHE_STREAM_ON_DIR          FATAL_FCACHE_BASE + 12
 
 /* Error codes used by opcode cache */
 #define FATAL_OCACHE_BASE                   700

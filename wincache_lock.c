@@ -86,7 +86,7 @@ Finished:
         dprintimportant("failure %d in lock_create", result);
     }
 
-    dprintverbose("end lock_create");
+    dprintverbose("end lock_create (%p)", plock);
 
     return result;
 }
@@ -94,7 +94,7 @@ Finished:
 /* Destroy the lock context */
 void lock_destroy(lock_context * plock)
 {
-    dprintverbose("start lock_destroy");
+    dprintverbose("start lock_destroy (%p)", plock);
 
     if( plock != NULL )
     {
@@ -452,7 +452,7 @@ void lock_readlock(lock_context * plock)
     const char *filename;
     uint   lineno;
 
-    dprintverbose("start lock_readlock");
+    dprintverbose("start lock_readlock (%p)", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -547,7 +547,7 @@ void lock_readunlock(lock_context * plock)
     const char *filename;
     uint   lineno;
 
-    dprintverbose("start lock_readunlock");
+    dprintverbose("start lock_readunlock (%p)", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -620,7 +620,7 @@ void lock_writelock(lock_context * plock)
     const char *filename;
     uint   lineno;
 
-    dprintverbose("start lock_writelock");
+    dprintverbose("start lock_writelock (%p)", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
@@ -716,7 +716,7 @@ void lock_writeunlock(lock_context * plock)
     const char *filename;
     uint   lineno;
 
-    dprintverbose("start lock_writeunlock");
+    dprintverbose("start lock_writeunlock (%p)", plock);
 
     _ASSERT(plock          != NULL);
     _ASSERT(plock->hxwrite != NULL);
