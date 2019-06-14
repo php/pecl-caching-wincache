@@ -879,7 +879,11 @@ PHP_MINFO_FUNCTION(wincache)
     return;
 }
 
+#if PHP_API_VERSION >= 20180731
 zend_string * wincache_resolve_path(const char * filename, size_t filename_len)
+#else
+zend_string * wincache_resolve_path(const char * filename, int filename_len)
+#endif
 {
     int            result       = NONFATAL;
     char *         res_path_str = NULL;
