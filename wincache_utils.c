@@ -1308,7 +1308,7 @@ const char * utils_get_typename(zend_uchar type)
         case IS_REFERENCE:
             valuetype = "reference";
             break;
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
         case IS_CONSTANT:
 #endif
         case IS_CONSTANT_AST:

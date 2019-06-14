@@ -93,8 +93,7 @@
 # define strcpy_s(src, size, dst) strcpy(src, dst)
 #endif
 
-#if ZEND_MODULE_API_NO >= 20170718
-#pragma message("PHP_73_API defined")
+#if PHP_API_VERSION >= 20180731
 # define PHP_73_API
 #endif
 

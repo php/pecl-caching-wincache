@@ -69,7 +69,7 @@ C_ASSERT(SIZEOF_SIZE_T <= SIZEOF_ZEND_LONG);
 #define IS_TYPE_CONSTANT 0
 #endif
 
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
 #define GC_ADDREF(p)            ++GC_REFCOUNT((p))
 #define GC_SET_REFCOUNT(p,n)    GC_REFCOUNT((p)) = n
 #define GC_ZERO_OUT_INFO(p)     GC_INFO((p)) = 0;
@@ -225,7 +225,7 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
         case IS_DOUBLE:
             break;
 
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
         case IS_CONSTANT:
 #endif
         case IS_STRING:
@@ -496,7 +496,7 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             /* Nothing to do */
             break;
 
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
         case IS_CONSTANT:
 #endif
         case IS_STRING:
@@ -641,7 +641,7 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     /* fix up the HashTable flags since we're persisting it */
     GC_SET_REFCOUNT(pnew_table,2);
     GC_ZERO_OUT_INFO(pnew_table);
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
     GC_FLAGS(pnew_table) &= ~IS_ARRAY_IMMUTABLE;
     pnew_table->u.flags &= ~HASH_FLAG_PERSISTENT;
 #else
@@ -915,7 +915,7 @@ static int copyin_string(zvcopy_context * pcopy, HashTable *phtable, zend_string
     {
         *(((char *)pzstr) + size - 1) = 0;
         zend_string_forget_hash_val(pzstr);
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
         GC_FLAGS(pzstr) &= ~(IS_STR_INTERNED | IS_STR_PERMANENT | IS_STR_PERSISTENT);
 #else
         GC_DEL_FLAGS(pzstr, (IS_STR_INTERNED | IS_STR_PERMANENT | IS_STR_PERSISTENT));
@@ -1190,7 +1190,7 @@ static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalu
                 case IS_DOUBLE:
                     break;
 
-#if ZEND_MODULE_API_NO < 20170718
+#if PHP_API_VERSION < 20180731
                 case IS_CONSTANT:
 #endif
                 case IS_STRING:
