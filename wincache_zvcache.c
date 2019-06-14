@@ -61,6 +61,21 @@ C_ASSERT(SIZEOF_SIZE_T <= SIZEOF_ZEND_LONG);
 #define WINCACHE_MAX_ZVKEY_LENGTH    0xFFFF
 #endif /* WINCACHE_MAX_ZVKEY_LENGTH */
 
+#ifndef IS_TYPE_COPYABLE
+#define IS_TYPE_COPYABLE 0
+#endif
+
+#ifndef IS_TYPE_CONSTANT
+#define IS_TYPE_CONSTANT 0
+#endif
+
+#if ZEND_MODULE_API_NO < 20170718
+#define GC_ADDREF(p)            ++GC_REFCOUNT((p))
+#define GC_SET_REFCOUNT(p,n)    GC_REFCOUNT((p)) = n
+#define GC_ZERO_OUT_INFO(p)     GC_INFO((p)) = 0;
+#else
+#define GC_ZERO_OUT_INFO(p)     GC_TYPE_INFO((p)) &= ~GC_INFO_MASK
+#endif
 
 #define ZMALLOC(pcopy, size)         (pcopy->fnmalloc(pcopy->palloc, pcopy->hoffset, size))
 #define ZREALLOC(pcopy, addr, size)  (pcopy->fnrealloc(pcopy->palloc, pcopy->hoffset, addr, size))
@@ -210,8 +225,10 @@ static int copyin_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTab
         case IS_DOUBLE:
             break;
 
-        case IS_STRING:
+#if ZEND_MODULE_API_NO < 20170718
         case IS_CONSTANT:
+#endif
+        case IS_STRING:
             result = copyin_string(pcopy, phtable, Z_STR_P(poriginal), &pzstr);
             if (FAILED(result))
             {
@@ -479,8 +496,10 @@ static int copyout_zval(zvcache_context * pcache, zvcopy_context * pcopy, HashTa
             /* Nothing to do */
             break;
 
-        case IS_STRING:
+#if ZEND_MODULE_API_NO < 20170718
         case IS_CONSTANT:
+#endif
+        case IS_STRING:
             /* create a new, non-persistent string from the cached copy */
             ptmp_str = (zend_string *)ZVALUE(pcache->incopy, (size_t)Z_STR_P(pcached));
             Z_STR_P(pnewzv) = zend_string_alloc(ZSTR_LEN(ptmp_str), 0);
@@ -620,10 +639,14 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     pnew_table->pDestructor = NULL;
 
     /* fix up the HashTable flags since we're persisting it */
-    GC_REFCOUNT(pnew_table) = 2;
-    GC_INFO(pnew_table) = 0;
+    GC_SET_REFCOUNT(pnew_table,2);
+    GC_ZERO_OUT_INFO(pnew_table);
+#if ZEND_MODULE_API_NO < 20170718
     GC_FLAGS(pnew_table) &= ~IS_ARRAY_IMMUTABLE;
     pnew_table->u.flags &= ~HASH_FLAG_PERSISTENT;
+#else
+    GC_DEL_FLAGS(pnew_table, (IS_ARRAY_PERSISTENT | IS_ARRAY_IMMUTABLE));
+#endif
 
     /* Uninitalized */
     if (!(pnew_table->u.flags & HASH_FLAG_INITIALIZED)) {
@@ -643,7 +666,8 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
 #pragma warning( push )
 #pragma warning( disable : 4018 ) /* yeah, we do signed/unsigned comparisons */
     /* Sparsely Populated: Need to compress while copying in */
-    else if (poriginal->nNumUsed < -(int32_t)poriginal->nTableMask / 2) {
+    else if ((HT_HASH_SIZE(poriginal->nTableMask) > 64) &&
+             (poriginal->nNumUsed < -(int32_t)poriginal->nTableMask / 2)) {
         /* compact table */
         Bucket *old_buckets = poriginal->arData;
         int32_t hash_size = -(int32_t)poriginal->nTableMask;
@@ -764,7 +788,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     {
         if((pnew_table = zend_hash_index_find_ptr(phtable, (zend_ulong)pcached)) != NULL)
         {
-            ++GC_REFCOUNT(pnew_table);
+            GC_ADDREF(pnew_table);
             *ppcopied = pnew_table;
             goto Finished;
         }
@@ -827,7 +851,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
             ptmp_str = (zend_string *)ZVALUE(pcache->incopy, (size_t)p->key);
             p->key = zend_string_alloc(ZSTR_LEN(ptmp_str), 0);
             memcpy(ZSTR_VAL(p->key), ZSTR_VAL(ptmp_str), ZSTR_LEN(ptmp_str)+1);
-            ++GC_REFCOUNT(p->key);
+            GC_ADDREF(p->key);
         }
 
         /* copy out the data itself */
@@ -891,7 +915,11 @@ static int copyin_string(zvcopy_context * pcopy, HashTable *phtable, zend_string
     {
         *(((char *)pzstr) + size - 1) = 0;
         zend_string_forget_hash_val(pzstr);
+#if ZEND_MODULE_API_NO < 20170718
         GC_FLAGS(pzstr) &= ~(IS_STR_INTERNED | IS_STR_PERMANENT | IS_STR_PERSISTENT);
+#else
+        GC_DEL_FLAGS(pzstr, (IS_STR_INTERNED | IS_STR_PERMANENT | IS_STR_PERSISTENT));
+#endif
     }
 
     *new_string = pzstr;
@@ -925,8 +953,8 @@ static int copyin_reference(zvcache_context * pcache, zvcopy_context * pcopy, Ha
     {
         pnew_zval = &pzref->val;
         result = copyin_zval(pcache, pcopy, phtable, pnew_zval, &pnew_zval);
-        GC_REFCOUNT(pzref) = 2;
-        GC_INFO(pzref) = 0;
+        GC_SET_REFCOUNT(pzref,2);
+        GC_ZERO_OUT_INFO(pzref);
     }
 
     *new_ref = pzref;
@@ -954,7 +982,7 @@ static int copyout_reference(zvcache_context * pcache, zvcopy_context * pcopy, H
     {
         if((pzref = zend_hash_index_find_ptr(phtable, (zend_ulong)pcached)) != NULL)
         {
-            ++GC_REFCOUNT(pzref);
+            GC_ADDREF(pzref);
             *ppnew_ref = pzref;
             goto Finished;
         }
@@ -1162,8 +1190,10 @@ static void destroy_zvcache_data(zvcache_context * pcache, zvcache_value * pvalu
                 case IS_DOUBLE:
                     break;
 
-                case IS_STRING:
+#if ZEND_MODULE_API_NO < 20170718
                 case IS_CONSTANT:
+#endif
+                case IS_STRING:
                     ZFREE(pcache->incopy, ZVALUE(pcache->incopy, (size_t)Z_STR_P(pzval)));
                     Z_STR_P(pzval) = NULL;
                     break;

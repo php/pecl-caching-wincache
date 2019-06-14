@@ -52,6 +52,12 @@ struct wclock_context
     unsigned int             tuse;        /* Tick count when this was last used */
 };
 
+#ifdef PHP_73_API
+# define wincache_zif_handler zif_handler
+#else
+typedef void (ZEND_FASTCALL *wincache_zif_handler)(INTERNAL_FUNCTION_PARAMETERS);
+#endif
+
 /* Module globals */
 ZEND_BEGIN_MODULE_GLOBALS(wincache)
     aplist_context *         lfcache;     /* Shared memory for fcache filelist */
@@ -61,32 +67,28 @@ ZEND_BEGIN_MODULE_GLOBALS(wincache)
     unsigned int             numfiles;    /* Configured number of files to handle */
     unsigned int             fcchkfreq;   /* File change check frequency in seconds */
     unsigned int             ttlmax;      /* Seconds a cache entry can stay dormant */
-                                          /* Pointer to the original rmdir function */
-    void                    (*orig_rmdir)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_rmdir;  /* Pointer to the original rmdir function */
                                           /* Pointer to the original file_exists function */
-    void                    (*orig_file_exists)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_file_exists;
                                           /* Pointer to the original file_get_contents function */
-    void                    (*orig_file_get_contents)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_file_get_contents;
                                           /* Pointer to the original filesize function */
-    void                    (*orig_filesize)(INTERNAL_FUNCTION_PARAMETERS);
-                                          /* Pointer to the original is_dir function */
-    void                    (*orig_is_dir)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_filesize;
+    wincache_zif_handler     orig_is_dir; /* Pointer to the original is_dir function */
                                           /* Pointer to the original is_file function */
-    void                    (*orig_is_file)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_is_file;
                                           /* Pointer to the original is_readable function */
-    void                    (*orig_is_readable)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_is_readable;
                                           /* Pointer to the original is_writable function */
-    void                    (*orig_is_writable)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_is_writable;
                                           /* Pointer to the original is_writeable function */
-    void                    (*orig_is_writeable)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_is_writeable;
                                           /* Pointer to the original readfile function */
-    void                    (*orig_readfile)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_readfile;
                                           /* Pointer to the original realpath function */
-    void                    (*orig_realpath)(INTERNAL_FUNCTION_PARAMETERS);
-                                          /* Pointer to the original unlink function */
-    void                    (*orig_unlink)(INTERNAL_FUNCTION_PARAMETERS);
-                                          /* Pointer to the original rename function */
-    void                    (*orig_rename)(INTERNAL_FUNCTION_PARAMETERS);
+    wincache_zif_handler     orig_realpath;
+    wincache_zif_handler     orig_unlink; /* Pointer to the original unlink function */
+    wincache_zif_handler     orig_rename; /* Pointer to the original rename function */
     zend_bool                enablecli;   /* Enable wincache for command line sapi */
     zend_bool                fcenabled;   /* File cache enabled or disabled */
     unsigned int             fcachesize;  /* File cache size in MBs */
@@ -128,7 +130,7 @@ ZEND_TSRMLS_CACHE_EXTERN();
 #define WCG(v) (wincache_globals.v)
 #endif
 
-typedef zend_string *(*fn_zend_resolve_path)(const char *filename, int filename_len);
+typedef zend_string *(*fn_zend_resolve_path)(const char *filename, size_t filename_len);
 typedef int (*fn_zend_stream_open_function)(const char * filename, zend_file_handle *handle);
 typedef zend_op_array * (*fn_zend_compile_file)(zend_file_handle *, int);
 typedef void (*fn_zend_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
@@ -136,7 +138,7 @@ typedef void (*fn_zend_error_cb)(int type, const char *error_filename, const uin
 fn_zend_resolve_path original_resolve_path;
 fn_zend_stream_open_function original_stream_open_function;
 
-extern zend_string * wincache_resolve_path(const char * filename, int filename_len);
+extern zend_string * wincache_resolve_path(const char * filename, size_t filename_len);
 extern int wincache_stream_open_function(const char * filename, zend_file_handle * file_handle);
 
 extern void wincache_intercept_functions_init();

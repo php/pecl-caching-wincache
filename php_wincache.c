@@ -73,17 +73,17 @@ PHP_FUNCTION(wincache_lock);
 PHP_FUNCTION(wincache_unlock);
 
 /* Wrapper functions for standard PHP functions */
-static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS);
-static void wincache_rename(INTERNAL_FUNCTION_PARAMETERS);
+PHP_FUNCTION(wincache_file_exists);
+PHP_FUNCTION(wincache_file_get_contents);
+PHP_FUNCTION(wincache_filesize);
+PHP_FUNCTION(wincache_is_dir);
+PHP_FUNCTION(wincache_is_file);
+PHP_FUNCTION(wincache_is_readable);
+PHP_FUNCTION(wincache_is_writable);
+PHP_FUNCTION(wincache_readfile);
+PHP_FUNCTION(wincache_realpath);
+PHP_FUNCTION(wincache_unlink);
+PHP_FUNCTION(wincache_rename);
 
 #ifdef WINCACHE_TEST
 PHP_FUNCTION(wincache_ucache_lasterror);
@@ -201,8 +201,6 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_wincache_fcnotify_meminfo, 0, 0, 0)
 ZEND_END_ARG_INFO()
 #endif
-
-#define WINCACHE_FUNC(name) static PHP_NAMED_FUNCTION(name)
 
 /* Put all user defined functions here */
 zend_function_entry wincache_functions[] = {
@@ -881,7 +879,7 @@ PHP_MINFO_FUNCTION(wincache)
     return;
 }
 
-zend_string * wincache_resolve_path(const char * filename, int filename_len)
+zend_string * wincache_resolve_path(const char * filename, size_t filename_len)
 {
     int            result       = NONFATAL;
     char *         res_path_str = NULL;
@@ -1373,7 +1371,7 @@ Finished:
     RETURN_TRUE;
 }
 
-static void wincache_file_exists(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_file_exists)
 {
     int            result   = NONFATAL;
     char *         filename = NULL;
@@ -1436,7 +1434,7 @@ Finished:
 }
 
 /* file_get_contents implemented in ext\standard\file.c */
-static void wincache_file_get_contents(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_file_get_contents)
 {
     int            result           = NONFATAL;
     char *         filename         = NULL;
@@ -1533,7 +1531,7 @@ Finished:
     return;
 }
 
-static void wincache_filesize(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_filesize)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -1604,7 +1602,7 @@ Finished:
 }
 
 /* readfile implemented in ext\standard\file.c */
-static void wincache_readfile(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_readfile)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -1684,7 +1682,7 @@ Finished:
 }
 
 /* is_readable implemented in tsrm\tsrm_win32.c */
-static void wincache_is_readable(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_is_readable)
 {
     int             result           = NONFATAL;
     char *          filename         = NULL;
@@ -1839,8 +1837,8 @@ Finished:
  * In any* case, we have to hook *both* of them.  To facilitate this, we create
  * a function pointer variable.
  */
-static void (*wincache_is_writeable)(INTERNAL_FUNCTION_PARAMETERS) = wincache_is_writable;
-static void wincache_is_writable(INTERNAL_FUNCTION_PARAMETERS)
+wincache_zif_handler zif_wincache_is_writeable = zif_wincache_is_writable;
+PHP_FUNCTION(wincache_is_writable)
 {
     int             result           = NONFATAL;
     char *          filename         = NULL;
@@ -1991,7 +1989,7 @@ Finished:
 }
 
 /* is_file implemented in ext\standard\file.c */
-static void wincache_is_file(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_is_file)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -2070,7 +2068,7 @@ Finished:
 }
 
 /* is_dir implemented in ext\standard\file.c */
-static void wincache_is_dir(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_is_dir)
 {
     int            result       = NONFATAL;
     char *         filename     = NULL;
@@ -2150,7 +2148,7 @@ Finished:
 }
 
 /* overwriting the rmdir implemented in ext\standard\file.c */
-WINCACHE_FUNC(wincache_rmdir)
+PHP_FUNCTION(wincache_rmdir)
 {
     int                result       = NONFATAL;
     char *             dirname      = NULL;
@@ -2250,7 +2248,7 @@ Finished:
 }
 
 /* file_get_contents implemented in tsrm\tsrm_win32.c */
-static void wincache_realpath(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_realpath)
 {
     int            result        = NONFATAL;
     char *         filename      = NULL;
@@ -2314,7 +2312,7 @@ Finished:
     return;
 }
 
-static void wincache_unlink(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_unlink)
 {
     int            result        = NONFATAL;
     char *         filename      = NULL;
@@ -2415,7 +2413,7 @@ Finished:
     dprintverbose("end wincache_unlink");
 }
 
-static void wincache_rename(INTERNAL_FUNCTION_PARAMETERS)
+PHP_FUNCTION(wincache_rename)
 {
     int            result        = NONFATAL;
     char *         srcname       = NULL;
@@ -2525,7 +2523,7 @@ Finished:
     orig = zend_hash_str_find_ptr(CG(function_table), #func, sizeof(#func)-1); \
     if (orig && orig->type == ZEND_INTERNAL_FUNCTION) { \
     WCG(orig_##func) = orig->internal_function.handler; \
-    orig->internal_function.handler = wincache_##func; \
+    orig->internal_function.handler = zif_wincache_##func; \
     }
 
 void wincache_intercept_functions_init()

@@ -93,6 +93,11 @@
 # define strcpy_s(src, size, dst) strcpy(src, dst)
 #endif
 
+#if ZEND_MODULE_API_NO >= 20170718
+#pragma message("PHP_73_API defined")
+# define PHP_73_API
+#endif
+
 #define CACHE_TYPE_FILELIST        1
 #define CACHE_TYPE_RESPATHS        2
 #define CACHE_TYPE_FILECONTENT     3
