@@ -97,6 +97,11 @@
 # define PHP_73_API
 #endif
 
+#if ZEND_MODULE_API_NO >= 20190128
+typedef unsigned long ulong;
+typedef unsigned int uint;
+#endif
+
 #define CACHE_TYPE_FILELIST        1
 #define CACHE_TYPE_RESPATHS        2
 #define CACHE_TYPE_FILECONTENT     3

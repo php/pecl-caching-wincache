@@ -70,11 +70,18 @@ C_ASSERT(SIZEOF_SIZE_T <= SIZEOF_ZEND_LONG);
 #endif
 
 #if PHP_API_VERSION < 20180731
+// PHP 7.2 and earlier
 #define GC_ADDREF(p)            ++GC_REFCOUNT((p))
 #define GC_SET_REFCOUNT(p,n)    GC_REFCOUNT((p)) = n
 #define GC_ZERO_OUT_INFO(p)     GC_INFO((p)) = 0;
 #else
+// PHP 7.3
 #define GC_ZERO_OUT_INFO(p)     GC_TYPE_INFO((p)) &= ~GC_INFO_MASK
+#endif
+
+#if PHP_API_VERSION < 20190128
+// PHP 7.3
+#define HT_IS_INITIALIZED(ht) (((ht)->u.flags & HASH_FLAG_INITIALIZED) != 0)
 #endif
 
 #define ZMALLOC(pcopy, size)         (pcopy->fnmalloc(pcopy->palloc, pcopy->hoffset, size))
@@ -649,7 +656,7 @@ static int copyin_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, Ha
 #endif
 
     /* Uninitalized */
-    if (!(pnew_table->u.flags & HASH_FLAG_INITIALIZED)) {
+    if (!HT_IS_INITIALIZED(pnew_table)) {
         HT_SET_DATA_ADDR(pnew_table, 0);
         goto Finished;
     }
@@ -822,7 +829,7 @@ static int copyout_hashtable(zvcache_context * pcache, zvcopy_context * pcopy, H
     *pnew_table = *pcached;
 
     /* Uninitalized */
-    if (!(pnew_table->u.flags & HASH_FLAG_INITIALIZED)) {
+    if (!HT_IS_INITIALIZED(pnew_table)) {
         HT_SET_DATA_ADDR(pnew_table, &uninitialized_bucket);
         goto Finished;
     }
