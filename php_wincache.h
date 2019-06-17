@@ -52,7 +52,11 @@ struct wclock_context
     unsigned int             tuse;        /* Tick count when this was last used */
 };
 
-#define wincache_zif_handler zif_handler
+#if PHP_VERSION_ID >= 70200
+# define wincache_zif_handler zif_handler
+#else
+typedef void (*wincache_zif_handler)(INTERNAL_FUNCTION_PARAMETERS);
+#endif
 
 /* Module globals */
 ZEND_BEGIN_MODULE_GLOBALS(wincache)
