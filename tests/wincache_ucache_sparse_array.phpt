@@ -283,7 +283,7 @@ array(6) {
       ["value_type"]=>
       string(5) "array"
       ["value_size"]=>
-      int(16451)
+      int(%d)
       ["ttl_seconds"]=>
       int(0)
       ["age_seconds"]=>
