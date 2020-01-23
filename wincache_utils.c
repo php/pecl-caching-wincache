@@ -1248,11 +1248,11 @@ void utils_reimpersonate_if_necessary(HANDLE hOriginalToken)
 
 void utils_get_filename_and_line(
     const char **filename,
-    uint *linenumber
+    uint32_t *linenumber
     )
 {
     const char *error_filename;
-    uint error_lineno = 0;
+    uint32_t error_lineno = 0;
 
     if (zend_is_compiling()) {
         error_filename = ZSTR_VAL(zend_get_compiled_filename());

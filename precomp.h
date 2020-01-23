@@ -99,7 +99,6 @@
 
 #if ZEND_MODULE_API_NO >= 20190128
 typedef unsigned long ulong;
-typedef unsigned int uint;
 #endif
 
 #define CACHE_TYPE_FILELIST        1

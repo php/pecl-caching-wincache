@@ -138,7 +138,7 @@ typedef zend_string *(*fn_zend_resolve_path)(const char *filename, int filename_
 
 typedef int (*fn_zend_stream_open_function)(const char * filename, zend_file_handle *handle);
 typedef zend_op_array * (*fn_zend_compile_file)(zend_file_handle *, int);
-typedef void (*fn_zend_error_cb)(int type, const char *error_filename, const uint error_lineno, const char *format, va_list args);
+typedef void (*fn_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args);
 
 fn_zend_resolve_path original_resolve_path;
 fn_zend_stream_open_function original_stream_open_function;

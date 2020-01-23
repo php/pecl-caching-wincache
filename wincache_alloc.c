@@ -92,7 +92,7 @@ static int allocate_memory(alloc_context * palloc, size_t size, void ** ppaddr)
     alloc_used_header *    usedh   = NULL;
 
     const char *           filename;
-    uint                   lineno;
+    uint32_t               lineno;
 
     dprintdecorate("start allocate_memory");
 
@@ -297,7 +297,7 @@ static void free_memory(alloc_context * palloc, void * paddr)
     alloc_free_header *    pfree  = NULL;
 
     const char *           filename;
-    uint                   lineno;
+    uint32_t               lineno;
 
     dprintdecorate("start free_memory");
 

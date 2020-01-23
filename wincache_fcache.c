@@ -669,12 +669,18 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
             result = FATAL_OUT_OF_LMEMORY;
             goto Finished;
         }
-
+        dprintverbose("alloc'd new zend_file_handle %p", phandle);
         allocated = 1;
+
+        ZeroMemory(phandle, sizeof(zend_file_handle));
     }
     else
     {
         phandle = *pphandle;
+        dprintverbose("using passed in zend_file_handle %p", phandle);
+        /* It's a stream handle, so we need to zero out the buf & len values */
+        phandle->buf = 0;
+        phandle->len = 0;
     }
 
     /* Allocate memory for fcache_handle. Release memory in fcache_closer */
@@ -708,7 +714,10 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
     phandle->handle.stream.handle = fhandle;
     phandle->type = ZEND_HANDLE_STREAM;
 
-    *pphandle = phandle;
+    if (allocated == 1)
+    {
+        *pphandle = phandle;
+    }
 
     _ASSERT(SUCCEEDED(result));
 

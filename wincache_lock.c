@@ -341,7 +341,7 @@ void lock_lock(lock_context * plock)
 {
     DWORD  ret       = 0;
     const char *filename;
-    uint   lineno;
+    uint32_t lineno;
     unsigned int last_owner = 0;
 
     dprintverbose("start lock_lock   %p", plock);

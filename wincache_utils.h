@@ -45,7 +45,7 @@ extern int          utils_apoolpid();
 extern unsigned int utils_ticksdiff(unsigned int present, unsigned int past);
 extern char *       utils_resolve_path(const char *filename, size_t filename_length, const char *path);
 extern char *       utils_build_temp_filename(char * suffix);
-extern void         utils_get_filename_and_line(const char **filename, uint *linenumber);
+extern void         utils_get_filename_and_line(const char **filename, uint32_t *linenumber);
 extern void         utils_wait_for_listener(const char * respath, unsigned int timeout);
 extern unsigned int utils_get_prime_less_than(size_t num);
 
