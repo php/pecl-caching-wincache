@@ -678,9 +678,11 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
     {
         phandle = *pphandle;
         dprintverbose("using passed in zend_file_handle %p", phandle);
+#if ZEND_MODULE_API_NO >= 20190902 /* PHP 7.4 release */
         /* It's a stream handle, so we need to zero out the buf & len values */
         phandle->buf = 0;
         phandle->len = 0;
+#endif
     }
 
     /* Allocate memory for fcache_handle. Release memory in fcache_closer */
