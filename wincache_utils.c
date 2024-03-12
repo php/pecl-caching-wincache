@@ -235,7 +235,11 @@ const char * utils_filepath(zend_file_handle * file_handle)
     }
     else if(file_handle->filename != NULL)
     {
+#if ZEND_MODULE_API_NO >= 20210902 /* PHP 8.1 release */
+        pchar = ZSTR_VAL(file_handle->filename);
+#else
         pchar = file_handle->filename;
+#endif
     }
 
     dprintverbose("end utils_filepath");

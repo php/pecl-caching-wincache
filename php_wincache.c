@@ -878,8 +878,9 @@ PHP_MINFO_FUNCTION(wincache)
     dprintverbose("end php_minfo");
     return;
 }
-
-#if PHP_API_VERSION >= 20180731
+#if PHP_API_VERSION >= 20210902
+zend_string * wincache_resolve_path(zend_string *filename_zstr)
+#elif PHP_API_VERSION >= 20180731
 zend_string * wincache_resolve_path(const char * filename, size_t filename_len)
 #else
 zend_string * wincache_resolve_path(const char * filename, int filename_len)
@@ -890,6 +891,9 @@ zend_string * wincache_resolve_path(const char * filename, int filename_len)
     zend_string *  resolve_path = NULL;
     unsigned char  cenabled     = 0;
     fcache_value * pfvalue      = NULL;
+#if PHP_API_VERSION >= 20210902
+    char *         filename     = ZSTR_VAL(filename_zstr);
+#endif
 
     cenabled = WCG(fcenabled);
 
@@ -905,7 +909,11 @@ zend_string * wincache_resolve_path(const char * filename, int filename_len)
     /* this method is called, use original_resolve_path */
     if(!cenabled || filename == NULL || WCG(lfcache) == NULL)
     {
+#if PHP_API_VERSION >= 20210902
+        return original_resolve_path(filename_zstr);
+#else
         return original_resolve_path(filename, filename_len);
+#endif
     }
 
     dprintverbose("zend_resolve_path called for %s", filename);
@@ -913,7 +921,11 @@ zend_string * wincache_resolve_path(const char * filename, int filename_len)
     if(isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintimportant("cache is disabled for the file because of ignore list");
+#if PHP_API_VERSION >= 20210902
+        return original_resolve_path(filename_zstr);
+#else
         return original_resolve_path(filename, filename_len);
+#endif
     }
 
     /* Keep last argument as NULL to indicate that we only want fullpath of file */
@@ -945,18 +957,29 @@ Finished:
     {
         dprintverbose("wincache_resolve_path failed with error %u", result);
 
+#if PHP_API_VERSION >= 20210902
+        return original_resolve_path(filename_zstr);
+#else
         return original_resolve_path(filename, filename_len);
+#endif
     }
 
     return resolve_path;
 }
 
+#if PHP_API_VERSION >= 20210902
+int wincache_stream_open_function(zend_file_handle * file_handle)
+#else
 int wincache_stream_open_function(const char * filename, zend_file_handle * file_handle)
+#endif
 {
     int            result   = NONFATAL;
     fcache_value * pfvalue  = NULL;
     char *         fullpath = NULL;
     unsigned char  cenabled = 0;
+#if PHP_API_VERSION >= 20210902
+    char *         filename = ZSTR_VAL(file_handle->filename);
+#endif
 
     dprintverbose("start wincache_stream_open_function");
 
@@ -974,7 +997,11 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
     /* this method is called, use original_stream_open_function */
     if(!cenabled || filename == NULL || WCG(lfcache) == NULL)
     {
+#if PHP_API_VERSION >= 20210902
+        return original_stream_open_function(file_handle);
+#else
         return original_stream_open_function(filename, file_handle);
+#endif
     }
 
     dprintverbose("zend_stream_open_function called for %s", filename);
@@ -982,7 +1009,11 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
     if(isin_ignorelist(WCG(ignorelist), filename))
     {
         dprintverbose("cache is disabled for the file because of ignore list");
+#if PHP_API_VERSION >= 20210902
+        return original_stream_open_function(file_handle);
+#else
         return original_stream_open_function(filename, file_handle);
+#endif
     }
 
     result = aplist_fcache_get(WCG(lfcache), filename, USE_STREAM_OPEN_CHECK, &fullpath, &pfvalue);
@@ -1005,9 +1036,10 @@ int wincache_stream_open_function(const char * filename, zend_file_handle * file
             aplist_fcache_close(WCG(lfcache), pfvalue);
             goto Finished;
         }
-
+#if PHP_API_VERSION < 20210902
         /* fullpath will be freed when close is called */
         file_handle->free_filename = 1;
+#endif
     }
 
     _ASSERT(SUCCEEDED(result));
@@ -1026,7 +1058,11 @@ Finished:
             fullpath = NULL;
         }
 
+#if PHP_API_VERSION >= 20210902
+        return original_stream_open_function(file_handle);
+#else
         return original_stream_open_function(filename, file_handle);
+#endif
     }
 
     dprintverbose("end wincache_stream_open_function");

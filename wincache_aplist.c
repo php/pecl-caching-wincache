@@ -1685,7 +1685,12 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
             {
                 /* Do a check for include_path, open_basedir validity */
                 /* by calling original stream open function */
+#if ZEND_MODULE_API_NO >= 20210902 /* PHP 8.1 release */
+                fhandle.filename = zend_string_init(fullpath, strlen(fullpath), 0);
+                result = original_stream_open_function(&fhandle);
+#else
                 result = original_stream_open_function(fullpath, &fhandle);
+#endif
 
                 /* Set is_verified status in rpvalue */
                 if(rpvalue != NULL)
@@ -1699,7 +1704,7 @@ int aplist_fcache_get(aplist_context * pcache, const char * filename, unsigned c
                     goto Finished;
                 }
 
-                zend_file_handle_dtor(&fhandle);
+                zend_destroy_file_handle(&fhandle);
             }
             else
             {

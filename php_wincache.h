@@ -130,26 +130,38 @@ ZEND_TSRMLS_CACHE_EXTERN();
 #define WCG(v) (wincache_globals.v)
 #endif
 
-#if PHP_API_VERSION >= 20180731
+#if PHP_API_VERSION >= 20210902
+typedef zend_string *(*fn_zend_resolve_path)(zend_string *filename_zstr);
+#elif PHP_API_VERSION >= 20180731
 typedef zend_string *(*fn_zend_resolve_path)(const char *filename, size_t filename_len);
 #else
 typedef zend_string *(*fn_zend_resolve_path)(const char *filename, int filename_len);
 #endif
 
+#if PHP_API_VERSION >= 20210902
+typedef zend_result (*fn_zend_stream_open_function)(zend_file_handle *handle);
+#else
 typedef int (*fn_zend_stream_open_function)(const char * filename, zend_file_handle *handle);
+#endif
 typedef zend_op_array * (*fn_zend_compile_file)(zend_file_handle *, int);
 typedef void (*fn_zend_error_cb)(int type, const char *error_filename, const uint32_t error_lineno, const char *format, va_list args);
 
 fn_zend_resolve_path original_resolve_path;
 fn_zend_stream_open_function original_stream_open_function;
 
-#if PHP_API_VERSION >= 20180731
+#if PHP_API_VERSION >= 20210902
+extern zend_string * wincache_resolve_path(zend_string * filename_zstr);
+#elif PHP_API_VERSION >= 20180731
 extern zend_string * wincache_resolve_path(const char * filename, size_t filename_len);
 #else
 extern zend_string * wincache_resolve_path(const char * filename, int filename_len);
 #endif
 
+#if PHP_API_VERSION >= 20210902
+extern zend_result wincache_stream_open_function(zend_file_handle * file_handle);
+#else
 extern int wincache_stream_open_function(const char * filename, zend_file_handle * file_handle);
+#endif
 
 extern void wincache_intercept_functions_init();
 extern void wincache_intercept_functions_shutdown();

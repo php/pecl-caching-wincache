@@ -693,9 +693,13 @@ int fcache_useval(fcache_context * pcache, const char * filename, fcache_value *
         goto Finished;
     }
 
+    phandle->opened_path   = zend_string_init(filename, strlen(filename), 0);
+#if ZEND_MODULE_API_NO >= 20210902 /* PHP 8.1 release */
+    phandle->filename      = zend_string_copy(phandle->opened_path);
+#else
     phandle->filename      = (char *)filename;
     phandle->free_filename = 0;
-    phandle->opened_path   = zend_string_init(filename, strlen(filename), 0);
+#endif
 
     ZeroMemory(&phandle->handle.stream, sizeof(zend_stream));
 
