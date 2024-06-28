@@ -27,22 +27,29 @@
     <name>Eric Stenson</name>
     <user>ericsten</user>
     <email>ericsten@php.net</email>
+    <active>no</active>
+  </lead>
+  <lead>
+    <name>Hao Lu</name>
+    <user>haolu</user>
+    <email>hao.lu@ife.uni-stuttgart.de</email>
     <active>yes</active>
   </lead>
-  <date>2016-11-09</date>
+  <date>2024-06-29</date>
   <version>
-    <release>2.0.0.8</release>
+    <release>2.0.0.9</release>
     <api>2.0.0</api>
   </version>
   <stability>
-    <release>stable</release>
+    <release>beta</release>
     <api>stable</api>
   </stability>
   <license uri="http://www.opensource.org/licenses/bsd-license.php">BSD License</license>
   <notes>
-2.0.0.8:
-- Revert "Global\" prefix for named objects.  It breaks IIS Express.
-- Improve tracing by adding thread ID to debug trace logs
+2.0.0.9:
+- Fix build for PHP 8.1 and later
+- Remove ownership/support contact information from phpinfo screen
+  * Note this is no longer a supported Microsoft product, and maintenance will only be done at a best-effort basis.
   </notes>
   <contents>
     <dir name="/">
@@ -85,7 +92,7 @@
       <file role="src" name="wincache_zvcache.h"/>
       <file role="src" name="wincache_zvcache.c"/>
       <file role="php" name="wincache.php"/>
-      <dir role="test" name="tests">
+      <dir name="tests">
         <file role="test" name="skipif.inc"/>
         <file role="test" name="wincache_001.phpt"/>
         <file role="test" name="wincache_002.phpt"/>
@@ -107,10 +114,10 @@
         <file role="test" name="wincache_ucache_set_array.phpt"/>
         <file role="test" name="wincache_ucache_string.phpt"/>
         <file role="test" name="wincache_ucache_unset_string.phpt"/>
-        <dir role="test" name="bar">
+        <dir name="bar">
           <file role="test" name="wincache_005_2.php"/>
         </dir>
-        <dir role="test" name="foo">
+        <dir name="foo">
           <file role="test" name="wincache_005_1.php"/>
         </dir>
       </dir>
@@ -151,6 +158,22 @@
       </notes>
     </release>
 -->
+    <release>
+      <date>2016-11-09</date>
+      <version>
+        <release>2.0.0.8</release>
+        <api>2.0.0</api>
+      </version>
+      <stability>
+        <release>stable</release>
+        <api>stable</api>
+      </stability>
+      <notes>
+2.0.0.8:
+- Revert "Global\" prefix for named objects.  It breaks IIS Express.
+- Improve tracing by adding thread ID to debug trace logs
+      </notes>
+    </release>
     <release>
       <date>2016-06-21</date>
       <version>
