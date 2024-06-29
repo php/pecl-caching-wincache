@@ -3,6 +3,7 @@
    | Windows Cache for PHP                                                                        |
    +----------------------------------------------------------------------------------------------+
    | Copyright (c) 2009, Microsoft Corporation. All rights reserved.                              |
+   | Copyright (c) 2024, Hao Lu. All rights reserved.                                             |
    |                                                                                              |
    | Redistribution and use in source and binary forms, with or without modification, are         |
    | permitted provided that the following conditions are met:                                    |
@@ -29,6 +30,7 @@
    +----------------------------------------------------------------------------------------------+
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
    | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
+   |          Hao Lu <hao.lu@ife.uni-stuttgart.de>                                                |
    +----------------------------------------------------------------------------------------------+
 */
 
@@ -36,7 +38,7 @@
 #define _PRECOMP_H_
 
 #define PHP_WINCACHE_EXTNAME   "wincache"
-#define PHP_WINCACHE_VERSION    "2.0.0.8"
+#define PHP_WINCACHE_VERSION    "2.0.0.9"
 #define PHP_WINCACHE_VERSION_LEN (sizeof(PHP_WINCACHE_VERSION)-1)
 
 /* comment following line for release builds */

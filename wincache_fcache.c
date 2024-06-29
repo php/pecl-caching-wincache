@@ -3,6 +3,7 @@
    | Windows Cache for PHP                                                                        |
    +----------------------------------------------------------------------------------------------+
    | Copyright (c) 2009, Microsoft Corporation. All rights reserved.                              |
+   | Copyright (c) 2024, Hao Lu. All rights reserved.                                             |
    |                                                                                              |
    | Redistribution and use in source and binary forms, with or without modification, are         |
    | permitted provided that the following conditions are met:                                    |
@@ -29,6 +30,7 @@
    +----------------------------------------------------------------------------------------------+
    | Author: Kanwaljeet Singla <ksingla@microsoft.com>                                            |
    | Updated: Eric Stenson <ericsten@microsoft.com>                                               |
+   |          Hao Lu <hao.lu@ife.uni-stuttgart.de>                                                |
    +----------------------------------------------------------------------------------------------+
 */
 
